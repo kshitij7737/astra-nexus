@@ -110,7 +110,7 @@ export const MISSIONS = [
     spacecraft: {
       ref: 'Lunar Reconnaissance Orbiter', model: 'lro',
       parts: [
-        { name: 'Spacecraft bus', note: 'Mass of the whole spacecraft: 891 kg.', kind: 'fact', src: 'crater' },
+        { name: 'Spacecraft bus', note: 'Carries power, computer, propulsion and instruments. Geometry is illustrative.', kind: 'illustrative' },
         { name: 'Solar array', note: 'Single deployable array. Geometry is illustrative.', kind: 'illustrative' },
         { name: 'High-gain antenna', note: 'Dish for data downlink. Geometry is illustrative.', kind: 'illustrative' },
         { name: 'Instrument module', note: 'Seven instruments, integrated at NASA Goddard.', kind: 'fact', src: 'lroNtrs' },
