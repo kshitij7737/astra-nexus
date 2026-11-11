@@ -84,7 +84,21 @@ async function sky() {
   scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.9, sizeAttenuation: true, transparent: true, opacity: 0.8 })));
   // sun with glow
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,240,210,1)'); gr.addColorStop(0.2, 'rgba(255,190,110,.6)'); gr.addColorStop(1, 'rgba(255,140,60,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
-  const sun = new THREE.Mesh(new THREE.SphereGeometry(2.2, 48, 32), new THREE.MeshBasicMaterial({ color: 0xffd9a0 })); scene.add(sun);
+  const sunMat = new THREE.ShaderMaterial({
+    uniforms: { uT: { value: 0 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix*mv; }',
+    fragmentShader: `uniform float uT; varying vec3 vN; varying vec3 vV; varying vec3 vP;
+      float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719)))*43758.5453); }
+      float n(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+        return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z); }
+      void main(){ float mu = max(dot(vN,vV),0.0);
+        float g = n(vP*6.0+uT*0.15)*0.6 + n(vP*14.0-uT*0.25)*0.4;
+        vec3 core = vec3(1.0,0.96,0.86), limb = vec3(1.0,0.42,0.08);
+        vec3 c = mix(limb, core, pow(mu, 0.45)) * (0.82 + 0.3*g);
+        gl_FragColor = vec4(c*1.15, 1.0); }`,
+  });
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(2.2, 64, 48), sunMat); scene.add(sun);
+  const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a50, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 })); corona.scale.setScalar(34); scene.add(corona);
   const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sunGlow.scale.setScalar(18); scene.add(sunGlow);
   // illustrative scale: 1 AU = 20 units
   const AU = 20;
@@ -113,6 +127,7 @@ async function sky() {
   r.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!reduced) t0 += dt * 0.03;
+    sunMat.uniforms.uT.value += dt;
     const pos = (a, e, period, phase, inc = 0) => { const t = t0 / period + phase; const rr = a * (1 - e * e) / (1 + e * Math.cos(t)); return new THREE.Vector3(Math.cos(t) * rr, Math.sin(t) * rr * Math.sin(inc), Math.sin(t) * rr * Math.cos(inc)); };
     earth.position.copy(pos(AU, 0.017, 1, 0));
     mars.position.copy(pos(1.524 * AU, 0.093, 1.88, 2.1));

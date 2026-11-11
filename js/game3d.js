@@ -1,7 +1,7 @@
 // NEXUS//04 game visuals: spacecraft builder model, launch cinematic, mission-control orbit view.
 import * as THREE from '../vendor/three.module.min.js';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import { buildWorld } from './scene.js';
+import { buildWorld, latLonToVec } from './scene.js';
 import { MISSIONS } from './data.js';
 
 export function webglOK() {
@@ -104,13 +104,27 @@ export function buildCraft(cfg, mission) {
   return { group: g, labels };
 }
 
-function stars(n = 2400) {
-  const p = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(60 + Math.random() * 60); p.set([v.x, v.y, v.z], i * 3); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-  return new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.18, sizeAttenuation: true, transparent: true, opacity: 0.85 }));
+const starTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); const r = g.createRadialGradient(16, 16, 0, 16, 16, 16); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(255,255,255,.6)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
+starTex.userData.shared = true;
+// Layered starfield: faint dust, a Milky Way band, and a few bright coloured stars.
+function stars() {
+  const grp = new THREE.Group();
+  const band = new THREE.Vector3(0.3, 1, 0.2).normalize();
+  const layer = (n, size, op, inBand, tint) => {
+    const p = new Float32Array(n * 3), c = new Float32Array(n * 3), col = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      let v = new THREE.Vector3().randomDirection();
+      if (inBand) { v.addScaledVector(band, -v.dot(band) * (0.85 + Math.random() * 0.15)).normalize(); }
+      v.multiplyScalar(80 + Math.random() * 40); p.set([v.x, v.y, v.z], i * 3);
+      const k = Math.random(); col.setHSL(k < 0.25 ? 0.6 : k < 0.5 ? 0.1 : 0, tint ? 0.6 : 0.25, 0.8 + Math.random() * 0.2); c.set([col.r, col.g, col.b], i * 3);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    grp.add(new THREE.Points(g, new THREE.PointsMaterial({ map: starTex, vertexColors: true, size, sizeAttenuation: true, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending })));
+  };
+  layer(4000, 0.35, 0.55, false, false); layer(5000, 0.3, 0.35, true, false); layer(220, 1.1, 0.95, false, true);
+  return grp;
 }
-function disposeTree(o) { o.traverse(x => { x.geometry?.dispose(); if (x.material) (Array.isArray(x.material) ? x.material : [x.material]).forEach(m => { m.map?.dispose?.(); m.dispose(); }); }); }
+function disposeTree(o) { o.traverse(x => { x.geometry?.dispose(); if (x.material) (Array.isArray(x.material) ? x.material : [x.material]).forEach(m => { if (!m.map?.userData?.shared) m.map?.dispose?.(); m.dispose(); }); }); }
 
 const missionWorld = id => MISSIONS.find(m => m.id === id);
 
@@ -159,10 +173,10 @@ export class GameStage {
   clear() {
     if (this.scene) disposeTree(this.scene);
     this.scene = new THREE.Scene(); this.labels = []; this.labelLayer.innerHTML = ''; this.update = null;
-    this.scene.add(stars());
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+    this.starField = stars(); this.scene.add(this.starField);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.05));
     this.sun = new THREE.DirectionalLight(0xfff1dd, 3); this.sun.position.set(5, 3, 4); this.scene.add(this.sun);
-    const rim = new THREE.DirectionalLight(0x9ab4ff, 0.7); rim.position.set(-4, 1, -3); this.scene.add(rim);
+    const rim = new THREE.DirectionalLight(0x9ab4ff, 0.3); rim.position.set(-4, 1, -3); this.scene.add(rim);
   }
   world(id, radius, plain = true) {
     const w = buildWorld(missionWorld(id)); w.scale.setScalar(radius);
@@ -215,6 +229,25 @@ export class GameStage {
     const s = this.scene;
     const earthR = 40;
     const earth = this.world('earth', earthR); earth.position.set(0, -earthR, 0); s.add(earth);
+    // at pad scale the cloud and glow shells sit just above the ground, so drop them
+    [...earth.children].forEach(c => { if (c.userData.layer) earth.remove(c); });
+    // put Cape Canaveral (28.5 N, 80.6 W) under the rocket
+    earth.quaternion.setFromUnitVectors(latLonToVec(28.5, -80.6, 1).normalize(), new THREE.Vector3(0, 1, 0));
+    // launch pad: concrete apron, flame trench and a service tower
+    const pad = new THREE.Group();
+    const concrete = new THREE.MeshStandardMaterial({ color: 0x5e5b56, roughness: 1 });
+    const apron = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.08, 48), concrete); apron.position.y = -0.04; pad.add(apron);
+    const trench = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 1 })); trench.position.set(0, 0.005, 0.9); pad.add(trench);
+    const steel = new THREE.MeshStandardMaterial({ color: 0x8a3a2a, roughness: 0.6, metalness: 0.4 });
+    const tower = new THREE.Group(); tower.position.set(-0.55, 0, -0.1);
+    for (const [x, z] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.03, 2.5, 0.03), steel); leg.position.set(x, 1.25, z); tower.add(leg); }
+    for (let i = 0; i < 12; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.02, 0.27), steel); r.position.y = 0.1 + i * 0.2; tower.add(r); }
+    for (const y of [0.8, 1.5]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.05), steel); arm.position.set(0.3, y, 0); tower.add(arm); }
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3020 })); beacon.position.y = 2.55; tower.add(beacon);
+    pad.add(tower);
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.MeshStandardMaterial({ color: 0x55704a, roughness: 1, transparent: true, opacity: 0.85 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.085; pad.add(ground);
+    pad.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.12; } });
+    s.add(pad);
     const sky = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 16), new THREE.MeshBasicMaterial({ color: 0x5b8fd8, side: THREE.BackSide, transparent: true, opacity: 1, depthWrite: false })); s.add(sky);
     // rocket
     const rocket = new THREE.Group();
@@ -287,9 +320,10 @@ export class GameStage {
         const back = 6.5 + fly * 1.4;
         this.cam.position.set(rocket.position.x + 3.4, y + 1.4 + fly * 0.5, back); this.cam.lookAt(rocket.position.x, y + 1.3, 0);
         sky.material.opacity = Math.max(0, 1 - fly / 6); // blue sky fades to black as we climb
+        this.starField.visible = sky.material.opacity < 0.45; // no stars in a daytime sky
         // exhaust
         const firing = t > T.lift - 0.6 && t < T.sep + 1.5;
-        glow.intensity = firing ? 30 : 0; glow.position.set(rocket.position.x, y - 0.1, 0);
+        glow.intensity = firing ? (fly < 1.5 ? 6 + fly * 16 : 30) : 0; glow.position.set(rocket.position.x, y - 0.1, 0);
         const base = new THREE.Vector3(0, stage === 0 ? 0 : 1.2, 0).applyMatrix4(rocket.matrixWorld);
         for (let i = 0; i < N; i++) {
           life[i] -= dt;
@@ -310,8 +344,9 @@ export class GameStage {
       } else {
         if (!transfer) {
           cues.transfer?.();
+          this.starField.visible = true;
           // clear launch objects, build schematic transfer view
-          [earth, sky, rocket, flame, glow, s1Fall].forEach(o => { if (o) { s.remove(o); } });
+          [earth, sky, rocket, flame, glow, s1Fall, pad].forEach(o => { if (o) { s.remove(o); } });
           transfer = new THREE.Group(); s.add(transfer);
           const e = this.world('earth', 1); e.position.set(-4, 0, 0); transfer.add(e);
           let dest;
@@ -393,7 +428,7 @@ export class GameStage {
     // flyby Earth for ASTRA
     let flyEarth = null;
     if (isAst) { flyEarth = this.world('earth', 2.2); flyEarth.visible = false; s.add(flyEarth); }
-    const camBase = new THREE.Vector3(orbitR * 2.1, orbitR * 1.5, orbitR * 2.7);
+    const camBase = new THREE.Vector3(orbitR * 3.0, orbitR * 1.15, orbitR * 0.15); // side-on so the day/night line is in view
     this.cam.position.copy(camBase); this.cam.lookAt(0, 0, 0);
     this.opsState = null; this.opsView = { yaw: 0, pitch: 0, zoom: 1 };
     let lostT = -1;

@@ -65,14 +65,54 @@ function dotTexture() {
 }
 
 function fresnelMaterial(color, power = 3, strength = 1.2) {
+  // Rim glow, brighter on the side facing the main light so the night side is not lit up.
   return new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color(color) }, uPower: { value: power }, uStrength: { value: strength }, uOpacity: { value: 1 } },
+    uniforms: { uColor: { value: new THREE.Color(color) }, uPower: { value: power }, uStrength: { value: strength }, uOpacity: { value: 1 }, uSun: { value: new THREE.Vector3(0, 0, 1) }, uSunOn: { value: 0 } },
     vertexShader: `varying vec3 vN; varying vec3 vV;
       void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }`,
-    fragmentShader: `uniform vec3 uColor; uniform float uPower; uniform float uStrength; uniform float uOpacity; varying vec3 vN; varying vec3 vV;
-      void main(){ float f = pow(1.0 - max(dot(vN, vV), 0.0), uPower) * uStrength; gl_FragColor = vec4(uColor, f * uOpacity); }`,
+    fragmentShader: `uniform vec3 uColor; uniform float uPower; uniform float uStrength; uniform float uOpacity; uniform vec3 uSun; uniform float uSunOn; varying vec3 vN; varying vec3 vV;
+      void main(){ float f = pow(1.0 - max(dot(vN, vV), 0.0), uPower) * uStrength;
+        float lit = mix(1.0, mix(0.12, 1.25, smoothstep(-0.35, 0.45, dot(vN, uSun))), uSunOn);
+        gl_FragColor = vec4(uColor, f * lit * uOpacity); }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   });
+}
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+function trackSun(mesh) {
+  let light = null;
+  mesh.onBeforeRender = (r, scene, cam) => {
+    if (!light || !light.parent) { light = null; scene.traverse(o => { if (!light && (o.isDirectionalLight || (o.isPointLight && o.intensity > 50))) light = o; }); }
+    const u = mesh.material.uniforms; if (!light) { u.uSunOn.value = 0; return; }
+    light.getWorldPosition(_a);
+    if (light.isDirectionalLight) { light.target.getWorldPosition(_b); _a.sub(_b); } else { mesh.getWorldPosition(_b); _a.sub(_b); }
+    u.uSun.value.copy(_a.transformDirection(cam.matrixWorldInverse)); u.uSunOn.value = 1;
+  };
+}
+
+// Shared texture cache. Colour maps are sRGB; data maps (bump, roughness, alpha) stay linear.
+const TEX = new Map();
+function tex(name, cb, srgb = true) {
+  let e = TEX.get(name);
+  if (!e) {
+    e = { t: null, cbs: [] }; TEX.set(name, e);
+    new THREE.TextureLoader().load(new URL(`../textures/${name}`, import.meta.url).href, t => {
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.userData.shared = true; e.t = t; e.cbs.forEach(f => f(t)); e.cbs = [];
+    });
+  }
+  if (e.t) cb(e.t); else e.cbs.push(cb);
+}
+// City lights only on the night side: fade the emissive map by the angle to the main light.
+function nightSide(mat) {
+  mat.onBeforeCompile = sh => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      float nxl = 1.0;
+      #if NUM_DIR_LIGHTS > 0
+        nxl = dot(normal, directionalLights[0].direction);
+      #elif NUM_POINT_LIGHTS > 0
+        nxl = dot(normal, normalize(pointLights[0].position + vViewPosition));
+      #endif
+      totalEmissiveRadiance *= smoothstep(0.12, -0.18, nxl);`);
+  };
 }
 
 // Icosahedron geometry is non-indexed; merge shared corners so normals smooth.
@@ -90,7 +130,7 @@ function indexed(geo) {
 
 export function buildWorld(m) {
   const kind = m.world.kind, g = new THREE.Group();
-  const geo = indexed(new THREE.IcosahedronGeometry(1, kind === 'asteroid' ? 40 : 64));
+  const geo = indexed(new THREE.IcosahedronGeometry(1, kind === 'asteroid' ? 40 : 2)); // textured worlds replace this below
   const pos = geo.attributes.position, cols = [], v = new THREE.Vector3(), base = new THREE.Color(m.color);
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).normalize();
@@ -128,14 +168,21 @@ export function buildWorld(m) {
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); geo.computeVertexNormals();
   if (kind === 'asteroid') g.scale.setScalar(0.74); // elongated body: keep it inside its frame
-  if (kind === 'earth') {
-    // Real coastlines (Natural Earth 1:50m via world-atlas); land colours are illustrative.
+  if (kind === 'earth' || kind === 'moon' || kind === 'mars') {
+    // Real global maps: Earth from NASA Blue Marble and Black Marble, Moon and Mars from Solar System Scope (CC BY 4.0, built on NASA mission data).
     geo.dispose();
-    const sphere = new THREE.SphereGeometry(1, 160, 120);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x1d5fa8, roughness: 0.85, metalness: 0, transparent: true });
-    new THREE.TextureLoader().load(new URL('../textures/earth-land.jpg', import.meta.url).href, t => {
-      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true;
-    });
+    const sphere = new THREE.SphereGeometry(1, 192, 128);
+    const mat = new THREE.MeshStandardMaterial({ color: kind === 'earth' ? 0x1d5fa8 : m.color, roughness: kind === 'earth' ? 0.8 : 0.97, metalness: 0, transparent: true });
+    if (kind === 'earth') {
+      tex('earth-day.jpg', t => { mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true; });
+      tex('earth-bump.jpg', t => { mat.bumpMap = t; mat.bumpScale = 1.6; mat.needsUpdate = true; }, false);
+      tex('earth-rough.jpg', t => { mat.roughnessMap = t; mat.roughness = 1.25; mat.needsUpdate = true; }, false);
+      tex('earth-night.jpg', t => { mat.emissiveMap = t; mat.emissive.set(0xffd9a0); mat.emissiveIntensity = 1.6; mat.needsUpdate = true; });
+      nightSide(mat);
+    } else {
+      tex(`${kind}.jpg`, t => { mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true; });
+      tex(`${kind}-bump.jpg`, t => { mat.bumpMap = t; mat.bumpScale = kind === 'moon' ? 2.2 : 1.8; mat.needsUpdate = true; }, false);
+    }
     g.userData.surface = sphere; g.add(new THREE.Mesh(sphere, mat));
   } else {
     g.userData.surface = geo;
@@ -143,16 +190,10 @@ export function buildWorld(m) {
   }
 
   if (kind === 'earth') {
-    const tc = document.createElement('canvas'); tc.width = 512; tc.height = 256; const tg = tc.getContext('2d'); const img = tg.createImageData(512, 256);
-    for (let y = 0; y < 256; y++) for (let x = 0; x < 512; x++) {
-      const lon = x / 512 * Math.PI * 2, lat = (y / 256 - 0.5) * Math.PI;
-      const p = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)).multiplyScalar(3.2);
-      const n = fbm(p, 77, 4), a = Math.max(0, (n - 0.5) * 3.2) * (1 - THREE.MathUtils.smoothstep(Math.abs(lat), 1.05, 1.35));
-      const k = (y * 512 + x) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = 255; img.data[k + 3] = Math.min(255, a * 255);
-    }
-    tg.putImageData(img, 0, 0);
-    const cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(1.025, 64, 48), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(tc), transparent: true, depthWrite: false }));
-    cloudMesh.userData.spin = 0.0004; g.add(cloudMesh);
+    const cmat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, roughness: 1 });
+    tex('earth-clouds.jpg', t => { cmat.alphaMap = t; cmat.opacity = 0.95; cmat.needsUpdate = true; }, false);
+    const cloudMesh = new THREE.Mesh(new THREE.SphereGeometry(1.012, 128, 96), cmat);
+    cloudMesh.userData.spin = 0.0004; cloudMesh.userData.baseOpacity = 0.95; cloudMesh.userData.layer = 'clouds'; g.add(cloudMesh);
     // exaggerated layer shells (illustrative scale)
     [[1.05, 0x7fc6ff, 0.07], [1.09, 0x9ad0ff, 0.045], [1.13, 0xb6c8ff, 0.03], [1.18, 0xc9b6ff, 0.022]].forEach(([r, col, op]) => {
       const s = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, side: THREE.BackSide, depthWrite: false }));
@@ -164,8 +205,9 @@ export function buildWorld(m) {
     sat.userData.orbit = { r: 1.32, tilt: THREE.MathUtils.degToRad(8) }; g.add(sat); g.userData.sat = sat;
   }
   if (kind !== 'asteroid') {
-    const atm = new THREE.Mesh(new THREE.SphereGeometry(kind === 'earth' ? 1.04 : 1.03, 64, 48), fresnelMaterial(m.glow, kind === 'moon' ? 4 : 3.2, kind === 'moon' ? 0.5 : kind === 'earth' ? 0.85 : 0.55));
-    g.add(atm);
+    if (kind === 'moon') return g; // the Moon has no real atmosphere, so no glow
+    const atm = new THREE.Mesh(new THREE.SphereGeometry(kind === 'earth' ? 1.035 : 1.02, 96, 64), fresnelMaterial(kind === 'earth' ? 0x5fa8ff : 0xe8a070, kind === 'earth' ? 2.6 : 3.6, kind === 'earth' ? 1.1 : 0.45));
+    trackSun(atm); atm.userData.layer = 'atm'; g.add(atm);
   }
   return g;
 }
@@ -249,7 +291,7 @@ function setOpacity(obj, k) {
   });
   obj.visible = k > 0.01;
 }
-function dispose(obj) { obj.traverse(o => { o.geometry?.dispose(); if (o.material) { o.material.map?.dispose(); o.material.dispose(); } }); }
+function dispose(obj) { obj.traverse(o => { o.geometry?.dispose(); if (o.material) { if (!o.material.map?.userData?.shared) o.material.map?.dispose(); o.material.dispose(); } }); }
 
 export class Stage {
   constructor(container) {
@@ -266,9 +308,9 @@ export class Stage {
     this.D = 8; this.fov = 32;
     this.camera = new THREE.PerspectiveCamera(this.fov, 1, 0.1, 200); this.camera.position.set(0, 0, this.D);
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.12));
-    this.hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.25); this.scene.add(this.hemi);
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.1); this.scene.add(this.hemi);
     const key = new THREE.DirectionalLight(0xfff4e6, 3.2); key.position.set(5, 2.5, 3); this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x8fb0ff, 0.8); rim.position.set(-4, 1, -3); this.scene.add(rim);
+    const rim = new THREE.DirectionalLight(0x8fb0ff, 0.3); rim.position.set(-4, 1, -3); this.scene.add(rim);
     const pm = new THREE.PMREMGenerator(this.renderer);
     this.env = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose();
     this.dot = dotTexture();

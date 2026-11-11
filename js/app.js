@@ -49,10 +49,10 @@ export async function mountMissionModule(root, opts = {}) {
     stage = new sc.Stage($('.mm-canvas'));
   } catch (e) {
     console.warn('NEXUS: 3D disabled, showing text-only layout.', e);
-    root.classList.add('mm-no3d'); $('.mm-pause').hidden = true;
+    root.classList.add('mm-no3d'); $('button.mm-pause').hidden = true;
   }
 
-  const pauseBtn = $('.mm-pause');
+  const pauseBtn = $('button.mm-pause');
   const syncPause = () => { pauseBtn.setAttribute('aria-pressed', String(stage.paused)); pauseBtn.textContent = stage.paused ? 'Resume motion' : 'Pause motion'; };
   if (stage) { syncPause(); pauseBtn.onclick = () => { stage.paused = !stage.paused; syncPause(); }; }
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMission(b.dataset.m));
@@ -79,7 +79,7 @@ export async function mountMissionModule(root, opts = {}) {
         <div class="mm-hero__foot">
           <nav class="mm-heronums" aria-label="Chapters">${CHAPTERS.map((c, i) => `<button type="button" data-goto="${i + 1}"><span>${pad(i + 1)}</span><em>${c}</em></button>`).join('')}</nav>
           <span class="mm-scroll">Scroll to enter</span>
-          <p class="mm-note" title="${esc(m.world.note)}">${TAG.illustrative} ${m.world.kind === 'earth' ? 'Real coastlines, illustrative colours' : 'Illustrative surface'}</p>
+          <p class="mm-note" title="${esc(m.world.note)}">${m.world.kind === 'earth' ? `${TAG.fact} NASA Blue Marble and Black Marble imagery` : m.world.kind === 'asteroid' ? `${TAG.illustrative} Illustrative shape: no close-up map of Apophis exists yet` : 'Global map by Solar System Scope, built from NASA mission data'}</p>
         </div>
       </section>
 

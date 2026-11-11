@@ -92,7 +92,7 @@ export const MISSIONS = [
       { k: 'Coldest ground', v: '~35 K', src: 'lroSys' },
       { k: 'Water ice', v: 'Searched for, not confirmed', src: 'lroInst' },
     ],
-    world: { kind: 'moon', note: 'Surface texture is procedural and illustrative. Swap in LOLA elevation and LROC mosaics once Karishma\'s Task 4 is approved.' },
+    world: { kind: 'moon', note: 'Global colour map from Solar System Scope (CC BY 4.0), built from NASA LRO imagery. Relief is shading from the same map, not LOLA elevation.' },
     targets: [
       { name: 'Shackleton crater', lat: -89.9, lon: 0, frame: 'Mean Earth / polar axis (IAU), planetocentric', units: 'degrees', desc: 'Permanently shadowed south-pole crater.', src: 'lroInst', kind: 'fact' },
       { name: 'Apollo 11 site', lat: 0.674, lon: 23.473, frame: 'Mean Earth / polar axis (IAU), planetocentric', units: 'degrees', desc: 'LROC can see the hardware left behind.', src: 'lroInst', kind: 'fact' },
@@ -135,7 +135,7 @@ export const MISSIONS = [
       { k: 'OMI', v: 'Ozone, NO2, SO2 at 13 x 24 km', src: 'omiData' },
       { k: 'NASA POWER', v: 'Surface solar and weather data', src: 'power' },
     ],
-    world: { kind: 'earth', note: 'Coastlines are real (Natural Earth 1:50m). Land colours, clouds and the exaggerated atmosphere shells are illustrative; real layer altitudes are in the text.' },
+    world: { kind: 'earth', note: 'Day side: NASA Blue Marble. Night lights: NASA Black Marble. Clouds are a real cloud map. The atmosphere shells are exaggerated for visibility; real layer altitudes are in the text.' },
     layers: [
       { name: 'Troposphere', top: 'about 6 km at the poles to 20 km at the equator', note: 'Weather and clouds.' },
       { name: 'Stratosphere', top: 'about 50 km', note: 'The ozone layer.' },
@@ -182,7 +182,7 @@ export const MISSIONS = [
       { k: 'Downlink', v: 'Up to 6 Mb/s', src: 'mroHuman' },
       { k: 'Relay', v: 'Passes on rover data', src: 'mroInst' },
     ],
-    world: { kind: 'mars', note: 'Surface colour and relief are procedural and illustrative, not MOLA or CTX data. Swap in team products once Anthariksha\'s Task 4 is approved.' },
+    world: { kind: 'mars', note: 'Global colour map from Solar System Scope (CC BY 4.0), built from NASA Viking and MGS data. Relief is shading from the same map, not MOLA elevation.' },
     targets: [
       { name: 'Jezero crater', lat: 18.38, lon: 77.58, frame: 'Mars planetocentric, east-positive', units: 'degrees', desc: 'Ancient lake. Perseverance landed here.', src: 'mroUsgs', kind: 'fact' },
       { name: 'Valles Marineris', lat: -14.0, lon: -59.2, frame: 'Mars planetocentric, east-positive', units: 'degrees', desc: 'Vast canyon with layered walls.', src: 'mroInst', kind: 'fact' },
