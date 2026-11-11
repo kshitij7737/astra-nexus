@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS//04 | Sources and data</title>
+<link rel="stylesheet" href="css/nexus.css"><link rel="stylesheet" href="css/landing.css">
+<style>.sx{max-width:960px;margin:0 auto;padding:120px var(--pad) 60px;position:relative;z-index:2}.sx ul{list-style:none;padding:0;display:grid;gap:8px}.sx li{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03)}.sx li a{color:var(--ink)}.sx li small{display:block;font:10px var(--mono);color:var(--muted)}.sx h3{font:500 11px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin:34px 0 10px}</style>
+</head><body class="lx" style="--acc:#ff7a3d">
+<header class="nx-top lx-top"><a class="nx-brand" href="index.html"><span><b>NEXUS//04</b><small>The mission collective</small></span></a><a class="nx-pill lx-play" href="play.html">Play</a></header>
+<main class="sx"><p class="lx-k">Sources and data</p><h2>Where every number comes from.</h2>
+<p class="lx-lede">Mission facts link to the page they came from. Component values in the game come from our team research documents and are labelled "Team". Values chosen only for gameplay are labelled "Conceptual".</p>
+<h3>Mission and science sources</h3><ul id="sx-list"></ul>
+<h3>Data, code and fonts</h3><ul>
+<li><a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> coastlines for the Earth texture<small>Public domain</small></li>
+<li><a href="https://threejs.org/" target="_blank" rel="noopener">three.js r170</a> 3D rendering<small>MIT licence</small></li>
+<li><a href="https://fonts.google.com/specimen/Archivo" target="_blank" rel="noopener">Archivo</a> and <a href="https://fonts.google.com/specimen/IBM+Plex+Mono" target="_blank" rel="noopener">IBM Plex Mono</a><small>SIL Open Font Licence</small></li>
+<li><a href="https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=99942" target="_blank" rel="noopener">JPL Small-Body Database: 99942 Apophis</a> approximate orbit on the home page<small>NASA/JPL</small></li></ul>
+<h3>Disclaimer</h3><p class="lx-lede">Built for the NASA Space Apps Challenge 2026 by team NEXUS//04. Not affiliated with or endorsed by NASA. No NASA logos are used. Surface textures for the Moon, Mars and Apophis are illustrative.</p>
+</main>
+<footer class="lx-foot"><p><a href="index.html">Home</a> · <a href="play.html">Play</a> · <a href="explore.html">Explore</a></p></footer>
+<script type="module">import { SOURCES } from './js/data.js';
+const e=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+document.getElementById('sx-list').innerHTML=Object.values(SOURCES).sort((a,b)=>a.title.localeCompare(b.title)).map(s=>`<li><a href="${e(s.url)}" target="_blank" rel="noopener">${e(s.title)}</a><small>${e(new URL(s.url).hostname)}</small></li>`).join('');</script>
+</body></html>

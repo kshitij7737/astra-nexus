@@ -1,0 +1,24 @@
+/* NEXUS//04 shared tokens and chrome */
+@font-face { font-family: 'NX Display'; src: url('../fonts/archivo.woff2') format('woff2'); font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; }
+@font-face { font-family: 'NX Mono'; src: url('../fonts/plex-mono-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'NX Mono'; src: url('../fonts/plex-mono-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+:root {
+  --bg: #04050a; --ink: #f2efe9; --muted: #a39f98; --line: rgba(242, 239, 233, .13); --card: rgba(12, 13, 20, .72);
+  --acc: #ff7a3d; --ok: #6fffd0; --warn: #ffb35c; --bad: #ff6b6b;
+  --display: 'NX Display', 'Helvetica Neue', Arial, sans-serif; --mono: 'NX Mono', ui-monospace, Menlo, monospace;
+  --pad: clamp(16px, 3.6vw, 56px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--display); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; border-radius: 6px; }
+[hidden] { display: none !important; }
+.nx-top { position: fixed; z-index: 20; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 22px; padding: 14px var(--pad); background: linear-gradient(#04050af0, #04050a00); }
+.nx-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--acc); }
+.nx-brand span { display: grid; line-height: 1.1; color: var(--ink); }
+.nx-brand b { font-weight: 800; font-stretch: 125%; letter-spacing: .1em; font-size: 15px; }
+.nx-brand small { font: 9px var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+.nx-pill { font: 500 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); text-decoration: none; white-space: nowrap; }
+.nx-pill:hover { color: var(--ink); border-color: var(--acc); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

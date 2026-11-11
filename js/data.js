@@ -118,7 +118,7 @@ export const MISSIONS = [
     },
   },
   {
-    id: 'earth', name: 'Earth Atmosphere', display: 'EARTH', subtitle: 'Atmospheric observation satellite',
+    id: 'earth', name: 'HALO', display: 'EARTH', subtitle: 'Atmospheric observation satellite',
     reference: 'Science reference: NASA Terra, Aqua and Aura, plus NASA POWER',
     owner: 'Research: Kshitij', color: 0x2a6fd6, accent: '#6fb4ff', glow: 0x4f9cff,
     vertical: 'AURA · 705 KM SUN-SYNCHRONOUS',
@@ -165,7 +165,7 @@ export const MISSIONS = [
     },
   },
   {
-    id: 'mars', name: 'Mars Orbiter', display: 'MARS', subtitle: 'Jezero-focused reconnaissance orbiter',
+    id: 'mars', name: 'JEZERO ECHO', display: 'MARS', subtitle: 'Jezero-focused reconnaissance orbiter',
     reference: 'Science reference: NASA Mars Reconnaissance Orbiter (MRO)',
     owner: 'Research: Anthariksha', color: 0xc1440e, accent: '#ff7a4d', glow: 0xff5a2a,
     vertical: 'JEZERO · 18.38° N 77.58° E',

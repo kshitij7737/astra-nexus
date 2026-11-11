@@ -1,4 +1,4 @@
-// ASTRA mission environments (Kshitij's workstream).
+// NEXUS//04 mission environments.
 // Integration entry point: mountMissionModule(containerEl, { mission: 'mars' })
 // Returns { setMission(id), destroy() }.
 import { MISSIONS, SOURCES, BUILDER, BODIES } from './data.js';
@@ -30,11 +30,12 @@ export async function mountMissionModule(root, opts = {}) {
     <div class="mm-vignette" aria-hidden="true"></div>
     <div class="mm-grain" aria-hidden="true"></div>
     <header class="mm-top">
-      <a class="mm-brand" href="#mm-ch-1" aria-label="ASTRA mission environments, back to top">
+      <a class="mm-brand" href="index.html" aria-label="NEXUS//04 home">
         <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><circle cx="16" cy="16" r="6" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5" fill="none" stroke="currentColor" stroke-width="1.5" transform="rotate(-24 16 16)"/></svg>
-        <span><b>ASTRA</b><small>Mission environments</small></span>
+        <span><b>NEXUS//04</b><small>Explore the worlds</small></span>
       </a>
       <nav class="mm-missions" aria-label="Choose a mission">${MISSIONS.map(m => `<button type="button" data-m="${m.id}">${esc(m.name)}</button>`).join('')}</nav>
+      <a class="mm-pause" href="play.html?mission=${mission.id}" id="mm-playlink" style="text-decoration:none">Play this mission</a>
       <button type="button" class="mm-pause" aria-pressed="false">Pause motion</button>
     </header>
     <div class="mm-vertical" aria-hidden="true"></div>
@@ -47,7 +48,7 @@ export async function mountMissionModule(root, opts = {}) {
     if (!sc.webglAvailable()) throw new Error('WebGL unavailable');
     stage = new sc.Stage($('.mm-canvas'));
   } catch (e) {
-    console.warn('ASTRA: 3D disabled, showing text-only layout.', e);
+    console.warn('NEXUS: 3D disabled, showing text-only layout.', e);
     root.classList.add('mm-no3d'); $('.mm-pause').hidden = true;
   }
 
@@ -155,7 +156,7 @@ export async function mountMissionModule(root, opts = {}) {
         <div class="mm-end__copy">
           <p class="mm-kicker">End of ${esc(m.name)}</p>
           <button type="button" class="mm-next" data-next="${next.id}"><span>Next mission</span><b>${esc(next.name)}</b></button>
-          <div class="mm-legend"><p class="mm-legend__t">How to read this page</p><p>${TAG.fact} published by NASA or an instrument team</p><p>${TAG.derived} calculated by us, formula shown</p><p>${TAG.illustrative} simplified or artistic, not measured</p><p>${TAG.conceptual} ASTRA design choice, not flight hardware</p></div>
+          <div class="mm-legend"><p class="mm-legend__t">How to read this page</p><p>${TAG.fact} published by NASA or an instrument team</p><p>${TAG.derived} calculated by us, formula shown</p><p>${TAG.illustrative} simplified or artistic, not measured</p><p>${TAG.conceptual} team design choice, not flight hardware</p></div>
           <details class="mm-sources"><summary>Sources for ${esc(m.name)} (${used.length})</summary><ul>${used.map(k => `<li>${srcLink(k)}</li>`).join('')}</ul></details>
         </div>
         <p class="mm-vword" aria-hidden="true">${esc(m.display)}</p>
@@ -336,7 +337,7 @@ export async function mountMissionModule(root, opts = {}) {
   function setMission(id) {
     const m = MISSIONS.find(x => x.id === id); if (!m) return;
     mission = m; cfg.alt = null; hangarTab = 'craft';
-    render();
+    render(); const pl = root.querySelector('#mm-playlink'); if (pl) pl.href = `play.html?mission=${id}`;
     window.scrollTo({ top: root.offsetTop, behavior: 'auto' });
   }
 

@@ -88,7 +88,7 @@ function indexed(geo) {
   geo.dispose(); return g;
 }
 
-function buildWorld(m) {
+export function buildWorld(m) {
   const kind = m.world.kind, g = new THREE.Group();
   const geo = indexed(new THREE.IcosahedronGeometry(1, kind === 'asteroid' ? 40 : 64));
   const pos = geo.attributes.position, cols = [], v = new THREE.Vector3(), base = new THREE.Color(m.color);
