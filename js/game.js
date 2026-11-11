@@ -1,5 +1,5 @@
 // NEXUS//04 game: Brief → Build → Launch → Operate → Debrief.
-import { GAME, ORDER, COMMON, ISP, rankFor } from './game-data.js';
+import { GAME, ORDER, COMMON, ISP, rankFor, gradeFor, DIFFICULTY } from './game-data.js';
 import { SOURCES } from './data.js';
 import { derive, estimate, Sim, defaultConfig } from './sim.js';
 
@@ -16,6 +16,12 @@ const store = {
   set(v) { try { localStorage.setItem('nexus04', JSON.stringify(v)); } catch { /* storage unavailable: progress is not kept */ } },
 };
 
+// ---------- settings (saved per browser)
+const SET_DEF = { diff: 'flight', rot: 1, zoom: 1, invert: false, vol: 0.7, speed: 1, shake: true, timers: true };
+const settings = { ...SET_DEF, ...(store.get().settings || {}) };
+function saveSettings() { const s = store.get(); s.settings = settings; store.set(s); stage?.setControls?.(settings); }
+const diff = () => DIFFICULTY[settings.diff] || DIFFICULTY.flight;
+
 // ---------- sound (Web Audio, created on first click)
 const audio = {
   on: store.get().sound !== false, ctx: null,
@@ -23,7 +29,7 @@ const audio = {
   beep(f = 880, d = 0.08, v = 0.06) {
     if (!this.on) return; this.init(); if (!this.ctx) return;
     const o = this.ctx.createOscillator(), g = this.ctx.createGain(); o.frequency.value = f; o.type = 'sine';
-    g.gain.setValueAtTime(v, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + d);
+    g.gain.setValueAtTime(v * settings.vol * 1.4 + 0.0001, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + d);
     o.connect(g).connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + d);
   },
   rumble(d = 6) {
@@ -31,10 +37,13 @@ const audio = {
     const c = this.ctx, n = c.sampleRate * d, buf = c.createBuffer(1, n, c.sampleRate), ch = buf.getChannelData(0);
     for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n);
     const s = c.createBufferSource(); s.buffer = buf; const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
-    const g = c.createGain(); g.gain.value = 0.35; s.connect(f).connect(g).connect(c.destination); s.start();
+    const g = c.createGain(); g.gain.value = 0.35 * settings.vol * 1.4; s.connect(f).connect(g).connect(c.destination); s.start();
   },
   chime() { [660, 880, 1320].forEach((f, i) => setTimeout(() => this.beep(f, 0.25, 0.05), i * 120)); },
   fail() { [300, 220].forEach((f, i) => setTimeout(() => this.beep(f, 0.4, 0.06), i * 220)); },
+  alarm() { [880, 660, 880, 660].forEach((f, i) => setTimeout(() => this.beep(f, 0.14, 0.05), i * 160)); },
+  tick() { this.beep(1200, 0.03, 0.03); },
+  boom() { this.rumble(3); this.beep(90, 1.2, 0.12); },
 };
 
 // ---------- story (mission control voice: VEGA)
@@ -70,10 +79,12 @@ async function boot() {
   const soundBtn = $('#gx-sound');
   const syncSound = () => { soundBtn.setAttribute('aria-pressed', String(audio.on)); soundBtn.textContent = audio.on ? 'Sound on' : 'Sound off'; };
   syncSound(); soundBtn.onclick = () => { audio.on = !audio.on; const s = store.get(); s.sound = audio.on; store.set(s); syncSound(); };
+  $('#gx-settings').onclick = openSettings;
+  document.addEventListener('keydown', onKey);
   try {
     const g3 = await import('./game3d.js');
     if (!g3.webglOK()) throw new Error('no WebGL');
-    stage = new g3.GameStage($('#gx-stage'));
+    stage = new g3.GameStage($('#gx-stage')); stage.setControls(settings);
   } catch (e) { console.warn('NEXUS: 3D disabled', e); document.body.classList.add('gx-no3d'); }
   if (!mission) return pickMission();
   start(mission.id);
@@ -86,6 +97,7 @@ function pickMission() {
     <div class="gx-wrap">
       <p class="gx-kicker">NEXUS//04 · Mission select</p>
       <h1 class="gx-h1">Choose your mission.</h1>
+      ${diffPicker()}
       <div class="gx-picks">${ORDER.map((id, i) => { const m = GAME[id]; return `
         <button class="gx-pickcard" data-go="${id}" style="--acc:${m.accent}">
           <span class="gx-n">${String(i + 1).padStart(2, '0')}</span>
@@ -94,6 +106,13 @@ function pickMission() {
         </button>`; }).join('')}</div>
     </div>`;
   $$('[data-go]').forEach(b => b.onclick = () => { history.replaceState(null, '', `?mission=${b.dataset.go}`); start(b.dataset.go); });
+  wireDiff();
+}
+function diffPicker() {
+  return `<div class="gx-diff" role="radiogroup" aria-label="Difficulty">${Object.values(DIFFICULTY).map(x => `<button type="button" role="radio" data-diff="${x.id}" aria-checked="${settings.diff === x.id}"><b>${x.label}</b><small>${esc(x.blurb)}</small></button>`).join('')}</div>`;
+}
+function wireDiff(after) {
+  $$('[data-diff]').forEach(b => b.onclick = () => { settings.diff = b.dataset.diff; saveSettings(); audio.beep(520, 0.05); $$('[data-diff]').forEach(x => x.setAttribute('aria-checked', String(x.dataset.diff === settings.diff))); after?.(); });
 }
 
 function start(id) {
@@ -122,6 +141,7 @@ function renderBrief() {
         <p class="gx-tag">${esc(m.tagline)}</p>
         <div class="gx-transmission"><span class="gx-vega">VEGA · Mission control</span><p id="gx-type"></p></div>
         ${m.whatIf ? `<p class="gx-whatif"><b>What if:</b> ${esc(m.whatIf)}</p>` : ''}
+        <p class="gx-kicker gx-kicker--sm">Difficulty</p>${diffPicker()}
         <div class="gx-row">
           <button class="gx-btn gx-btn--go" id="gx-tobuild">Start building</button>
           <a class="gx-btn" href="explore.html?mission=${m.id === 'earth' ? 'earth' : m.id}">Explore ${esc(m.world)} first</a>
@@ -134,16 +154,17 @@ function renderBrief() {
           <li><b>Answer mission-control questions</b><span>up to 10 pts</span></li></ol>
         <h2>Constraints</h2>
         <ul class="gx-cons">
-          <li><span>Budget</span><b>${fmt(m.budget ?? COMMON.budget)} credits</b></li>
+          <li><span>Budget</span><b id="gx-budgetv">${fmt(Math.round((m.budget ?? COMMON.budget) * diff().budgetMul))} credits</b></li>
           <li><span>Launch vehicles</span><b>${COMMON.options.launch.map(l => `${l.wetKg} kg`).join(' or ')}</b></li>
           <li><span>Δv to reach orbit</span><b>${m.dvRequired} m/s + upkeep</b></li>
           <li><span>Orbits</span><b>${dvOpt.map(o => esc(o.label)).join(' · ')}</b></li>
           <li><span>Distance from Sun</span><b>${m.solarAU} AU</b></li>
+          <li><span>Spacecraft can be lost</span><b>Yes. Battery blackouts and faults damage it</b></li>
         </ul>
         <p class="gx-rule">Rule of the game: <b>science only counts when it reaches Earth.</b></p>
       </aside>
     </div>`;
-  typewriter($('#gx-type'), STORY[m.id]);
+  typewriter($('#gx-type'), STORY[m.id]); wireDiff(() => { const b = $('#gx-budgetv'); if (b) b.textContent = `${fmt(Math.round((m.budget ?? COMMON.budget) * diff().budgetMul))} credits`; });
   $('#gx-tobuild').onclick = () => { audio.beep(660); setScreen('build'); renderBuild(); };
   $('#gx-switch').onclick = () => { history.replaceState(null, '', 'play.html'); pickMission(); };
   if (stage) stage.showBuild(m, cfg, 0, true);
@@ -193,14 +214,14 @@ function renderBuild() {
 
 let estTimer = 0;
 function refreshBuild(light) {
-  const m = mission; d = derive(m, cfg); saveCfg();
+  const m = mission; d = derive(m, cfg, settings.diff); saveCfg();
   $$('#gx-build .gx-seg button').forEach(b => b.setAttribute('aria-checked', String(cfg[b.dataset.k] === b.dataset.v)));
   $$('#gx-build [data-inst]').forEach(b => b.setAttribute('aria-pressed', String(cfg.inst.includes(b.dataset.inst))));
   $('#gx-propv').textContent = `${cfg.propKg} kg · ${fmt(d.dvAvail)} m/s`;
   if (stage) { stage.lastCfg = cfg; if (!light) stage.showBuild(m, cfg); }
   clearTimeout(estTimer);
   const paint = () => {
-    est = d.launchable ? estimate(m, cfg) : null;
+    est = d.launchable ? estimate(m, cfg, settings.diff) : null;
     const bad = d.checks.filter(c => !c.ok);
     const hint = bad.length ? HINT[bad[0].id](d) : 'VEGA: Design looks solid. Ready when you are.';
     $('#gx-build .gx-sum').innerHTML = `
@@ -210,9 +231,10 @@ function refreshBuild(light) {
         <div class="gx-stat"><span>Data storage</span><b>${d.storage} Gbit</b><small>${fmt(d.perPassGbit, 1)} Gbit per pass</small></div>
         <div class="gx-stat"><span>Comm capacity</span><b>${fmt(d.perContactGbit, 1)} Gbit</b><small>per contact</small></div>
         <div class="gx-stat ${d.cost > d.budget ? 'is-bad' : ''}"><span>Budget</span><b>${fmt(d.cost)}</b><small>of ${fmt(d.budget)} credits</small></div>
+        <div class="gx-stat ${d.launchFail > 0.02 ? 'is-bad' : ''}"><span>Launch success</span><b>${fmt((1 - d.launchFail) * 100, 1)}%</b><small>${esc(diff().label)} difficulty</small></div>
       </div>
-      <div class="gx-compat"><span>Compatibility</span><ul>${d.checks.map(c => `<li class="${c.ok ? 'ok' : 'bad'}"><i aria-hidden="true">${c.ok ? '✓' : '!'}</i>${esc(c.label)}<small>${esc(c.detail)}</small></li>`).join('')}</ul></div>
-      <div class="gx-est"><span>Estimated science score</span>${ring(est ? est.score : 0, 90, est ? '' : '—')}<small>${est ? `if flown with no surprises (max 90 before questions)` : 'fix mass or budget to estimate'}</small></div>
+      <div class="gx-compat"><span>Compatibility</span><ul>${d.checks.map(c => `<li class="${c.ok ? 'ok' : c.soft ? 'warn' : 'bad'}"><i aria-hidden="true">${c.ok ? '✓' : '!'}</i>${esc(c.label)}<small>${esc(c.detail)}</small></li>`).join('')}</ul></div>
+      <div class="gx-est"><span>Estimated science score</span>${ring(est ? est.score : 0, 90, est ? '' : '—')}<small>${est ? (est.failed?.reason === 'lost' ? '<b class="gx-red">Spacecraft would be lost</b> to battery blackouts' : `if flown with no surprises (max 90 before questions)`) : 'fix mass or budget to estimate'}</small></div>
       <div class="gx-launchbox">
         <p class="gx-hint">${esc(hint)}</p>
         <button class="gx-btn gx-btn--go" id="gx-launch" ${d.launchable ? '' : 'disabled'}>Launch mission</button>
@@ -232,8 +254,10 @@ const HINT = {
   mass: d => `VEGA: Too heavy. You are ${fmt(d.wet - d.launch.wetKg)} kg over. Try Launch B or drop a heavy instrument.`,
   budget: d => `VEGA: Over budget by ${fmt(d.cost - d.budget)} credits. Small parts or fewer instruments will fix it.`,
   dv: d => `VEGA: Not enough propellant. You can launch, but you will fly past ${mission.world}. Add about ${fmt(Math.ceil((d.dvNeed - d.dvAvail) / 8))} kg more.`,
-  eclipse: d => `VEGA: The battery runs dry ${fmt(d.eclipseMin, 0)} minutes into each eclipse. Expect safe-mode shutdowns.`,
+  eclipse: d => `VEGA: The battery runs dry in every ${fmt(d.eclipseMin, 0)} minute eclipse. Each blackout damages the spacecraft, and enough of them will kill it.`,
   power: () => 'VEGA: Running everything at once drains the battery even in sunlight. A larger array helps.',
+  reserve: d => `VEGA: Only ${Math.round(d.dvAvail - d.dvNeed)} m/s spare. Faults and decisions can cost propellant. About ${Math.ceil((60 - (d.dvAvail - d.dvNeed)) / 8)} kg more gives you a safe reserve.`,
+  margin: d => `VEGA: The rocket is loaded to ${Math.round((1 - d.margin) * 100)}% of its limit. That raises the chance it fails. Lighten the craft or take Launch B.`,
   science: () => 'VEGA: One objective has no instrument. Those points are impossible without it.',
 };
 function ring(score, max = 100, label) {
@@ -241,32 +265,54 @@ function ring(score, max = 100, label) {
   return `<svg class="gx-ring" viewBox="0 0 80 80" role="img" aria-label="Score ${label || score}"><circle cx="40" cy="40" r="${r}" class="gx-ring__bg"/><circle cx="40" cy="40" r="${r}" class="gx-ring__fg" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - f)}"/><text x="40" y="46" text-anchor="middle">${label || score}</text></svg>`;
 }
 
-// ---------- 03 launch
+// ---------- 03 launch: GO / NO-GO poll, then the countdown
+const POLL = { reserve: 'Reserve', mass: 'Booster', budget: 'Finance', dv: 'Propulsion', eclipse: 'Power', power: 'Electrical', science: 'Science', margin: 'Range safety' };
 function goLaunch() {
   if (!d.launchable) return;
+  const mo = $('#gx-pollbox'); mo.hidden = false;
+  const nogo = d.checks.filter(c => !c.ok);
+  mo.innerHTML = `<div class="gx-card gx-poll" role="dialog" aria-modal="true" aria-labelledby="gx-pollt">
+    <p class="gx-kicker">Flight director poll · ${esc(diff().label)}</p><h2 id="gx-pollt">Go or no-go for launch?</h2>
+    <ul>${d.checks.map((c, i) => `<li class="${c.ok ? 'ok' : c.soft ? 'warn' : 'bad'}" style="--i:${i}"><span>${esc(POLL[c.id] || c.id)}</span><b>${c.ok ? 'GO' : 'NO-GO'}</b><small>${esc(c.detail)}</small></li>`).join('')}</ul>
+    ${nogo.length ? `<p class="gx-hint">${nogo.length} station${nogo.length > 1 ? 's' : ''} called no-go. You can launch anyway. It is your call, Flight.</p>` : '<p class="gx-hint">All stations go. Launch success chance ' + fmt((1 - d.launchFail) * 100, 1) + '%.</p>'}
+    <div class="gx-opts gx-opts--row"><button class="gx-btn ${nogo.length ? 'gx-btn--warn' : 'gx-btn--go'}" id="gx-golaunch">${nogo.length ? 'Launch anyway' : 'Commit to launch'}</button><button class="gx-btn gx-btn--ghost" id="gx-scrub">Scrub and fix</button></div></div>`;
+  $$('.gx-poll li', mo).forEach((li, i) => setTimeout(() => { li.classList.add('in'); audio.beep(li.classList.contains('ok') ? 900 : 300, 0.05); }, 120 + i * 140));
+  $('#gx-scrub').onclick = () => { mo.hidden = true; };
+  $('#gx-golaunch').onclick = () => { mo.hidden = true; runLaunch(); };
+  $('#gx-golaunch').focus();
+}
+function runLaunch() {
   setScreen('launch');
-  const success = d.dvAvail >= d.dvNeed, m = mission;
+  const m = mission, reachesOrbit = d.dvAvail >= d.dvNeed;
+  const rocketFails = Math.random() < d.launchFail;
+  const explodeAt = rocketFails ? 3.4 + Math.random() * 4 : 0;
   const lines = [
     [0, 'T-3'], [0.7, 'T-2'], [1.4, 'T-1'], [2.2, 'Liftoff'], [4.2, 'Max-Q'], [7.5, 'Stage separation'], [8.3, 'Fairing separation'], [9.2, 'Arrays deployed'],
-    [10.5, m.id === 'earth' ? 'Raising to final orbit' : `Transfer to ${m.world}`], [15.5, success ? 'Orbit insertion burn' : 'Insertion burn... propellant exhausted'],
+    [10.5, m.id === 'earth' ? 'Raising to final orbit' : `Transfer to ${m.world}`], [15.5, reachesOrbit ? 'Orbit insertion burn' : 'Insertion burn... propellant exhausted'],
   ];
   const box = $('#gx-launchtext'); box.innerHTML = ''; const timers = [];
-  lines.forEach(([t, txt]) => timers.push(setTimeout(() => {
-    box.innerHTML = `<b>${esc(txt)}</b>`; if (/^T-/.test(txt)) audio.beep(880, 0.12); if (txt === 'Liftoff') audio.rumble(6);
-  }, t * 1000)));
-  const finish = ok => {
+  lines.forEach(([t, txt]) => { if (explodeAt && t > explodeAt) return; timers.push(setTimeout(() => {
+    box.innerHTML = `<b>${esc(txt)}</b>`; if (/^T-/.test(txt)) audio.beep(880, 0.12); if (txt === 'Liftoff') { audio.rumble(6); stage?.shake(0.8); } if (txt === 'Max-Q') stage?.shake(0.5);
+  }, t * 1000)); });
+  const finish = (ok, why) => {
     timers.forEach(clearTimeout);
+    if (why === 'launch' || (rocketFails && !stage)) {
+      sim = new Sim(m, cfg, { diff: settings.diff });
+      sim.failed = { reason: 'launch', text: `The rocket broke apart ${fmt(explodeAt - 2.2, 1)} seconds after liftoff. It was loaded to ${Math.round((1 - d.margin) * 100)}% of its limit, giving a ${fmt(d.launchFail * 100, 1)}% chance of failure. This time the odds lost.` };
+      setTimeout(() => showDebrief(sim.result()), 600); return;
+    }
     if (ok) { audio.chime(); box.innerHTML = `<b>Orbit achieved</b>`; setTimeout(startOps, 900); }
-    else { audio.fail(); box.innerHTML = `<b>Missed ${esc(m.world)}</b>`; sim = new Sim(m, cfg); setTimeout(() => showDebrief(sim.result()), 1400); }
+    else { audio.fail(); box.innerHTML = `<b>Missed ${esc(m.world)}</b>`; sim = new Sim(m, cfg, { diff: settings.diff }); setTimeout(() => showDebrief(sim.result()), 1400); }
   };
-  $('#gx-skip').onclick = () => { stage?.skipLaunch?.(); if (!stage) finish(success); };
-  if (stage) stage.playLaunch(m, success, finish);
-  else setTimeout(() => finish(success), 1500);
+  const cues = { boom: () => { timers.forEach(clearTimeout); box.innerHTML = '<b class="gx-red">Vehicle lost</b>'; audio.boom(); document.body.classList.add('gx-flash'); setTimeout(() => document.body.classList.remove('gx-flash'), 900); } };
+  $('#gx-skip').onclick = () => { stage?.skipLaunch?.(); if (!stage) finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : ''); };
+  if (stage) stage.playLaunch(m, reachesOrbit, finish, cues, { explodeAt });
+  else setTimeout(() => finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : ''), 1500);
 }
 
 // ---------- 04 operations
 function startOps() {
-  const m = mission; sim = new Sim(m, cfg, { interactive: true }); flags = {};
+  const m = mission; sim = new Sim(m, cfg, { interactive: true, diff: settings.diff }); flags = {}; simSpeed = settings.speed; lastHealth = 100; streak = 0;
   setScreen('ops');
   if (stage) stage.showOps(m, sim.d);
   $('#gx-ops').innerHTML = `
@@ -276,10 +322,11 @@ function startOps() {
         <div class="gx-speed" role="group" aria-label="Simulation speed">${[0, 1, 2, 4].map(s => `<button type="button" data-speed="${s}" aria-pressed="${s === simSpeed}">${s ? s + '×' : 'Pause'}</button>`).join('')}</div></div>
       <div class="gx-chipsrow" id="gx-phase"></div>
       <div class="gx-timeline" aria-hidden="true"><div class="gx-tl" id="gx-tl"></div><i id="gx-play"></i></div>
-      <div class="gx-legend"><span class="e">Eclipse</span><span class="p">Target pass</span><span class="c">Contact</span></div>
+      <div class="gx-legend"><span class="e">Eclipse</span><span class="p">Target pass</span><span class="c">Contact</span></div><p class="gx-keys">Space pause · 1 2 4 speed · drag the view to look around · scroll to zoom</p>
       <div class="gx-gauges">
         <div class="gx-gauge"><span>Battery</span><div><i id="gx-batt"></i></div><b id="gx-battv"></b></div>
         <div class="gx-gauge"><span>Recorder</span><div><i id="gx-stor"></i></div><b id="gx-storv"></b></div>
+        <div class="gx-gauge gx-gauge--hp"><span>Health</span><div><i id="gx-hp"></i></div><b id="gx-hpv"></b></div>
       </div>
       <h3>Objectives · science back on Earth</h3>
       <ul class="gx-prog" id="gx-prog"></ul>
@@ -308,7 +355,8 @@ function log(text, kind = 'info') {
 function loop(now) {
   const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
   if (screen !== 'ops') return;
-  if (!sim.pending && simSpeed > 0) {
+  const modalOpen = !$('#gx-modal').hidden;
+  if (!sim.pending && simSpeed > 0 && !modalOpen) {
     const stepsPerSec = (sim.T / sim.dt) / 9 * simSpeed; // one orbit ≈ 9 s at 1×
     acc += dt * stepsPerSec;
     let n = Math.floor(acc); acc -= n;
@@ -322,11 +370,18 @@ function loop(now) {
       if (st.inContact && !before.inContact && !flags.con && storeBefore > 0) { flags.con = 1; log(VEGA.contact); }
       if (sim.lost > lostBefore && !flags.full) { flags.full = 1; log(VEGA.full, 'warn'); audio.beep(300, 0.2); }
     }
-    for (const e of sim.log.slice(logLen)) { log(e.text, e.kind); if (e.kind === 'warn') audio.beep(260, 0.25); }
+    for (const e of sim.log.slice(logLen)) { log(e.text, e.kind); if (e.kind === 'warn') { audio.alarm(); alert('Power blackout. Spacecraft damaged.'); } }
+    // hook: reward clean downlinks
+    const sent = sim.sentTotal;
+    if (sent - (flags.lastMilestone || 0) >= milestoneStep()) { flags.lastMilestone = Math.floor(sent / milestoneStep()) * milestoneStep(); toast(`${fmt(flags.lastMilestone, 0)} Gbit home`); audio.beep(1100, 0.08); }
   }
   paintOps();
   if (sim.pending && $('#gx-modal').hidden) showCard(sim.pending);
-  if (sim.done && !sim.pending) { cancelAnimationFrame(raf); setTimeout(() => showDebrief(sim.result()), 700); return; }
+  if (sim.done && !sim.pending && !modalOpen) {
+    cancelAnimationFrame(raf);
+    if (sim.failed?.reason === 'lost') { lostSequence(); return; }
+    setTimeout(() => showDebrief(sim.result()), 700); return;
+  }
   raf = requestAnimationFrame(loop);
 }
 function paintOps() {
@@ -334,7 +389,12 @@ function paintOps() {
   const used = sim.storageUsed();
   const observing = !sim.safe && s.inPass && !skip && sim.enabled.size > 0;
   const transmitting = !sim.safe && s.inContact && used > 1e-6;
-  stage?.setOps({ phase: s.phase, orbitFloat: sim.t / sim.T, observing, transmitting, sunlit: s.sunlit });
+  const bf0 = sim.batt / sim.d.battWh;
+  stage?.setOps({ phase: s.phase, orbitFloat: sim.t / sim.T, observing, transmitting, sunlit: s.sunlit, alert: sim.safe || bf0 < 0.15 || sim.health < 30 });
+  document.body.classList.toggle('gx-danger', sim.health < 30 || sim.safe);
+  if (sim.health < lastHealth) { lastHealth = sim.health; }
+  $('#gx-hp').style.width = sim.health + '%'; $('#gx-hp').className = sim.health < 30 ? 'low' : sim.health < 60 ? 'mid' : '';
+  $('#gx-hpv').textContent = `${Math.round(sim.health)}%`;
   $('#gx-orbit').textContent = `Orbit ${Math.min(m.orbits, s.orbit + 1)} / ${m.orbits}`;
   const hrs = sim.t / 3600; $('#gx-time').textContent = `Mission time ${Math.floor(hrs)} h ${String(Math.floor((hrs % 1) * 60)).padStart(2, '0')} m`;
   $('#gx-phase').innerHTML = [
@@ -361,37 +421,136 @@ function drawChart() {
   line('batt', '#ffd166'); line('store', '#ff7a3d'); line('ret', '#6fffd0', maxRet);
 }
 function showCard(p) {
-  const mo = $('#gx-modal'); mo.hidden = false; audio.beep(740, 0.15);
-  const it = p.item, isQ = p.type === 'challenge';
-  mo.innerHTML = `<div class="gx-card" role="dialog" aria-modal="true" aria-labelledby="gx-cardt">
-    <p class="gx-kicker">${isQ ? 'VEGA asks · +5 points' : 'Decision · orbit ' + (it.orbit + 1)}</p>
+  const mo = $('#gx-modal'); mo.hidden = false;
+  const it = p.item, isQ = p.type === 'challenge', isA = p.type === 'anomaly';
+  if (isA) { audio.alarm(); stage?.shake(0.7); alert(it.title); } else audio.beep(740, 0.15);
+  const timed = isA && p.timer && settings.timers;
+  mo.innerHTML = `<div class="gx-card ${isA ? 'gx-card--alarm' : ''}" role="dialog" aria-modal="true" aria-labelledby="gx-cardt">
+    <p class="gx-kicker">${isQ ? 'VEGA asks · +5 points' : isA ? 'Master alarm · spacecraft fault' : 'Decision · orbit ' + (it.orbit + 1)}</p>
     <h2 id="gx-cardt">${esc(isQ ? it.q : it.title)}</h2>
     ${isQ ? '' : `<p>${esc(it.text)}</p>`}
-    <div class="gx-opts">${(isQ ? it.a : it.options.map(o => o.label)).map((t, i) => `<button class="gx-btn" data-opt="${i}">${esc(t)}</button>`).join('')}</div>
-    ${isQ ? `<p class="gx-fine">Evidence: ${src(it.src)}</p>` : '<p class="gx-fine">Scenario event for gameplay.</p>'}
+    ${timed ? `<div class="gx-timer" aria-hidden="true"><i id="gx-timer"></i></div><p class="gx-fine" id="gx-timerv">${p.timer} s to respond. If time runs out, nothing is done.</p>` : ''}
+    <div class="gx-opts">${(isQ ? it.a : it.options.map(o => o.label)).map((t, i) => `<button class="gx-btn" data-opt="${i}"><kbd>${i + 1}</kbd> <span>${esc(t)}${isQ ? '' : costTags(it.options[i].effect)}</span></button>`).join('')}</div>
+    ${isQ ? `<p class="gx-fine">Evidence: ${src(it.src)}</p>` : isA ? '<p class="gx-fine">Scenario fault, modelled on problems real spacecraft have had.</p>' : '<p class="gx-fine">Scenario event for gameplay.</p>'}
   </div>`;
-  $$('[data-opt]', mo).forEach(b => b.onclick = () => {
-    const res = sim.choose(+b.dataset.opt);
-    const good = isQ ? +b.dataset.opt === it.correct : true;
-    if (isQ) good ? audio.chime() : audio.fail();
-    log(res, isQ ? (good ? 'ok' : 'warn') : 'info');
-    mo.innerHTML = `<div class="gx-card"><p class="gx-kicker">${isQ ? (good ? 'Correct' : 'Not quite') : 'Outcome'}</p><h2>${esc(res)}</h2><button class="gx-btn gx-btn--go" id="gx-cont">Continue mission</button></div>`;
+  let timerId = 0;
+  const pick = i => {
+    clearInterval(timerId);
+    const hpBefore = sim.health;
+    const res = sim.choose(i);
+    const good = isQ ? i === it.correct : true;
+    if (isQ) { good ? (audio.chime(), streak++) : (audio.fail(), streak = 0); if (streak >= 2) toast('Two for two. Sharp, Flight.'); }
+    const hurt = sim.health < hpBefore;
+    if (hurt) { stage?.shake(0.9); audio.fail(); }
+    log(res, isQ ? (good ? 'ok' : 'warn') : hurt ? 'warn' : 'info');
+    mo.innerHTML = `<div class="gx-card"><p class="gx-kicker">${isQ ? (good ? 'Correct' : 'Not quite') : hurt ? `Damage taken · health ${Math.round(sim.health)}%` : 'Outcome'}</p><h2>${esc(res)}</h2><button class="gx-btn gx-btn--go" id="gx-cont">Continue mission</button></div>`;
     $('#gx-cont').focus();
     $('#gx-cont').onclick = () => { mo.hidden = true; lastFrame = performance.now(); };
-  });
+  };
+  $$('[data-opt]', mo).forEach(b => b.onclick = () => pick(+b.dataset.opt));
+  mo.onkey = k => { const n = +k - 1; const bs = $$('[data-opt]', mo); if (bs[n]) pick(n); };
+  if (timed) {
+    const t0 = performance.now(), T = p.timer * 1000; let lastSec = p.timer;
+    timerId = setInterval(() => {
+      const left = Math.max(0, T - (performance.now() - t0)); const sec = Math.ceil(left / 1000);
+      $('#gx-timer').style.width = left / T * 100 + '%';
+      if (sec !== lastSec) { lastSec = sec; $('#gx-timerv').textContent = `${sec} s to respond. If time runs out, nothing is done.`; if (sec <= 3) audio.tick(); }
+      if (left <= 0) { clearInterval(timerId); toast('Too slow. No action taken.'); pick(it.options.length - 1); }
+    }, 50);
+  }
   $('[data-opt]', mo)?.focus();
+}
+function costTags(e) {
+  const t = [];
+  if (e.dvCost) t.push([e.dvCost > sim.dvMargin ? 'fatal' : 'cost', e.dvCost > sim.dvMargin ? `−${e.dvCost} m/s: more than your ${Math.max(0, Math.round(sim.dvMargin))} m/s spare. Mission ends` : `−${e.dvCost} m/s of ${Math.round(sim.dvMargin)} spare`]);
+  if (e.battCost) t.push(['cost', e.battCost > 1000 ? 'Drains the battery' : `−${e.battCost} Wh battery`]);
+  if (e.health) t.push([sim.health + e.health <= 0 ? 'fatal' : 'cost', sim.health + e.health <= 0 ? `Health −${-e.health}: spacecraft lost` : `Health −${-e.health}`]);
+  if (e.skipPasses) t.push(['cost', `Skip ${e.skipPasses} pass${e.skipPasses > 1 ? 'es' : ''}`]);
+  if (e.skipInst) t.push(['cost', 'One instrument idle']);
+  if (e.value != null && e.value < 1) t.push(['cost', `Data quality ${Math.round(e.value * 100)}%`]);
+  if (e.contactMul && e.contactMul < 1) t.push(['cost', `Downlink ${Math.round(e.contactMul * 100)}%`]);
+  if (e.contactMul > 1) t.push(['gain', `Downlink +${Math.round((e.contactMul - 1) * 100)}%`]);
+  if (e.dataBoost) t.push(['gain', `Data +${Math.round((e.dataBoost - 1) * 100)}%`]);
+  if (e.bonusData) t.push(['gain', `+${e.bonusData.gbit} Gbit`]);
+  if (e.compress) t.push(['gain', 'Smaller files']);
+  if (e.battBonus) t.push(['gain', 'Battery refilled']);
+  if (e.relay) t.push(['gain', 'Helps Perseverance']);
+  if (!t.length) t.push(['none', 'No cost']);
+  return `<small class="gx-tags">${t.map(([k, v]) => `<i class="${k}">${esc(v)}</i>`).join('')}</small>`;
+}
+let lastHealth = 100, streak = 0;
+const milestoneStep = () => Math.max(2, Math.round(mission.objectives.reduce((a, o) => a + o.need, 0) / 4));
+function toast(text) {
+  const t = $('#gx-toast'); const el = document.createElement('p'); el.textContent = text; t.appendChild(el);
+  setTimeout(() => el.classList.add('out'), 2200); setTimeout(() => el.remove(), 2800);
+}
+function alert(text) {
+  document.body.classList.remove('gx-alert'); void document.body.offsetWidth; document.body.classList.add('gx-alert');
+  toast(text);
+}
+function lostSequence() {
+  audio.boom(); stage?.loseCraft?.(); stage?.shake(1);
+  const l = $('#gx-lost'); l.hidden = false; $('#gx-lostsub').textContent = `${mission.name} is not responding. Orbit ${sim.orbit + 1}.`;
+  setTimeout(() => { l.hidden = true; showDebrief(sim.result()); }, reduced ? 600 : 3200);
+}
+function onKey(e) {
+  if (e.key === 'Escape' && !$('#gx-setbox').hidden) { $('#gx-setbox').hidden = true; return; }
+  if (e.key === 'Escape' && !$('#gx-pollbox').hidden) { $('#gx-pollbox').hidden = true; return; }
+  if (e.target.matches?.('input, textarea, select')) return;
+  const mo = $('#gx-modal');
+  if (mo && !mo.hidden && /^[1-4]$/.test(e.key) && mo.onkey && $('[data-opt]', mo)) { mo.onkey(e.key); e.preventDefault(); return; }
+  if (screen !== 'ops') return;
+  const set = v => { simSpeed = v; $$('[data-speed]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.speed === simSpeed))); };
+  if (e.key === ' ') { set(simSpeed ? 0 : (settings.speed || 1)); e.preventDefault(); }
+  if (e.key === '1') set(1); if (e.key === '2') set(2); if (e.key === '4') set(4);
+}
+
+// ---------- settings
+function openSettings() {
+  const mo = $('#gx-setbox'); mo.hidden = false;
+  const row = (id, label, min, max, step, val, out) => `<label class="gx-set"><span>${label}</span><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><output id="${id}v">${out}</output></label>`;
+  mo.innerHTML = `<div class="gx-card gx-setcard" role="dialog" aria-modal="true" aria-labelledby="gx-sett">
+    <p class="gx-kicker">Settings · saved in this browser</p><h2 id="gx-sett">Flight settings</h2>
+    <p class="gx-kicker gx-kicker--sm">Difficulty${screen === 'ops' ? ' (applies to your next flight)' : ''}</p>${diffPicker()}
+    ${row('st-rot', 'Camera drag sensitivity', 0.25, 3, 0.25, settings.rot, settings.rot + '×')}
+    ${row('st-zoom', 'Zoom sensitivity', 0.25, 3, 0.25, settings.zoom, settings.zoom + '×')}
+    ${row('st-vol', 'Volume', 0, 1, 0.05, settings.vol, Math.round(settings.vol * 100) + '%')}
+    <label class="gx-set"><span>Default mission speed</span><select id="st-speed">${[1, 2, 4].map(v => `<option value="${v}" ${settings.speed === v ? 'selected' : ''}>${v}×</option>`).join('')}</select></label>
+    <label class="gx-check"><input type="checkbox" id="st-inv" ${settings.invert ? 'checked' : ''}> Invert vertical drag</label>
+    <label class="gx-check"><input type="checkbox" id="st-shake" ${settings.shake ? 'checked' : ''}> Camera shake</label>
+    <label class="gx-check"><input type="checkbox" id="st-timers" ${settings.timers ? 'checked' : ''}> Countdown on spacecraft faults</label>
+    <div class="gx-opts gx-opts--row"><button class="gx-btn gx-btn--go" id="st-done">Done</button><button class="gx-btn gx-btn--ghost" id="st-view">Reset camera</button><button class="gx-btn gx-btn--ghost" id="st-reset">Restore defaults</button></div></div>`;
+  const bind = (id, key, fmtFn, num = true) => { $('#' + id).oninput = e => { settings[key] = num ? +e.target.value : e.target.value; $('#' + id + 'v') && ($('#' + id + 'v').textContent = fmtFn(settings[key])); saveSettings(); }; };
+  bind('st-rot', 'rot', v => v + '×'); bind('st-zoom', 'zoom', v => v + '×'); bind('st-vol', 'vol', v => Math.round(v * 100) + '%');
+  $('#st-speed').onchange = e => { settings.speed = +e.target.value; saveSettings(); };
+  $('#st-inv').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
+  $('#st-shake').onchange = e => { settings.shake = e.target.checked; saveSettings(); };
+  $('#st-timers').onchange = e => { settings.timers = e.target.checked; saveSettings(); };
+  wireDiff(() => { if (screen === 'build') refreshBuild(); if (screen === 'brief') renderBrief(); });
+  $('#st-view').onclick = () => { stage?.resetView?.(); audio.beep(700, 0.05); };
+  $('#st-reset').onclick = () => { Object.assign(settings, SET_DEF); saveSettings(); openSettings(); };
+  $('#st-done').onclick = () => { mo.hidden = true; if (screen === 'pick') pickMission(); };
+  $('#st-done').focus();
 }
 
 // ---------- 05 debrief
 function showDebrief(r) {
   cancelAnimationFrame(raf); setScreen('debrief');
-  const m = mission, rank = r.failed?.reason === 'insertion' ? 'Lost in space' : rankFor(r.score);
+  const m = mission, failed = r.missionFailed, rank = r.failed ? 'Mission lost' : rankFor(r.score), grade = failed ? 'F' : gradeFor(r.score);
+  document.body.classList.remove('gx-danger');
+  const earned = achievementsFor(r);
   const s = store.get(); s.best = s.best || {}; s.best[m.id] = Math.max(s.best[m.id] || 0, r.score);
   const unlocked = m.discoveries.filter(x => r.objs.find(o => o.id === x.unlock)?.frac >= 1);
-  s.disc = [...new Set([...(s.disc || []), ...unlocked.map(x => x.id)])]; store.set(s);
+  s.disc = [...new Set([...(s.disc || []), ...unlocked.map(x => x.id)])];
+  const prevAch = new Set(s.ach || []); s.ach = [...new Set([...(s.ach || []), ...earned.map(a => a.id)])];
+  s.flights = (s.flights || 0) + 1; if (!failed) s.wins = (s.wins || 0) + 1; store.set(s);
+  const newAch = earned.filter(a => !prevAch.has(a.id));
   const tips = [];
   if (r.failed?.reason === 'insertion') tips.push('Add propellant until the Δv check turns green. The builder shows exactly how much you need.');
   if (r.failed?.reason === 'propellant') tips.push('Your choices used more propellant than you carried. Leave a margin for surprises.');
+  if (r.failed?.reason === 'launch') tips.push('Rockets loaded close to their limit fail more often. Keep at least 12% mass margin, or move up to Launch B. The builder shows the exact odds.');
+  if (r.failed?.reason === 'lost') tips.push('Every battery blackout and every ignored fault damages the spacecraft. Make the eclipse check green, and act on master alarms quickly.');
+  if (!r.failed && failed) tips.push(`On ${diff().label} a mission needs at least ${r.failBelow} points to count as a success. Return more science.`);
   if (r.brown) tips.push(`The battery ran out ${r.brown} time${r.brown > 1 ? 's' : ''}. A larger battery keeps you alive through eclipse.`);
   if (r.lost > 1) tips.push(`${fmt(r.lost, 1)} Gbit was lost to a full recorder. A bigger recorder or a faster radio fixes that.`);
   r.objs.filter(o => o.frac < 1).forEach(o => tips.push(`"${o.label}" reached ${Math.round(o.frac * 100)}%. ${o.got < 0.01 ? 'Fly an instrument that serves it.' : 'More downlink would finish it.'}`));
@@ -404,10 +563,11 @@ function showDebrief(r) {
         ${patch(m, r.score, comp)}
         <div>
           <p class="gx-kicker">Step 05 · Debrief</p>
-          <h1 class="gx-h1">${r.failed?.reason === 'insertion' ? 'Mission lost.' : r.score >= 80 ? 'Science is home.' : r.score >= 50 ? 'Partial success.' : 'Hard lessons.'}</h1>
-          <p class="gx-tag">${r.failed ? esc(r.failed.text) : `Your rank: <b>${esc(rank)}</b>.`}</p>
+          ${failed ? `<p class="gx-stamp" aria-hidden="true">Mission failed</p>` : `<p class="gx-stamp gx-stamp--ok" aria-hidden="true">Mission success</p>`}
+          <h1 class="gx-h1">${r.failed?.reason === 'launch' ? 'Vehicle lost.' : r.failed?.reason === 'insertion' ? 'Lost in space.' : r.failed?.reason === 'lost' ? 'Signal lost.' : r.failed?.reason === 'propellant' ? 'Out of propellant.' : failed ? 'Not enough science.' : r.score >= 80 ? 'Science is home.' : 'Partial success.'}</h1>
+          <p class="gx-tag">${r.failed ? esc(r.failed.text) : `Grade <b class="gx-grade">${grade}</b> · rank <b>${esc(rank)}</b> · ${esc(diff().label)} difficulty.`}</p>
           <div class="gx-row"><div class="gx-bigscore">${ring(r.score, 100)}<span>Final score</span></div>
-            <ul class="gx-mini"><li><b>${fmt(r.sent || 0, 1)} Gbit</b> science returned</li><li><b>${fmt(r.lost || 0, 1)} Gbit</b> lost to a full recorder</li><li><b>${r.brown || 0}</b> safe-mode shutdowns</li><li><b>${(r.challenge || 0) / 5} / 2</b> questions right</li></ul></div>
+            <ul class="gx-mini"><li><b>${fmt(r.sent || 0, 1)} Gbit</b> science returned</li><li><b>${fmt(r.lost || 0, 1)} Gbit</b> lost to a full recorder</li><li><b>${r.brown || 0}</b> safe-mode shutdowns</li><li><b>${(r.challenge || 0) / 5} / 2</b> questions right</li>${r.failed?.reason === 'launch' || r.failed?.reason === 'insertion' ? '' : `<li><b>${r.health ?? 0}%</b> spacecraft health at the end</li>`}</ul></div>
         </div>
       </div>
       <div class="gx-cols">
@@ -417,18 +577,50 @@ function showDebrief(r) {
           <table class="gx-table"><thead><tr><th></th><th>Real mission</th></tr></thead><tbody>${m.compare.map(([k, v, s]) => `<tr><th>${esc(k)}</th><td>${esc(v)} ${src(s)}</td></tr>`).join('')}
             <tr><th>Your solar power</th><td>${fmt(d.solarW)} W at ${esc(m.world)} (game value)</td></tr></tbody></table>
           <h2>Discoveries unlocked</h2>
-          <div class="gx-disc">${m.discoveries.map(x => { const on = unlocked.includes(x); return `<article class="${on ? 'on' : ''}"><b>${on ? esc(x.title) : 'Locked'}</b><p>${on ? esc(x.text) : 'Complete the matching objective to unlock.'}</p>${on ? src(x.src) : ''}</article>`; }).join('')}</div></section>
+          <div class="gx-disc">${m.discoveries.map(x => { const on = unlocked.includes(x); return `<article class="${on ? 'on' : ''}"><b>${on ? esc(x.title) : 'Locked'}</b><p>${on ? esc(x.text) : 'Complete the matching objective to unlock.'}</p>${on ? src(x.src) : ''}</article>`; }).join('')}</div>
+          <h2>Achievements</h2>
+          <div class="gx-ach">${ACH.map(a => { const on = (store.get().ach || []).includes(a.id); return `<span class="${on ? 'on' : ''} ${newAch.some(x => x.id === a.id) ? 'new' : ''}" title="${esc(a.how)}"><b>${esc(a.name)}</b><small>${esc(a.how)}</small></span>`; }).join('')}</div></section>
       </div>
       <div class="gx-row gx-deb__actions">
-        <button class="gx-btn gx-btn--go" id="gx-retry">Rebuild and fly again</button>
+        <button class="gx-btn gx-btn--go" id="gx-retry">${failed ? 'Try again' : 'Rebuild and fly again'}</button>
+        ${!failed && settings.diff !== 'commander' ? `<button class="gx-btn" id="gx-harder">Fly it on ${settings.diff === 'cadet' ? 'Flight' : 'Commander'}</button>` : ''}
         <a class="gx-btn" href="play.html?mission=${next}">Next mission: ${esc(GAME[next].name)}</a>
         <a class="gx-btn gx-btn--ghost" href="index.html#archive">Discovery archive</a>
         <a class="gx-btn gx-btn--ghost" href="index.html">Back to NEXUS</a>
       </div>
     </div>`;
   $('#gx-retry').onclick = () => { setScreen('build'); renderBuild(); };
+  const hb = $('#gx-harder'); if (hb) hb.onclick = () => { settings.diff = settings.diff === 'cadet' ? 'flight' : 'commander'; saveSettings(); setScreen('build'); renderBuild(); };
+  newAch.forEach((a, i) => setTimeout(() => { toast(`Achievement: ${a.name}`); audio.chime(); }, 900 + i * 900));
   if (stage) stage.showBuild(m, cfg, 0, true);
-  r.score >= 50 ? audio.chime() : audio.fail();
+  failed ? audio.fail() : audio.chime();
+}
+const ACH = [
+  { id: 'first', name: 'First light', how: 'Complete any mission' },
+  { id: 'clean', name: 'Clean sheet', how: 'No blackouts and no lost data' },
+  { id: 'full', name: 'Full house', how: 'Finish every objective in a mission' },
+  { id: 'quiz', name: 'Know your stuff', how: 'Answer both of VEGA\'s questions' },
+  { id: 'tough', name: 'Iron hull', how: 'Survive a fault and finish above 90% health' },
+  { id: 'cheap', name: 'Shoestring', how: 'Succeed using under 85% of the budget' },
+  { id: 'cmdr', name: 'Commander', how: 'Succeed on Commander difficulty' },
+  { id: 'perfect', name: 'Flight Director', how: 'Score 95 or more' },
+  { id: 'grand', name: 'Four frontiers', how: 'Succeed on all four missions' },
+];
+function achievementsFor(r) {
+  const ok = !r.missionFailed, out = [];
+  const add = id => out.push(ACH.find(a => a.id === id));
+  if (ok) add('first');
+  if (ok && !r.brown && (r.lost || 0) < 0.1) add('clean');
+  if (ok && r.objs.every(o => o.frac >= 1)) add('full');
+  if (r.challenge >= 10) add('quiz');
+  if (ok && sim?.firedAnoms?.size && r.health > 90) add('tough');
+  if (ok && d && d.cost < d.budget * 0.85) add('cheap');
+  if (ok && settings.diff === 'commander') add('cmdr');
+  if (r.score >= 95) add('perfect');
+  const best = { ...(store.get().best || {}) }; if (ok) best[mission.id] = Math.max(best[mission.id] || 0, r.score);
+  const wins = store.get().winsBy || {}; if (ok) wins[mission.id] = 1; const s = store.get(); s.winsBy = wins; store.set(s);
+  if (ORDER.every(id => wins[id])) add('grand');
+  return out;
 }
 function patch(m, score, col) {
   const starsN = score >= 95 ? 5 : score >= 80 ? 4 : score >= 60 ? 3 : score >= 40 ? 2 : score > 0 ? 1 : 0;

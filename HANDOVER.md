@@ -13,5 +13,10 @@ Live: https://kshitij7737.github.io/astra-nexus/
 - Progress is saved in the browser under the key nexus04.
 - Run locally: python3 -m http.server, then open localhost:8000.
 
+## Difficulty, failure and settings
+- Difficulty (Cadet, Flight, Commander) and spacecraft faults live in js/game-data.js (DIFFICULTY, ANOMALIES).
+- Ways to fail: rocket failure (odds shown in the builder and launch poll), missing orbit (not enough propellant), running out of propellant, spacecraft lost (health reaches 0 from battery blackouts and faults), or scoring under the difficulty's pass mark.
+- Settings (camera and zoom sensitivity, invert, volume, speed, shake, fault countdown) are saved in the browser under nexus04.settings.
+
 ## Roles
 Sneha: ASTRA, landing and navigation. Karishma: LUNARIS, QA. Kshitij: HALO, worlds and spacecraft. Anthariksha: JEZERO ECHO, mission control and challenges.

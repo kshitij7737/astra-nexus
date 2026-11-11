@@ -95,3 +95,11 @@
   .lx-ch { min-height: 100vh; padding: 12vh var(--pad); }
   .lx-giant { font-size: 18vw; bottom: 3vh; }
 }
+
+.lx-stats { list-style: none; padding: 0; margin: 24px 0 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.lx-stats li { display: grid; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+.lx-stats b { font-weight: 800; font-stretch: 112%; font-size: 30px; line-height: 1; } .lx-stats span { font: 10px var(--mono); text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin-top: 6px; }
+.lx-achs { display: flex; flex-wrap: wrap; gap: 8px; }
+.lx-achs span { font: 11px var(--mono); letter-spacing: .08em; padding: 7px 11px; border-radius: 999px; border: 1px dashed var(--line); color: var(--muted); }
+.lx-achs span.on { border: 1px solid #ffb35c; color: var(--ink); background: rgba(255,179,92,.1); }
+@media (max-width: 640px) { .lx-stats { grid-template-columns: 1fr 1fr; } }

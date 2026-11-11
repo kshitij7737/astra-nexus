@@ -128,14 +128,33 @@ export class GameStage {
     this.labelLayer = document.createElement('div'); this.labelLayer.className = 'g3-labels'; el.appendChild(this.labelLayer);
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(el);
     this.drag = { yaw: 0.6, pitch: 0.35, active: false };
-    el.addEventListener('pointerdown', e => { if (this.mode !== 'build') return; this.drag.active = true; this.drag.x = e.clientX; this.drag.y = e.clientY; el.setPointerCapture(e.pointerId); });
-    el.addEventListener('pointermove', e => { if (!this.drag.active) return; this.drag.yaw += (e.clientX - this.drag.x) * 0.008; this.drag.pitch = Math.max(-1, Math.min(1.2, this.drag.pitch + (e.clientY - this.drag.y) * 0.006)); this.drag.x = e.clientX; this.drag.y = e.clientY; this.userTurned = true; });
+    this.ctl = { rot: 1, zoom: 1, invert: false, shake: true };
+    this.opsView = { yaw: 0, pitch: 0, zoom: 1 };
+    this.shakeT = 0;
+    const can = () => this.mode === 'build' || this.mode === 'ops';
+    el.addEventListener('pointerdown', e => { if (!can()) return; this.drag.active = true; this.drag.x = e.clientX; this.drag.y = e.clientY; el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointermove', e => {
+      if (!this.drag.active) return;
+      const dx = (e.clientX - this.drag.x) * this.ctl.rot, dy = (e.clientY - this.drag.y) * this.ctl.rot * (this.ctl.invert ? -1 : 1);
+      this.drag.x = e.clientX; this.drag.y = e.clientY;
+      if (this.mode === 'ops') { this.opsView.yaw += dx * 0.006; this.opsView.pitch = Math.max(-0.9, Math.min(0.9, this.opsView.pitch + dy * 0.005)); return; }
+      this.drag.yaw += dx * 0.008; this.drag.pitch = Math.max(-1, Math.min(1.2, this.drag.pitch + dy * 0.006)); this.userTurned = true;
+    });
     el.addEventListener('pointerup', () => { this.drag.active = false; });
-    el.addEventListener('wheel', e => { if (this.mode !== 'build') return; e.preventDefault(); this.zoom = Math.max(0.6, Math.min(1.6, (this.zoom || 1) * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
+    el.addEventListener('pointercancel', () => { this.drag.active = false; });
+    el.addEventListener('wheel', e => {
+      if (!can()) return; e.preventDefault();
+      const k = 1 + Math.sign(e.deltaY) * 0.08 * this.ctl.zoom;
+      if (this.mode === 'ops') this.opsView.zoom = Math.max(0.45, Math.min(2.2, this.opsView.zoom * k));
+      else this.zoom = Math.max(0.6, Math.min(1.6, (this.zoom || 1) * k));
+    }, { passive: false });
     this.paused = false;
     this.resize();
     this.r.setAnimationLoop(() => this.tick());
   }
+  setControls(c) { Object.assign(this.ctl, c); }
+  shake(amount = 0.6) { if (this.ctl.shake && !this.reduced) this.shakeT = Math.max(this.shakeT, amount); }
+  resetView() { this.opsView = { yaw: 0, pitch: 0, zoom: 1 }; this.userTurned = false; this.zoom = 1; }
   resize() { const w = this.el.clientWidth || 1, h = this.el.clientHeight || 1; this.r.setSize(w, h, false); this.cam.aspect = w / h; this.cam.updateProjectionMatrix(); }
   clear() {
     if (this.scene) disposeTree(this.scene);
@@ -190,7 +209,8 @@ export class GameStage {
   }
 
   // ---------------- launch cinematic. onDone(success) fires at the end.
-  playLaunch(mission, success, onDone, cues = {}) {
+  playLaunch(mission, success, onDone, cues = {}, opts = {}) {
+    const boomAt = opts.explodeAt || 0; let boom = null;
     this.mode = 'launch'; this.clear(); this.setLabels([]);
     const s = this.scene;
     const earthR = 40;
@@ -227,6 +247,39 @@ export class GameStage {
     this.update = dt => {
       t += dt;
       const fly = Math.max(0, t - T.lift);
+      if (boomAt && t > boomAt) {
+        if (!boom) {
+          cues.boom?.(); this.shake(1.4);
+          const p0 = new THREE.Vector3(0, 1.2, 0).applyMatrix4(rocket.matrixWorld);
+          const n = 700, bp = new Float32Array(n * 3), bv = [];
+          for (let i = 0; i < n; i++) { bp.set([p0.x, p0.y, p0.z], i * 3); bv.push(new THREE.Vector3().randomDirection().multiplyScalar(1 + Math.random() * 4)); }
+          const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(bp, 3));
+          const pts = new THREE.Points(bg, new THREE.PointsMaterial({ color: 0xffa040, size: 0.32, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+          const soft = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,.45)'); r.addColorStop(0.7, 'rgba(255,255,255,.08)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+          const smoke = new THREE.Group(); smoke.position.copy(p0);
+          for (let i = 0; i < 70; i++) {
+            const fire = i < 16;
+            const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: soft, color: fire ? 0xffb050 : 0x6a625c, transparent: true, depthWrite: false, opacity: fire ? 1 : 0.7, blending: fire ? THREE.AdditiveBlending : THREE.NormalBlending }));
+            sp.userData = { v: new THREE.Vector3().randomDirection().multiplyScalar(fire ? 0.9 : 0.5 + Math.random() * 0.9), fire, s0: fire ? 0.3 : 0.25, grow: fire ? 0.9 : 0.25 + Math.random() * 0.3 };
+            sp.position.copy(sp.userData.v).multiplyScalar(0.1); smoke.add(sp);
+          }
+          s.add(pts, smoke);
+          const debris = [];
+          rocket.children.slice().forEach(c => { const wp = new THREE.Vector3(); c.getWorldPosition(wp); rocket.remove(c); s.add(c); c.position.copy(wp); debris.push({ o: c, v: new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3), r: (Math.random() - 0.5) * 6 }); });
+          glow.intensity = 200; glow.position.copy(p0); glow.distance = 20;
+          boom = { t: 0, bp, bv, bg, pts, smoke, debris };
+        }
+        boom.t += dt; const b = boom;
+        for (let i = 0; i < b.bv.length; i++) { b.bp[i * 3] += b.bv[i].x * dt; b.bp[i * 3 + 1] += (b.bv[i].y - b.t * 1.5) * dt; b.bp[i * 3 + 2] += b.bv[i].z * dt; }
+        b.bg.attributes.position.needsUpdate = true; b.pts.material.opacity = Math.max(0, 1 - b.t / 2.2);
+        b.smoke.children.forEach(sp => { const u = sp.userData; sp.position.addScaledVector(u.v, dt * (u.fire ? 1 : 0.6)); u.v.y += dt * 0.25; sp.scale.setScalar(u.s0 + b.t * u.grow); sp.material.opacity = u.fire ? Math.max(0, 1 - b.t * 1.1) : Math.max(0, 0.35 - b.t * 0.1); });
+        glow.intensity = Math.max(0, 200 - b.t * 220);
+        b.debris.forEach(d => { d.v.y -= dt * 2.5; d.o.position.addScaledVector(d.v, dt); d.o.rotation.z += d.r * dt; d.o.rotation.x += d.r * 0.5 * dt; });
+        for (let i = 0; i < N; i++) pos[i * 3 + 1] = -999; pg.attributes.position.needsUpdate = true;
+        this.cam.position.lerp(b.smoke.position.clone().add(new THREE.Vector3(2.6, 0.8, 5.5)), dt * 0.8); this.cam.lookAt(b.smoke.position);
+        if (b.t > 3.2 && !ended) { ended = true; onDone?.(false, 'launch'); }
+        return;
+      }
       if (t < T.transfer) {
         const y = 0.5 * 0.9 * fly * fly; // accelerating climb
         rocket.position.y = y; rocket.rotation.z = -Math.min(0.5, fly * 0.06); rocket.position.x = Math.min(6, fly * fly * 0.06);
@@ -295,7 +348,7 @@ export class GameStage {
       }
       if (t > T.end && !ended) { ended = true; this._insertCue = false; onDone?.(success); }
     };
-    this.skipLaunch = () => { if (!ended) { ended = true; this._insertCue = false; onDone?.(success); } };
+    this.skipLaunch = () => { if (!ended) { if (boomAt && !boom) { t = boomAt; return; } ended = true; this._insertCue = false; onDone?.(success); } };
   }
 
   // ---------------- operations: orbit view driven by the simulation
@@ -340,16 +393,30 @@ export class GameStage {
     // flyby Earth for ASTRA
     let flyEarth = null;
     if (isAst) { flyEarth = this.world('earth', 2.2); flyEarth.visible = false; s.add(flyEarth); }
-    this.cam.position.set(orbitR * 2.1, orbitR * 1.5, orbitR * 2.7); this.cam.lookAt(0, 0, 0);
-    this.opsState = null;
+    const camBase = new THREE.Vector3(orbitR * 2.1, orbitR * 1.5, orbitR * 2.7);
+    this.cam.position.copy(camBase); this.cam.lookAt(0, 0, 0);
+    this.opsState = null; this.opsView = { yaw: 0, pitch: 0, zoom: 1 };
+    let lostT = -1;
+    this.loseCraft = () => { lostT = 0; };
     this.update = dt => {
       const st = this.opsState; if (!st) return;
       const ang = st.phase * Math.PI * 2;
       // eclipse centred at phase 0.75 => craft on the -z side (away from the Sun at +z)
       // phase 0.75 sits on the -z side, away from the Sun at +z: that is where the eclipse is
       const cp = new THREE.Vector3(Math.cos(ang) * orbitR, 0, Math.sin(ang) * orbitR);
+      // camera: player-controlled orbit around the body
+      const sph = new THREE.Spherical().setFromVector3(camBase);
+      sph.theta += this.opsView.yaw; sph.phi = Math.max(0.15, Math.min(Math.PI - 0.15, sph.phi - this.opsView.pitch)); sph.radius *= this.opsView.zoom;
+      this.cam.position.setFromSpherical(sph); this.cam.lookAt(0, 0, 0);
+      if (lostT >= 0) { // spacecraft lost: tumble away and fade
+        lostT += dt; craft.rotation.x += dt * 3; craft.rotation.z += dt * 2.2;
+        craft.position.addScaledVector(cp.clone().normalize(), dt * 0.4 * lostT);
+        halo.material.opacity = Math.max(0, 0.9 - lostT); beam.visible = false; link.visible = false; return;
+      }
       craft.position.copy(cp);
       craft.lookAt(0, 0, 0);
+      halo.material.color.set(st.alert ? 0xff3b3b : mission.accent);
+      halo.scale.setScalar(st.alert ? 4 + Math.sin(this.clock.elapsedTime * 10) * 1.2 : 4);
       beam.visible = st.observing;
       if (st.observing) { // cone from the craft down to the surface
         const len = orbitR - R;
@@ -376,7 +443,10 @@ export class GameStage {
     const dt = Math.min(raw, this.mode === 'launch' ? 0.25 : 0.05);
     if (this.update && !(this.paused && this.mode !== 'launch')) this.update(dt);
     if (!this.scene) return;
+    let off = null;
+    if (this.shakeT > 0) { this.shakeT = Math.max(0, this.shakeT - raw * 1.5); const a = this.shakeT * 0.08; off = new THREE.Vector3((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, 0).applyQuaternion(this.cam.quaternion); this.cam.position.add(off); }
     this.r.render(this.scene, this.cam);
+    if (off) this.cam.position.sub(off);
     // project labels
     if (this.labels.length) {
       const w = this.el.clientWidth, h = this.el.clientHeight, v = new THREE.Vector3();

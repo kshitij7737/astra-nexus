@@ -49,8 +49,12 @@ function chapters() {
 }
 
 // ---------- archive
+const ACHN = { first: 'First light', clean: 'Clean sheet', full: 'Full house', quiz: 'Know your stuff', tough: 'Iron hull', cheap: 'Shoestring', cmdr: 'Commander', perfect: 'Flight Director', grand: 'Four frontiers' };
 function archive() {
-  const s = store(), got = new Set(s.disc || []), best = s.best || {};
+  const s = store(), got = new Set(s.disc || []), best = s.best || {}, ach = new Set(s.ach || []);
+  const total = ORDER.reduce((n, id) => n + GAME[id].discoveries.length, 0);
+  $('#lx-stats').innerHTML = `<li><b>${s.flights || 0}</b><span>flights flown</span></li><li><b>${s.wins || 0}</b><span>missions succeeded</span></li><li><b>${got.size} / ${total}</b><span>discoveries</span></li><li><b>${ach.size} / ${Object.keys(ACHN).length}</b><span>achievements</span></li>`;
+  $('#lx-ach').innerHTML = Object.entries(ACHN).map(([k, v]) => `<span class="${ach.has(k) ? 'on' : ''}">${esc(v)}</span>`).join('');
   $('#lx-arch').innerHTML = ORDER.map(id => {
     const m = GAME[id];
     return `<div class="lx-arch__m" style="--acc:${m.accent}"><h3>${esc(m.name)} <small>${best[id] != null ? `best score ${best[id]}` : 'not flown yet'}</small></h3>

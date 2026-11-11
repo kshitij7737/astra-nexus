@@ -14,7 +14,7 @@
 <header class="nx-top gx-top">
   <a class="nx-brand" href="index.html" aria-label="NEXUS//04 home"><svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><circle cx="16" cy="16" r="5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5" fill="none" stroke="currentColor" stroke-width="1.5" transform="rotate(-24 16 16)"/><ellipse cx="16" cy="16" rx="14" ry="5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5" transform="rotate(30 16 16)"/></svg><span><b>NEXUS//04</b><small id="gx-mname">Mission collective</small></span></a>
   <ol class="gx-steps" aria-label="Mission steps"><li>01 Brief</li><li>02 Build</li><li>03 Launch</li><li>04 Operate</li><li>05 Debrief</li></ol>
-  <div class="gx-topbtns"><button type="button" id="gx-sound" class="nx-pill" aria-pressed="true">Sound on</button><a class="nx-pill" href="index.html">Home</a></div>
+  <div class="gx-topbtns"><button type="button" id="gx-settings" class="nx-pill" aria-haspopup="dialog">Settings</button><button type="button" id="gx-sound" class="nx-pill" aria-pressed="true">Sound on</button><a class="nx-pill" href="index.html">Home</a></div>
 </header>
 <main>
   <section data-screen="pick" id="gx-pick" hidden></section>
@@ -27,6 +27,10 @@
   <section data-screen="ops" id="gx-ops" hidden></section>
   <section data-screen="debrief" id="gx-debrief" hidden></section>
 </main>
+<div class="gx-modal" id="gx-pollbox" hidden></div>
+<div class="gx-modal" id="gx-setbox" hidden></div>
+<div class="gx-toast" id="gx-toast" aria-live="polite"></div>
+<div class="gx-lost" id="gx-lost" hidden><b>SIGNAL LOST</b><span id="gx-lostsub"></span></div>
 <footer class="gx-foot">Built for the NASA Space Apps Challenge 2026 by team NEXUS//04. Not affiliated with or endorsed by NASA. <a href="sources.html">Sources and data</a></footer>
 <noscript><p style="padding:2em;color:#eee">This game needs JavaScript.</p></noscript>
 <script type="module" src="js/game.js"></script>

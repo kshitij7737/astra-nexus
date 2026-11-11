@@ -41,9 +41,10 @@ export const COMMON = {
 };
 
 const RANKS = [
-  [95, 'Flight Director'], [80, 'Mission Lead'], [60, 'Flight Controller'], [40, 'Systems Engineer'], [0, 'Cadet'],
+  [95, 'Flight Director'], [80, 'Mission Lead'], [60, 'Flight Controller'], [40, 'Systems Engineer'], [0, 'Trainee'],
 ];
 export const rankFor = s => RANKS.find(([min]) => s >= min)[1];
+export const gradeFor = s => s >= 95 ? 'S' : s >= 80 ? 'A' : s >= 60 ? 'B' : s >= 40 ? 'C' : 'F';
 
 // ---------------------------------------------------------------------------
 export const GAME = {
@@ -276,3 +277,40 @@ export const GAME = {
   },
 };
 export const ORDER = ['astra', 'lunaris', 'earth', 'mars'];
+
+// ---------------------------------------------------------------------------
+// Difficulty. Every risk is shown to the player before it can hurt them.
+export const DIFFICULTY = {
+  cadet: { id: 'cadet', label: 'Cadet', blurb: 'Learn the ropes. No launch failures, no surprise faults, gentle damage.', launchRisk: 0, anomalies: [], timer: 0, dmg: 0.5, failBelow: 25, budgetMul: 1.1 },
+  flight: { id: 'flight', label: 'Flight', blurb: 'The real thing. Overloaded rockets can fail. One fault to handle against the clock.', launchRisk: 1, anomalies: [6], timer: 15, dmg: 1, failBelow: 40, budgetMul: 1 },
+  commander: { id: 'commander', label: 'Commander', blurb: 'Tight budget, three faults, 9 seconds to react. The spacecraft can die.', launchRisk: 2, anomalies: [2, 6, 13], timer: 9, dmg: 1.5, failBelow: 50, budgetMul: 0.96 },
+};
+
+// Spacecraft faults (scenario events). Each is modelled on a kind of fault real missions have handled.
+// If the timer runs out, the last option (do nothing) is applied.
+export const ANOMALIES = [
+  { id: 'wheel', title: 'Reaction wheel fault', text: 'One reaction wheel is grinding and pointing is drifting. Kepler lost two of its four wheels this way.',
+    options: [
+      { label: 'Switch to thruster control', effect: { dvCost: 45 }, result: 'Pointing is steady again. It cost propellant.' },
+      { label: 'Power-cycle the wheel', effect: { skipPasses: 1, battCost: 30 }, result: 'Wheel recovered after a reboot. One pass missed.' },
+      { label: 'Ignore it', effect: { health: -40, value: 0.7, orbits: 2 }, result: 'The wheel seized. Images are blurred and the spacecraft is damaged.' },
+    ] },
+  { id: 'flare', title: 'Solar particle storm', text: 'A burst of energetic particles from the Sun is arriving. Electronics are at risk.',
+    options: [
+      { label: 'Safe the instruments', effect: { skipPasses: 1 }, result: 'Instruments rode it out switched off. One pass lost, no harm done.' },
+      { label: 'Keep observing', effect: { health: -30 }, result: 'You kept collecting, but radiation damaged the electronics.' },
+      { label: 'Do nothing', effect: { health: -45 }, result: 'The storm hit with everything running. Serious damage.' },
+    ] },
+  { id: 'bitflip', title: 'Recorder memory errors', text: 'Radiation is flipping bits in the recorder. Stored data is being corrupted.',
+    options: [
+      { label: 'Run error correction', effect: { battCost: 45, skipPasses: 1 }, result: 'Memory scrubbed. Battery and one pass spent.' },
+      { label: 'Downlink fast, then wipe', effect: { contactMul: 1.4, orbits: 1, health: -10 }, result: 'You pushed data home early. Minor wear on the radio.' },
+      { label: 'Ignore it', effect: { health: -25, value: 0.6, orbits: 2 }, result: 'Corrupted files reached Earth. Some science is unusable.' },
+    ] },
+  { id: 'heater', title: 'Heater stuck on', text: 'A propellant-line heater will not switch off. It is draining the battery.',
+    options: [
+      { label: 'Switch to the backup circuit', effect: { battCost: 20 }, result: 'Backup heater online. Small battery cost.' },
+      { label: 'Cut power to that zone', effect: { health: -15 }, result: 'Drain stopped, but a cold propellant line took some damage.' },
+      { label: 'Let it run', effect: { battCost: 9999, health: -20 }, result: 'The battery drained flat.' },
+    ] },
+];

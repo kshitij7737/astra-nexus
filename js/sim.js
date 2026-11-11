@@ -5,7 +5,8 @@
 //   Solar power       P = rating × derating ÷ d²   (d = distance from Sun in AU)
 //   Delta-v           Δv = Isp × g0 × ln(m_wet / m_dry)
 //   Data return       D = rate × efficiency × contact time
-import { COMMON, ISP, G0 } from './game-data.js';
+import { COMMON, ISP, G0, DIFFICULTY, ANOMALIES } from './game-data.js';
+export const diffOf = id => DIFFICULTY[id] || DIFFICULTY.flight;
 
 const opt = (list, id) => list.find(o => o.id === id) || list[0];
 
@@ -17,7 +18,8 @@ export function defaultConfig(m) {
   };
 }
 
-export function derive(m, cfg) {
+export function derive(m, cfg, diffId) {
+  const diff = diffOf(diffId);
   const O = COMMON.options;
   const solar = opt(O.solar, cfg.solar), batt = opt(O.battery, cfg.battery), radio = opt(O.radio, cfg.radio);
   const rec = opt(O.recorder, cfg.recorder), launch = opt(O.launch, cfg.launch);
@@ -55,16 +57,26 @@ export function derive(m, cfg) {
     { id: 'power', ok: solarW >= sunLoad, label: 'Arrays power everything at once', detail: `${Math.round(solarW)} W vs ${Math.round(sunLoad)} W load` },
     { id: 'science', ok: missing.length === 0, label: 'Every objective has an instrument', detail: missing.length ? `Missing: ${missing.map(o => o.label.toLowerCase()).join('; ')}` : 'All covered' },
   ];
-  const budget = m.budget ?? COMMON.budget;
+  const budget = Math.round((m.budget ?? COMMON.budget) * diff.budgetMul);
+  checks[1].ok = cost <= budget; checks[1].detail = `${cost} of ${budget} credits`;
+  // launch reliability falls as the rocket is loaded close to its limit (shown to the player)
+  const margin = 1 - wet / launch.wetKg;
+  const reliability = Math.max(0.86, Math.min(0.995, 0.995 - Math.max(0, 0.12 - margin) * 0.9));
+  const launchFail = diff.launchRisk ? Math.min(0.3, (1 - reliability) * diff.launchRisk) : 0;
+  checks.push({ id: 'reserve', ok: dvAvail - dvNeed >= 60, soft: true, label: 'Propellant reserve for surprises', detail: `${Math.round(dvAvail - dvNeed)} m/s spare, 60 recommended` });
+  checks.push({ id: 'margin', ok: launchFail <= 0.02, soft: true, label: 'Launch risk acceptable', detail: diff.launchRisk ? `${(launchFail * 100).toFixed(1)}% chance the rocket fails (mass margin ${Math.round(margin * 100)}%)` : 'No launch failures on Cadet' });
   const launchable = checks.find(c => c.id === 'mass').ok && checks.find(c => c.id === 'budget').ok && cfg.inst.length > 0;
-  return { budget: m.budget ?? COMMON.budget, solar, batt, radio, rec, launch, orbit, insts, dry, wet, cost, solarW, battWh, rateMbps, storage: rec.gbit, periodMin, eclipseFrac, eclipseMin, eclipseWh, dvAvail, dvNeed, contactMin, passMin, perContactGbit, perPassGbit, sunLoad, a, checks, launchable };
+  return { diff, margin, reliability, launchFail, budget, solar, batt, radio, rec, launch, orbit, insts, dry, wet, cost, solarW, battWh, rateMbps, storage: rec.gbit, periodMin, eclipseFrac, eclipseMin, eclipseWh, dvAvail, dvNeed, contactMin, passMin, perContactGbit, perPassGbit, sunLoad, a, checks, launchable };
 }
 
 const inWin = (p, w) => w[0] <= w[1] ? p >= w[0] && p < w[1] : p >= w[0] || p < w[1];
 
 export class Sim {
   constructor(m, cfg, opts = {}) {
-    this.m = m; this.cfg = cfg; this.d = derive(m, cfg);
+    this.m = m; this.cfg = cfg; this.diff = diffOf(opts.diff); this.d = derive(m, cfg, opts.diff);
+    this.health = 100; this.firedAnoms = new Set();
+    const off = { astra: 1, lunaris: 3, earth: 2, mars: 0 }[m.id] || 0, pool = ANOMALIES.slice(off).concat(ANOMALIES);
+    this.anoms = this.diff.anomalies.map((o, i) => ({ orbit: o, ...pool[i] }));
     this.interactive = !!opts.interactive;
     this.dt = 20; // s of mission time per step
     this.T = this.d.periodMin * 60;
@@ -113,15 +125,25 @@ export class Sim {
     if (e.bonusData) this.addData(e.bonusData.inst, e.bonusData.gbit);
     if (e.battCost) this.batt = Math.max(0, this.batt - e.battCost);
     if (e.relay) this.relay = true;
+    if (e.battBonus) this.batt = this.d.battWh;
+    if (e.health) this.damage(-e.health, 'fault');
     if (e.dvCost) {
       this.dvMargin -= e.dvCost;
       if (this.dvMargin < 0) { this.failed = { reason: 'propellant', text: 'Out of propellant. The spacecraft could no longer hold its orbit and the mission ended early.' }; this.done = true; }
     }
   }
+  damage(n, why) {
+    if (n <= 0 || this.done) return;
+    this.health = Math.max(0, this.health - n);
+    if (this.health <= 0 && !this.failed) {
+      this.failed = { reason: 'lost', text: why === 'power' ? 'Repeated deep battery discharges killed the spacecraft. It went silent and never answered again.' : 'The spacecraft took too much damage and stopped responding. Mission lost.' };
+      this.note('Spacecraft not responding. Signal lost.', 'bad'); this.done = true;
+    }
+  }
   choose(optionIndex) {
     const p = this.pending; if (!p) return null;
     let result;
-    if (p.type === 'event') { const o = p.item.options[optionIndex]; this.applyEffect(o.effect); this.choices.push({ title: p.item.title, choice: o.label }); result = o.result; }
+    if (p.type === 'event' || p.type === 'anomaly') { const o = p.item.options[optionIndex]; this.applyEffect(o.effect); this.choices.push({ title: p.item.title, choice: o.label }); result = o.result; }
     else { const ok = optionIndex === p.item.correct; if (ok) this.challengeScore += 5; result = ok ? `Correct. ${p.item.why}` : `Not quite. ${p.item.why}`; }
     this.pending = null; return result;
   }
@@ -135,6 +157,8 @@ export class Sim {
         if (ev) { this.firedEvents.add(ev.orbit); this.pending = { type: 'event', item: ev }; return; }
         const ch = this.m.challenges.find(c => c.orbit === ob && !this.firedChallenges.has(c.orbit));
         if (ch) { this.firedChallenges.add(ch.orbit); this.pending = { type: 'challenge', item: ch }; return; }
+        const an = this.anoms.find(a => a.orbit === ob && !this.firedAnoms.has(a.orbit));
+        if (an) { this.firedAnoms.add(an.orbit); this.pending = { type: 'anomaly', item: an, timer: this.diff.timer }; return; }
       }
     }
     if (ob >= this.m.orbits) { this.done = true; return; }
@@ -173,7 +197,7 @@ export class Sim {
     this.batt = Math.min(this.d.battWh, this.batt + (gen - load) * dt / 3600);
     if (this.batt <= 0) {
       this.batt = 0;
-      if (!this.safe) { this.safe = true; this.brownouts++; this.note('Battery empty. Safe mode: instruments and radio off until the arrays recharge.', 'warn'); }
+      if (!this.safe) { this.safe = true; this.brownouts++; this.note('Battery empty. Safe mode: instruments and radio off until the arrays recharge.', 'warn'); this.damage(8 * this.diff.dmg, 'power'); }
     }
     this.t += dt;
     if (Math.round(this.t / dt) % 6 === 0) this.history.push({ t: this.t, batt: this.batt / this.d.battWh, store: this.storageUsed() / this.d.storage, ret: this.sentTotal });
@@ -189,12 +213,14 @@ export class Sim {
   }
   result() {
     const objs = this.objectiveProgress();
-    if (this.failed?.reason === 'insertion') return { score: 0, objs, failed: this.failed, brown: 0, lost: 0, challenge: 0, base: 0 };
+    if (this.failed?.reason === 'insertion' || this.failed?.reason === 'launch') return { score: 0, objs, failed: this.failed, missionFailed: true, brown: 0, lost: 0, challenge: 0, base: 0, health: 0 };
     const base = objs.reduce((s, o) => s + o.w * o.frac, 0);
     const pen = Math.min(15, this.brownouts * 3) + Math.min(5, Math.floor(this.lost / 20));
-    const score = Math.max(0, Math.min(100, Math.round(base + this.challengeScore - pen)));
-    return { score, objs, failed: this.failed, brown: this.brownouts, lost: this.lost, challenge: this.challengeScore, base: Math.round(base), pen, sent: this.sentTotal, relay: this.relay };
+    let score = Math.max(0, Math.min(100, Math.round(base + this.challengeScore - pen)));
+    if (this.failed) score = Math.round(score * 0.6); // a lost spacecraft keeps only part of the credit
+    const missionFailed = !!this.failed || score < this.diff.failBelow;
+    return { score, objs, failed: this.failed, missionFailed, health: Math.round(this.health), failBelow: this.diff.failBelow, brown: this.brownouts, lost: this.lost, challenge: this.challengeScore, base: Math.round(base), pen, sent: this.sentTotal, relay: this.relay };
   }
 }
 
-export function estimate(m, cfg) { return new Sim(m, cfg).runAll(); }
+export function estimate(m, cfg, diff) { return new Sim(m, cfg, { diff }).runAll(); }
