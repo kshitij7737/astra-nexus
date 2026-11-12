@@ -49,7 +49,7 @@ export const gradeFor = s => s >= 95 ? 'S' : s >= 80 ? 'A' : s >= 60 ? 'B' : s >
 // ---------------------------------------------------------------------------
 export const GAME = {
   astra: {
-    id: 'astra', budget: 1200, name: 'ASTRA', world: 'Apophis', owner: 'Sneha', accent: '#e8a85c',
+    id: 'astra', budget: 1200, name: 'ASTRA', world: 'Apophis', owner: 'Sneha', accent: '#4aa8ff',
     tagline: 'Watch an asteroid change as Earth pulls on it.',
     body: { name: 'Apophis', radiusKm: 0.17, kind: 'asteroid' },
     solarAU: 1.0,
@@ -70,9 +70,9 @@ export const GAME = {
       { id: 'tes', name: 'Thermal spectrometer', heritage: 'OTES', kg: 6, w: 15, mbps: 0.4, cr: 60, src: 'apexUA' },
     ],
     objectives: [
-      { id: 'before', label: 'Map Apophis before the Earth pass', inst: ['cam', 'alt'], need: 20, phase: 'pre', w: 30 },
-      { id: 'after', label: 'Map it again after the pass', inst: ['cam', 'alt'], need: 20, phase: 'post', w: 35 },
-      { id: 'surface', label: 'Read surface minerals and heat', inst: ['vis', 'tes'], need: 10, phase: 'all', w: 25 },
+      { id: 'before', label: 'Map Apophis before the Earth pass', inst: ['cam', 'alt'], need: 20, phase: 'pre', w: 30 , why: "A close pass by Earth can change an asteroid's spin and maybe its surface. This map is the \"before\" picture." },
+      { id: 'after', label: 'Map it again after the pass', inst: ['cam', 'alt'], need: 20, phase: 'post', w: 35 , why: "Comparing after with before shows what Earth's gravity changed. That is the main goal of NASA's real OSIRIS-APEX plan." },
+      { id: 'surface', label: 'Read surface minerals and heat', inst: ['vis', 'tes'], need: 10, phase: 'all', w: 25 , why: "Colours and heat reveal what the surface is made of and how loose or rocky it is." },
     ],
     events: [
       { orbit: 5, title: 'Close approach in two loops',
@@ -108,7 +108,7 @@ export const GAME = {
   },
 
   lunaris: {
-    id: 'lunaris', budget: 1200, name: 'LUNARIS', world: 'Moon', owner: 'Karishma', accent: '#b9c8e8',
+    id: 'lunaris', budget: 1200, name: 'LUNARIS', world: 'Moon', owner: 'Karishma', accent: '#9fe0ea',
     tagline: 'Read the coldest craters on the Moon.',
     body: { name: 'Moon', radiusKm: 1737.4, mu: 4900, kind: 'moon' },
     solarAU: 1.0,
@@ -128,9 +128,9 @@ export const GAME = {
       { id: 'neu', name: 'Neutron detector', heritage: 'LEND', kg: 20, w: 15, mbps: 0.15, cr: 60, src: 'lroInst' },
     ],
     objectives: [
-      { id: 'terrain', label: 'Image the crater and its rim', inst: ['cam', 'alt'], need: 14, phase: 'all', w: 30 },
-      { id: 'temp', label: 'Map its temperature', inst: ['rad'], need: 1.5, phase: 'all', w: 30 },
-      { id: 'ice', label: 'Look for signs of ice', inst: ['sar', 'neu'], need: 6, phase: 'all', w: 30 },
+      { id: 'terrain', label: 'Image the crater and its rim', inst: ['cam', 'alt'], need: 14, phase: 'all', w: 30 , why: "Detailed images and heights show the shape of craters near the pole that sunlight never reaches." },
+      { id: 'temp', label: 'Map its temperature', inst: ['rad'], need: 1.5, phase: 'all', w: 30 , why: "Ground this cold can trap ice for billions of years. LRO's Diviner measured some of the coldest temperatures in the Solar System here." },
+      { id: 'ice', label: 'Look for signs of ice', inst: ['sar', 'neu'], need: 6, phase: 'all', w: 30 , why: "Radar and neutron readings can hint at ice. They are clues, not proof: confirming ice needs more than one method." },
     ],
     events: [
       { orbit: 4, title: 'Low sun over the rim',
@@ -165,7 +165,7 @@ export const GAME = {
   },
 
   earth: {
-    id: 'earth', budget: 1100, name: 'HALO', world: 'Earth', owner: 'Kshitij', accent: '#6fb4ff',
+    id: 'earth', budget: 1100, name: 'HALO', world: 'Earth', owner: 'Kshitij', accent: '#a78bfa',
     tagline: 'Watch the thin blue line that keeps us alive.',
     body: { name: 'Earth', radiusKm: 6371, mu: 398600, kind: 'earth' },
     solarAU: 1.0,
@@ -184,9 +184,9 @@ export const GAME = {
       { id: 'limb', name: 'Limb sounder', heritage: 'MLS', kg: 18, w: 50, mbps: 1, cr: 70, src: 'aura' },
     ],
     objectives: [
-      { id: 'aerosol', label: 'Track dust and haze', inst: ['img', 'uv'], need: 8, phase: 'all', w: 30 },
-      { id: 'ozone', label: 'Measure ozone over Antarctica', inst: ['uv', 'limb'], need: 1.8, phase: 'all', w: 30 },
-      { id: 'profile', label: 'Profile temperature and water vapour', inst: ['ir'], need: 3, phase: 'all', w: 30 },
+      { id: 'aerosol', label: 'Track dust and haze', inst: ['img', 'uv'], need: 8, phase: 'all', w: 30 , why: "Dust and haze change how much sunlight reaches the ground and affect the air we breathe." },
+      { id: 'ozone', label: 'Measure ozone over Antarctica', inst: ['uv', 'limb'], need: 1.8, phase: 'all', w: 30 , why: "The ozone layer blocks harmful ultraviolet light. Satellites track the Antarctic ozone hole every southern spring." },
+      { id: 'profile', label: 'Profile temperature and water vapour', inst: ['ir'], need: 3, phase: 'all', w: 30 , why: "Temperature and water vapour at different heights drive the weather and feed forecasts." },
     ],
     events: [
       { orbit: 4, title: 'Clouds over the Indo-Gangetic Plain',
@@ -221,7 +221,7 @@ export const GAME = {
   },
 
   mars: {
-    id: 'mars', budget: 1400, name: 'JEZERO ECHO', world: 'Mars', owner: 'Anthariksha', accent: '#ff7a3d',
+    id: 'mars', budget: 1400, name: 'JEZERO ECHO', world: 'Mars', owner: 'Anthariksha', accent: '#d0674c', accent2: '#a9d4ff',
     tagline: 'Read an ancient lake from orbit.',
     body: { name: 'Mars', radiusKm: 3389.5, mu: 42828, kind: 'mars' },
     solarAU: 1.524,
@@ -240,9 +240,9 @@ export const GAME = {
       { id: 'uhf', name: 'Relay radio', heritage: 'Electra', kg: 12, w: 30, mbps: 0.5, cr: 60, src: 'mroInst' },
     ],
     objectives: [
-      { id: 'context', label: 'Map Jezero in context', inst: ['ctx'], need: 3, phase: 'all', w: 25 },
-      { id: 'delta', label: 'Zoom into the river delta', inst: ['hir'], need: 5, phase: 'all', w: 35 },
-      { id: 'minerals', label: 'Find water-formed minerals', inst: ['cri'], need: 3, phase: 'all', w: 30 },
+      { id: 'context', label: 'Map Jezero in context', inst: ['ctx'], need: 3, phase: 'all', w: 25 , why: "A wide map shows Jezero's rim, the old river channel and the fan-shaped delta together." },
+      { id: 'delta', label: 'Zoom into the river delta', inst: ['hir'], need: 5, phase: 'all', w: 35 , why: "Layers in the delta look like sediment dropped by flowing water, evidence that a lake once filled the crater." },
+      { id: 'minerals', label: 'Find water-formed minerals', inst: ['cri'], need: 3, phase: 'all', w: 30 , why: "Clays and carbonates form in water. Spotting them from orbit supports the ancient-lake idea and helped choose Jezero for Perseverance." },
     ],
     events: [
       { orbit: 4, title: 'Dust storm rising',
@@ -314,3 +314,6 @@ export const ANOMALIES = [
       { label: 'Let it run', effect: { battCost: 9999, health: -20 }, result: 'The battery drained flat.' },
     ] },
 ];
+
+// Best tested build per mission and difficulty (searched over every combination of parts; see HANDOVER.md).
+export const RECOMMENDED = {"astra": {"cadet": {"solar": "S", "battery": "S", "radio": "L", "recorder": "L", "launch": "A", "orbit": "far", "propKg": 60, "inst": ["cam", "vis"]}, "flight": {"solar": "S", "battery": "S", "radio": "L", "recorder": "L", "launch": "A", "orbit": "far", "propKg": 60, "inst": ["cam", "vis"]}, "commander": {"solar": "S", "battery": "S", "radio": "L", "recorder": "L", "launch": "A", "orbit": "far", "propKg": 60, "inst": ["cam", "vis"]}}, "lunaris": {"cadet": {"solar": "S", "battery": "L", "radio": "L", "recorder": "L", "launch": "A", "orbit": "100", "propKg": 120, "inst": ["cam", "rad", "sar"]}, "flight": {"solar": "S", "battery": "L", "radio": "L", "recorder": "S", "launch": "A", "orbit": "100", "propKg": 120, "inst": ["cam", "rad", "sar"]}, "commander": {"solar": "S", "battery": "L", "radio": "S", "recorder": "S", "launch": "A", "orbit": "100", "propKg": 120, "inst": ["cam", "rad", "sar"]}}, "earth": {"cadet": {"solar": "S", "battery": "L", "radio": "L", "recorder": "S", "launch": "A", "orbit": "705", "propKg": 30, "inst": ["uv", "ir"]}, "flight": {"solar": "S", "battery": "L", "radio": "L", "recorder": "S", "launch": "A", "orbit": "705", "propKg": 30, "inst": ["uv", "ir"]}, "commander": {"solar": "S", "battery": "L", "radio": "L", "recorder": "S", "launch": "A", "orbit": "705", "propKg": 30, "inst": ["uv", "ir"]}}, "mars": {"cadet": {"solar": "S", "battery": "L", "radio": "L", "recorder": "L", "launch": "A", "orbit": "400", "propKg": 120, "inst": ["ctx", "hir", "cri"]}, "flight": {"solar": "S", "battery": "L", "radio": "L", "recorder": "L", "launch": "A", "orbit": "400", "propKg": 120, "inst": ["ctx", "hir", "cri"]}, "commander": {"solar": "S", "battery": "L", "radio": "L", "recorder": "L", "launch": "A", "orbit": "400", "propKg": 120, "inst": ["ctx", "hir", "cri"]}}};

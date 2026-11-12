@@ -197,7 +197,7 @@ export function buildWorld(m) {
     // exaggerated layer shells (illustrative scale)
     [[1.05, 0x7fc6ff, 0.07], [1.09, 0x9ad0ff, 0.045], [1.13, 0xb6c8ff, 0.03], [1.18, 0xc9b6ff, 0.022]].forEach(([r, col, op]) => {
       const s = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, side: THREE.BackSide, depthWrite: false }));
-      s.userData.baseOpacity = op; g.add(s);
+      s.userData.baseOpacity = op; s.userData.shell = true; g.add(s);
     });
     const ring = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.003, 8, 160), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }));
     ring.userData.baseOpacity = 0.35; ring.rotation.y = Math.PI / 2; ring.rotation.z = THREE.MathUtils.degToRad(8); g.add(ring);

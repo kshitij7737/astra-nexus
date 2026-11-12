@@ -213,13 +213,17 @@ export class Sim {
   }
   result() {
     const objs = this.objectiveProgress();
-    if (this.failed?.reason === 'insertion' || this.failed?.reason === 'launch') return { score: 0, objs, failed: this.failed, missionFailed: true, brown: 0, lost: 0, challenge: 0, base: 0, health: 0 };
+    if (this.failed?.reason === 'insertion' || this.failed?.reason === 'launch') return { score: 0, preLoss: 0, outcome: 'failure', objs, failed: this.failed, missionFailed: true, brown: 0, lost: 0, challenge: 0, base: 0, pen: 0, penBrown: 0, penLost: 0, health: 0, sent: 0, generated: 0, onboard: 0 };
     const base = objs.reduce((s, o) => s + o.w * o.frac, 0);
-    const pen = Math.min(15, this.brownouts * 3) + Math.min(5, Math.floor(this.lost / 20));
-    let score = Math.max(0, Math.min(100, Math.round(base + this.challengeScore - pen)));
+    const penBrown = Math.min(15, this.brownouts * 3), penLost = Math.min(5, Math.floor(this.lost / 20)), pen = penBrown + penLost;
+    const preLoss = Math.max(0, Math.min(100, Math.round(base + this.challengeScore - pen)));
+    let score = preLoss;
     if (this.failed) score = Math.round(score * 0.6); // a lost spacecraft keeps only part of the credit
     const missionFailed = !!this.failed || score < this.diff.failBelow;
-    return { score, objs, failed: this.failed, missionFailed, health: Math.round(this.health), failBelow: this.diff.failBelow, brown: this.brownouts, lost: this.lost, challenge: this.challengeScore, base: Math.round(base), pen, sent: this.sentTotal, relay: this.relay };
+    // one outcome for badge, headline and summary
+    const outcome = missionFailed ? 'failure' : objs.every(o => o.frac >= 1) ? 'success' : 'partial';
+    const onboard = this.storageUsed();
+    return { score, preLoss, outcome, objs, failed: this.failed, missionFailed, health: Math.round(this.health), failBelow: this.diff.failBelow, brown: this.brownouts, lost: this.lost, challenge: this.challengeScore, base, pen, penBrown, penLost, sent: this.sentTotal, generated: this.collected + this.lost, onboard, relay: this.relay };
   }
 }
 

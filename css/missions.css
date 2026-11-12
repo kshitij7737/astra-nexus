@@ -238,3 +238,7 @@
 @media (prefers-reduced-motion: reduce) {
   .astra-mm *, .astra-mm *::before, .astra-mm *::after { animation: none !important; transition: none !important; }
 }
+/* lighter, sentence-case headings (redesign brief); giant world names stay as display art */
+.astra-mm h1, .astra-mm h2 { font-weight: 650; font-stretch: 104%; text-transform: none; letter-spacing: -.02em; line-height: 1.04; }
+.mm-tcard__name, .mm-tdetail h3, .mm-pdetail h3, .mm-icard h3, .mm-frame__label b { text-transform: none; font-stretch: 104%; font-weight: 650; letter-spacing: -.01em; }
+.mm-icard h3 { font-size: 26px; }

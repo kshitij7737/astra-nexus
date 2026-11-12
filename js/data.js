@@ -36,7 +36,7 @@ export const MISSIONS = [
   {
     id: 'astra', name: 'ASTRA', display: 'ASTRA', subtitle: 'Asteroid Apophis encounter',
     reference: 'Science reference: NASA OSIRIS-APEX at asteroid 99942 Apophis',
-    owner: 'Research: Sneha', color: 0xb9a68e, accent: '#e8a85c', glow: 0xe8a85c,
+    owner: 'Research: Sneha', color: 0xb9a68e, accent: '#4aa8ff', glow: 0x4aa8ff,
     vertical: '99942 APOPHIS · 13 APR 2029',
     hero: {
       kicker: 'The close pass',
@@ -77,7 +77,7 @@ export const MISSIONS = [
   {
     id: 'lunaris', name: 'LUNARIS', display: 'LUNARIS', subtitle: 'Lunar polar orbiter',
     reference: 'Science reference: NASA Lunar Reconnaissance Orbiter (LRO)',
-    owner: 'Research: Karishma', color: 0xb8b8b8, accent: '#b9c8e8', glow: 0x9fb4e0,
+    owner: 'Research: Karishma', color: 0xb8b8b8, accent: '#9fe0ea', glow: 0x9fe0ea,
     vertical: 'LRO · IN ORBIT SINCE 2009',
     hero: {
       kicker: 'The longest watch',
@@ -120,7 +120,7 @@ export const MISSIONS = [
   {
     id: 'earth', name: 'HALO', display: 'EARTH', subtitle: 'Atmospheric observation satellite',
     reference: 'Science reference: NASA Terra, Aqua and Aura, plus NASA POWER',
-    owner: 'Research: Kshitij', color: 0x2a6fd6, accent: '#6fb4ff', glow: 0x4f9cff,
+    owner: 'Research: Kshitij', color: 0x2a6fd6, accent: '#a78bfa', glow: 0xa78bfa,
     vertical: 'AURA · 705 KM SUN-SYNCHRONOUS',
     hero: {
       kicker: 'The thin blue line',
@@ -167,7 +167,7 @@ export const MISSIONS = [
   {
     id: 'mars', name: 'JEZERO ECHO', display: 'MARS', subtitle: 'Jezero-focused reconnaissance orbiter',
     reference: 'Science reference: NASA Mars Reconnaissance Orbiter (MRO)',
-    owner: 'Research: Anthariksha', color: 0xc1440e, accent: '#ff7a4d', glow: 0xff5a2a,
+    owner: 'Research: Anthariksha', color: 0xc1440e, accent: '#d0674c', glow: 0xd0674c,
     vertical: 'JEZERO · 18.38° N 77.58° E',
     hero: {
       kicker: 'The dry lake',

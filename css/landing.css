@@ -103,3 +103,24 @@
 .lx-achs span { font: 11px var(--mono); letter-spacing: .08em; padding: 7px 11px; border-radius: 999px; border: 1px dashed var(--line); color: var(--muted); }
 .lx-achs span.on { border: 1px solid #ffb35c; color: var(--ink); background: rgba(255,179,92,.1); }
 @media (max-width: 640px) { .lx-stats { grid-template-columns: 1fr 1fr; } }
+/* lighter headings (redesign brief) */
+.lx h2 { font-weight: 650; font-stretch: 104%; text-transform: none; font-size: clamp(32px, 4vw, 60px); line-height: 1.04; letter-spacing: -.02em; }
+.lx-steps b { font-weight: 700; text-transform: none; font-stretch: 104%; }
+.lx-ch h2 { font-size: clamp(28px, 3vw, 46px); }
+
+/* eight-planet labels */
+.lx-plabels { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .6s; }
+.lx-plabels.on { opacity: 1; }
+.lx-plabels span { position: absolute; left: 0; top: 0; font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: rgba(242,239,233,.8); white-space: nowrap; text-shadow: 0 1px 6px #000; }
+/* handoff + dashboard */
+.lx-handoff { min-height: 90vh; }
+.lx-dash { padding: 16vh var(--pad); position: relative; z-index: 2; background: linear-gradient(rgba(2,3,10,0), rgba(2,3,10,.9) 18%); }
+.lx-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 24px; }
+.lx-card { display: grid; gap: 8px; align-content: start; padding: 20px; border-radius: 16px; border: 1px solid var(--line); border-top: 3px solid var(--acc); background: rgba(10,12,18,.75); backdrop-filter: blur(6px); }
+.lx-card h3 { margin: 0; font-weight: 700; font-size: 22px; color: var(--ink); }
+.lx-card p { margin: 0; color: #d8d4cc; font-size: 14px; }
+.lx-card__k { font: 500 10px var(--mono) !important; letter-spacing: .14em; text-transform: uppercase; color: var(--muted) !important; display: flex; align-items: center; gap: 8px; }
+.lx-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc2, var(--acc)) 35%, transparent); }
+.lx-card__meta { display: flex; justify-content: space-between; font: 11px var(--mono) !important; color: var(--muted) !important; }
+@media (max-width: 1000px) { .lx-cards { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .lx-cards { grid-template-columns: 1fr; } }
