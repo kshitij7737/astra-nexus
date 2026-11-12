@@ -77,11 +77,11 @@ function archive() {
 
 // ---------- 3D solar system that follows the story
 async function sky() {
-  let THREE, buildWorld, buildCraft;
+  let THREE, buildWorld, buildCraft, lightCraft;
   try {
     THREE = await import('../vendor/three.module.min.js');
     ({ buildWorld } = await import('./scene.js'));
-    ({ buildCraft } = await import('./game3d.js'));
+    ({ buildCraft, lightCraft } = await import('./game3d.js'));
     const c = document.createElement('canvas'); if (!(c.getContext('webgl2') || c.getContext('webgl'))) throw new Error('no webgl');
   } catch (e) { document.body.classList.add('lx-no3d'); return; }
   const { MISSIONS } = await import('./data.js');
@@ -156,8 +156,13 @@ async function sky() {
   const sizeOf = { astra: 0.32, earth: 1.1, lunaris: 0.32, mars: 0.8 };
   // the spacecraft (same model and colours as in the game)
   const { group: craft } = buildCraft({ solar: 'L', battery: 'S', radio: 'L', recorder: 'S', propKg: 80, inst: [] }, GAME.earth);
-  craft.traverse(o => { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.envMap = env; m.envMapIntensity = 0.8; }); } });
-  craft.scale.setScalar(0.09); scene.add(craft);
+  lightCraft(craft, env);
+  // A neutral fill makes the antenna and blue arrays legible against the dark sky.
+  const craftFill = new THREE.PointLight(0xe3eeff, 0.1);
+  craftFill.distance = 0.8;
+  scene.add(craftFill);
+  craft.scale.setScalar(0.09);
+  scene.add(craft);
   const plume = craft.userData.plume;
   let t0 = 0.9, focus = 'sun';
   const HERO = new THREE.Vector3(0, 62, 96);
@@ -201,12 +206,14 @@ async function sky() {
     lastCraft.copy(craftPos);
     craftPos.lerp(craftGoal, reduced || first ? 1 : 1 - Math.pow(focus === 'exit' ? 0.3 : 0.15, dt));
     craft.position.copy(craftPos);
+    craftFill.position.copy(craftPos).add(v3.set(-0.14, 0.23, 0.18));
     const sp = craftPos.distanceTo(lastCraft) / Math.max(dt, 1e-3);
-    if (sp > 0.05) { const ahead = craftPos.clone().add(craftPos.clone().sub(lastCraft)); craft.up.set(0, 1, 0); craft.lookAt(ahead); craft.rotateX(Math.PI / 2); }
+    if (reduced || first) craft.rotation.set(0.42, -0.5, -0.12);
+    else if (sp > 0.05) { const ahead = craftPos.clone().add(craftPos.clone().sub(lastCraft)); craft.up.set(0, 1, 0); craft.lookAt(ahead); craft.rotateX(Math.PI / 2); }
     else craft.rotation.y += dt * 0.2;
-    if (plume) plume.material.opacity = sp > 1.5 ? Math.min(0.9, (sp - 1.5) * 0.2) : 0;
+    if (plume) plume.material.opacity = !reduced && !first && sp > 1.5 ? Math.min(0.9, (sp - 1.5) * 0.2) : 0;
     const near = focus !== 'sun' && focus !== 'dash';
-    craft.scale.setScalar(near ? 0.09 * Math.max(0.75, sizeOf[focus === 'exit' ? 'mars' : focus]) / 0.6 : 0.09);
+    craft.scale.setScalar(near ? 0.14 * Math.max(0.75, sizeOf[focus === 'exit' ? 'mars' : focus]) / 0.6 : 0.09);
     ['Jupiter', 'Saturn', 'Uranus', 'Neptune'].forEach(nm => { bodies[nm].visible = !near; });
     // planet labels only on the overview
     const showLabels = focus === 'sun';

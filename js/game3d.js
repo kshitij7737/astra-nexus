@@ -52,7 +52,23 @@ function dish(r) {
   const pts = []; for (let i = 0; i <= 20; i++) { const x = (i / 20) * r; pts.push(new THREE.Vector2(x, 0.4 * r * (x / r) ** 2)); }
   const g = new THREE.Group();
   const d = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), M.white()); g.add(d);
-  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, r * 0.7), M.grey()); feed.position.y = r * 0.35; g.add(feed);
+  const supportMaterial = M.grey();
+  const focus = new THREE.Vector3(0, r * 0.6, 0);
+  const axis = new THREE.Vector3(0, 1, 0);
+  const legGeometry = new THREE.CylinderGeometry(0.007, 0.007, 1, 8);
+  for (let i = 0; i < 3; i++) {
+    const angle = i * 2 * Math.PI / 3;
+    const anchor = new THREE.Vector3(Math.cos(angle) * r * 0.78, r * 0.24, Math.sin(angle) * r * 0.78);
+    const leg = new THREE.Mesh(legGeometry, supportMaterial);
+    const direction = focus.clone().sub(anchor);
+    leg.position.copy(anchor).addScaledVector(direction, 0.5);
+    leg.scale.y = direction.length();
+    leg.quaternion.setFromUnitVectors(axis, direction.normalize());
+    g.add(leg);
+  }
+  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.019, 0.045, 12), supportMaterial);
+  feed.position.copy(focus);
+  g.add(feed);
   return g;
 }
 
@@ -94,19 +110,58 @@ function glowSprite() {
   r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,.5)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64);
   glowTexC = new THREE.CanvasTexture(c); glowTexC.userData.shared = true; return glowTexC;
 }
+export function lightCraft(craft, environment) {
+  craft.traverse(object => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      material.envMap = environment;
+      material.envMapIntensity = 0.9;
+    }
+  });
+}
+
 export function buildCraft(cfg, mission) {
   const g = new THREE.Group(), labels = [];
-  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.8), M.foil()); g.add(bus);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.05, 0.82), M.grey()); deck.position.y = 0.42; g.add(deck);
-  // solar wings
+  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.8), M.foil());
+  g.add(bus);
+  const alloy = M.grey();
+  const deckGeometry = new THREE.BoxGeometry(0.94, 0.045, 0.84);
+  for (const y of [-0.4, 0.42]) {
+    const deck = new THREE.Mesh(deckGeometry, alloy);
+    deck.position.y = y;
+    g.add(deck);
+  }
+  // A continuous spar connects the hinged sections back to the bus.
   const nPanels = cfg.solar === 'L' ? 3 : 2;
+  const panelGeometry = new THREE.BoxGeometry(0.62, 0.024, 0.5);
+  const back = M.panelBack();
+  const face = M.panel();
+  const panelMaterials = [back, back, face, back, back, back];
+  const edgeGeometry = new THREE.EdgesGeometry(panelGeometry);
+  const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xb1bccb });
+  const sparLength = 0.37 + (nPanels - 1) * 0.64 + 0.53;
+  const sparGeometry = new THREE.BoxGeometry(sparLength, 0.028, 0.055);
+  const hingeGeometry = new THREE.CylinderGeometry(0.044, 0.044, 0.13, 12);
   for (const side of [-1, 1]) {
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.35), M.grey()); boom.rotation.z = Math.PI / 2; boom.position.set(side * 0.62, 0.05, 0); g.add(boom);
+    const wing = new THREE.Group();
+    wing.position.set(side * 0.45, 0.05, 0);
+    wing.rotation.x = 0.25;
+    const spar = new THREE.Mesh(sparGeometry, alloy);
+    spar.position.set(side * sparLength / 2, -0.025, 0);
+    wing.add(spar);
     for (let i = 0; i < nPanels; i++) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.02, 0.5), [M.panelBack(), M.panelBack(), M.panel(), M.panelBack(), M.panelBack(), M.panelBack()]); p.position.set(side * (0.82 + 0.31 + i * 0.64), 0.05, 0); p.rotation.x = 0.25; g.add(p);
-      const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.62, 0.021, 0.5)), new THREE.LineBasicMaterial({ color: 0xc8ccd2, transparent: true, opacity: 0.6 })); frame.position.copy(p.position); frame.rotation.copy(p.rotation); g.add(frame);
-      if (i === nPanels - 1 && side === 1) labels.push({ obj: p, text: 'Solar arrays' });
+      const panel = new THREE.Mesh(panelGeometry, panelMaterials);
+      panel.position.x = side * (0.68 + i * 0.64);
+      panel.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
+      wing.add(panel);
+      if (i === nPanels - 1 && side === 1) labels.push({ obj: panel, text: 'Solar arrays' });
     }
+    const hinge = new THREE.Mesh(hingeGeometry, alloy);
+    hinge.position.x = side * 0.07;
+    hinge.rotation.x = Math.PI / 2;
+    wing.add(hinge);
+    g.add(wing);
   }
   // antenna
   const dr = cfg.radio === 'L' ? 0.42 : 0.26;
@@ -258,7 +313,7 @@ export class GameStage {
     }
     this.craftHolder.children.forEach(c => { this.craftHolder.remove(c); disposeTree(c); });
     const { group, labels } = buildCraft(cfg, mission);
-    group.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.9; } });
+    lightCraft(group, this.env);
     group.scale.setScalar(1.25);
     this.craftHolder.add(group); this.craft = group;
     this.craftHolder.visible = !hideCraft;
@@ -498,7 +553,7 @@ export class GameStage {
           upper.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.7; } });
           upper.rotation.z = -0.25; orbitShot.add(upper);
           const { group: craft } = buildCraft({ solar: 'L', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
-          craft.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.9; } });
+          lightCraft(craft, this.env);
           craft.scale.setScalar(0.55); orbitShot.add(craft);
           const wings = craft.children.filter(c => c.material && (Array.isArray(c.material) || c.material.map === cells()) || (c.isLineSegments));
           craft.position.set(0, 1.35, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
@@ -586,7 +641,7 @@ export class GameStage {
     if (derived.eclipseFrac > 0) tilt.add(arc([0.75 - derived.eclipseFrac / 2, 0.75 + derived.eclipseFrac / 2], 0x334466, orbitR, 0.9));
     // craft
     const { group: craft } = buildCraft(this.lastCfg || { solar: 'S', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
-    craft.scale.setScalar(0.15); craft.traverse(o => { if (o.material) { o.material.envMap = this.env; } });
+    craft.scale.setScalar(0.15); lightCraft(craft, this.env);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ color: new THREE.Color(mission.accent), transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,.35)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })() }));
     halo.scale.setScalar(4); craft.add(halo);
     tilt.add(craft); this.opsCraft = craft;
