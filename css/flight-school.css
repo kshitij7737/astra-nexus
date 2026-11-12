@@ -1,0 +1,157 @@
+#flight-school {
+  color:#edf5ff;
+  background:radial-gradient(ellipse at top right,#17374b,transparent 60%),#090f1b;
+  border:1px solid #547487;
+  border-radius:24px;
+  padding:clamp(22px,5vw,48px);
+  width:min(760px,calc(100vw - 32px));
+  max-height:88dvh;
+  box-sizing:border-box;
+  box-shadow:0 30px 120px #000b;
+  font-family:Archivo,system-ui,sans-serif;
+  line-height:1.6;
+  overflow:auto
+}
+#flight-school::backdrop {
+  background:#020711c9;
+  backdrop-filter:blur(8px)
+}
+#flight-school header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  color:#8ce7dd;
+  font:12px monospace;
+  letter-spacing:.15em
+}
+#flight-school button {
+  cursor:pointer
+}
+#flight-school header button {
+  color:white;
+  background:transparent;
+  border:1px solid #668292;
+  border-radius:50%;
+  width:44px;
+  height:44px;
+  font-size:20px
+}
+#flight-school h2 {
+  font-size:clamp(28px,5vw,44px);
+  line-height:1.08;
+  letter-spacing:-.03em;
+  margin:25px 0 16px
+}
+.flight-lead {
+  font-size:18px;
+  color:#b9cadc
+}
+.flight-route {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  background:#82e4d512;
+  color:#8ce7dd;
+  padding:18px 12px;
+  border:1px solid #82e4d544;
+  border-radius:12px;
+  font:12px monospace
+}
+.flight-lessons {
+  padding-left:24px
+}
+.flight-lessons li {
+  padding:12px 0 12px 12px
+}
+.flight-lessons li::marker {
+  color:#8ce7dd
+}
+.flight-lessons b {
+  font-size:18px
+}
+.flight-lessons p {
+  color:#c1cfdf;
+  margin:6px 0
+}
+#flight-school details {
+  border-top:1px solid #345064;
+  padding:16px 0
+}
+#flight-school summary {
+  cursor:pointer;
+  font-weight:700
+}
+#flight-school dt {
+  color:#8ce7dd;
+  margin-top:12px
+}
+#flight-school dd {
+  margin:0;
+  color:#c1cfdf
+}
+.flight-evidence {
+  font-size:12px;
+  color:#9aafc7
+}
+.flight-ready {
+  background:#8ce7dd;
+  color:#08121d;
+  border:0;
+  border-radius:30px;
+  padding:16px 25px;
+  font-weight:700;
+  font-size:16px
+}
+button:focus-visible,a:focus-visible,summary:focus-visible {
+  outline:3px solid #8ce7dd;
+  outline-offset:4px
+}
+.gx-topbtns {
+  flex-wrap:wrap
+}
+.gx-pickcard {
+  position:relative;
+  overflow:hidden
+}
+.gx-pickcard:after {
+  content:'';
+  position:absolute;
+  right:-35px;
+  top:-45px;
+  width:150px;
+  height:150px;
+  border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);
+  border-radius:50%;
+  box-shadow:0 0 45px color-mix(in srgb,var(--acc) 15%,transparent);
+  pointer-events:none
+}
+.gx-pickcard:focus-visible,.gx-pickcard:hover {
+  box-shadow:0 12px 40px #0008
+}
+.gx-compat li {
+  border-radius:8px
+}
+.gx-prog i {
+  box-shadow:0 0 12px color-mix(in srgb,var(--acc) 35%,transparent)
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*:before,*:after {
+  scroll-behavior:auto!important;
+  animation-duration:.01ms!important;
+  transition-duration:.01ms!important
+}
+
+}
+@media(max-width:600px) {
+  .gx-topbtns {
+  gap:5px
+}
+.gx-topbtns .nx-pill {
+  font-size:10px;
+  padding:8px
+}
+.flight-route {
+  font-size:10px
+}
+
+}
