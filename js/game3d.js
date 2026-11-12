@@ -567,6 +567,9 @@ export class GameStage {
     const isAst = mission.id === 'astra';
     const R = isAst ? 0.8 : 1.15;
     const body = this.world(mission.id, R); s.add(body); this.body = body;
+    // the Sun, far away along the light direction, so the player can see where the sunlight comes from
+    const sunSp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowSprite(), color: 0xfff0c8, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sunSp.position.copy(this.sun.position).normalize().multiplyScalar(60); sunSp.scale.setScalar(9); s.add(sunSp);
+    const sunHalo = sunSp.clone(); sunHalo.material = sunSp.material.clone(); sunHalo.material.opacity = 0.25; sunHalo.material.color.set(0xffb060); sunHalo.scale.setScalar(30); s.add(sunHalo);
     const orbitR = isAst ? 2.6 : R * (derived.a ? Math.max(1.12, Math.min(1.6, derived.a / mission.body.radiusKm)) : 1.3) * 1.25;
     const tilt = new THREE.Group(); tilt.rotation.set(0.35, 0, 0.15); s.add(tilt);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(orbitR, 0.006, 8, 200), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }));
@@ -648,6 +651,9 @@ export class GameStage {
 
   tick() {
     const raw = this.clock.getDelta();
+    // slow device: drop render resolution a step at a time until frames are smooth
+    this._ft = (this._ft ?? 0.016) * 0.95 + Math.min(raw, 0.2) * 0.05; this._fn = (this._fn || 0) + 1;
+    if (this._fn > 90 && this._ft > 0.038 && this.r.getPixelRatio() > 0.75) { this.r.setPixelRatio(Math.max(0.75, this.r.getPixelRatio() - 0.25)); this.resize(); this._fn = 0; this._ft = 0.02; }
     // the launch cinematic follows the wall clock so slow devices still finish on time
     const dt = Math.min(raw, this.mode === 'launch' ? 0.25 : 0.05);
     if (this.update && !(this.paused && this.mode !== 'launch')) this.update(dt);
@@ -659,12 +665,16 @@ export class GameStage {
     // project labels
     if (this.labels.length) {
       const w = this.el.clientWidth, h = this.el.clientHeight, v = new THREE.Vector3();
+      const placed = [];
       for (const l of this.labels) {
         l.obj.getWorldPosition(v); v.project(this.cam);
-        const vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
-        l.el.style.opacity = vis ? 1 : 0;
-        l.el.style.transform = `translate(${(v.x * 0.5 + 0.5) * w}px, ${(-v.y * 0.5 + 0.5) * h}px)`;
+        l.vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1; l.x = (v.x * 0.5 + 0.5) * w; l.y = (-v.y * 0.5 + 0.5) * h;
+        if (l.vis) placed.push(l);
       }
+      // keep labels from sitting on top of each other: push later ones down
+      placed.sort((a, b) => a.y - b.y);
+      for (let i = 1; i < placed.length; i++) for (let k = 0; k < i; k++) { const a = placed[k], b = placed[i]; if (Math.abs(a.x - b.x) < 170 && b.y - a.y < 26) b.y = a.y + 26; }
+      for (const l of this.labels) { l.el.style.opacity = l.vis ? 1 : 0; l.el.style.transform = `translate(${l.x}px, ${l.y}px)`; }
     }
   }
   dispose() { this.r.setAnimationLoop(null); this.ro.disconnect(); if (this.scene) disposeTree(this.scene); this.r.dispose(); }

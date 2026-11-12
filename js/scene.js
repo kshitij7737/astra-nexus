@@ -91,11 +91,20 @@ function trackSun(mesh) {
 
 // Shared texture cache. Colour maps are sRGB; data maps (bump, roughness, alpha) stay linear.
 const TEX = new Map();
+// Phones and low-memory devices get half-size maps (about a quarter of the download).
+const SMALL = typeof window !== 'undefined' && (Math.min(screen.width, screen.height) < 700 || (navigator.deviceMemory && navigator.deviceMemory <= 2) || navigator.connection?.saveData);
+// Thin progress bar at the top of the page while imagery loads (styled in nexus.css).
+if (typeof document !== 'undefined') {
+  const M = THREE.DefaultLoadingManager, root = document.documentElement;
+  M.onStart = () => { root.classList.add('nx-loading'); root.style.setProperty('--load', 0.05); };
+  M.onProgress = (u, n, t) => root.style.setProperty('--load', Math.max(0.05, n / t));
+  M.onLoad = M.onError = () => { root.style.setProperty('--load', 1); setTimeout(() => root.classList.remove('nx-loading'), 400); };
+}
 function tex(name, cb, srgb = true) {
   let e = TEX.get(name);
   if (!e) {
     e = { t: null, cbs: [] }; TEX.set(name, e);
-    new THREE.TextureLoader().load(new URL(`../textures/${name}`, import.meta.url).href, t => {
+    new THREE.TextureLoader().load(new URL(`../textures/${SMALL ? 'sm/' : ''}${name}`, import.meta.url).href, t => {
       if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.userData.shared = true; e.t = t; e.cbs.forEach(f => f(t)); e.cbs = [];
     });
   }
@@ -115,6 +124,25 @@ function nightSide(mat) {
   };
 }
 
+// Fine rock grain for the asteroid: per-pixel bumps and speckle from 3D noise, so it holds up in close-ups.
+function rockDetail(mat) {
+  mat.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vOP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vOP;
+      float rh(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7)))*43758.5453); }
+      float rn(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+        return mix(mix(mix(rh(i),rh(i+vec3(1,0,0)),f.x),mix(rh(i+vec3(0,1,0)),rh(i+vec3(1,1,0)),f.x),f.y),mix(mix(rh(i+vec3(0,0,1)),rh(i+vec3(1,0,1)),f.x),mix(rh(i+vec3(0,1,1)),rh(i+vec3(1,1,1)),f.x),f.y),f.z); }
+      float rockH(vec3 p){ float h = rn(p*9.0)*0.5 + rn(p*21.0)*0.3 + rn(p*44.0)*0.2; float b = rn(p*16.0+7.0); return h + smoothstep(0.7, 0.92, b)*0.5; }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      float rk = rockH(vOP); diffuseColor.rgb *= 0.9 + 0.35*rk; diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.15,1.1,1.02), smoothstep(0.7,0.92,rn(vOP*16.0+7.0)));`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      { float hgt = rockH(vOP); vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition); float dhx = dFdx(hgt), dhy = dFdy(hgt);
+        vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx); float det = dot(dpx, r1);
+        vec3 grad = sign(det) * (dhx * r1 + dhy * r2); normal = normalize(abs(det) * normal - 0.012 * grad); }`);
+  };
+}
+
 // Icosahedron geometry is non-indexed; merge shared corners so normals smooth.
 function indexed(geo) {
   const pos = geo.attributes.position, map = new Map(), verts = [], idx = [];
@@ -130,17 +158,23 @@ function indexed(geo) {
 
 export function buildWorld(m) {
   const kind = m.world.kind, g = new THREE.Group();
-  const geo = indexed(new THREE.IcosahedronGeometry(1, kind === 'asteroid' ? 40 : 2)); // textured worlds replace this below
+  const geo = indexed(new THREE.IcosahedronGeometry(1, kind === 'asteroid' ? 72 : 2)); // textured worlds replace this below
   const pos = geo.attributes.position, cols = [], v = new THREE.Vector3(), base = new THREE.Color(m.color);
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).normalize();
     let h = 0; const c = base.clone();
     if (kind === 'asteroid') {
+      // Rubble-pile look (like Itokawa and Bennu): lumpy two-lobed body, boulders at several sizes, few clean craters.
+      // The real shape of Apophis is only known roughly from radar, so this stays illustrative.
       const n = fbm(v.clone().multiplyScalar(2.2), 3);
-      const lobe = Math.exp(-((v.x - 0.55) ** 2) * 4) + Math.exp(-((v.x + 0.55) ** 2) * 4); // soft two-lobed hint
-      h = (n - 0.5) * 0.35 + craters(v, 9, 14, 0.35) + lobe * 0.12;
-      v.multiply(new THREE.Vector3(1.32, 0.82, 0.86));
-      c.multiplyScalar(0.8 + n * 0.6);
+      const mid = fbm(v.clone().multiplyScalar(7), 5, 4), fine = fbm(v.clone().multiplyScalar(22), 8, 3);
+      const ridged = 1 - Math.abs(fbm(v.clone().multiplyScalar(11), 12, 3) * 2 - 1); // boulder fields
+      const lobe = Math.exp(-((v.x - 0.55) ** 2) * 4) + Math.exp(-((v.x + 0.55) ** 2) * 4);
+      const neck = Math.exp(-(v.x ** 2) * 14) * 0.07;
+      h = (n - 0.5) * 0.34 + (mid - 0.5) * 0.07 + (fine - 0.5) * 0.012 + Math.pow(ridged, 6) * 0.03 + craters(v, 9, 9, 0.3) + craters(v, 19, 30, 0.09) * 0.6 + lobe * 0.13 - neck;
+      v.multiply(new THREE.Vector3(1.34, 0.8, 0.86));
+      c.set(0xb3a595).lerp(new THREE.Color(0x8d8073), THREE.MathUtils.smoothstep(mid, 0.42, 0.6)).lerp(new THREE.Color(0xcfc2b0), Math.pow(ridged, 6) * 0.8);
+      c.multiplyScalar(0.85 + n * 0.45);
     } else if (kind === 'moon') {
       const n = fbm(v.clone().multiplyScalar(3), 7);
       const mare = fbm(v.clone().multiplyScalar(1.2), 11, 3);
@@ -186,7 +220,9 @@ export function buildWorld(m) {
     g.userData.surface = sphere; g.add(new THREE.Mesh(sphere, mat));
   } else {
     g.userData.surface = geo;
-    g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, flatShading: false, transparent: true })));
+    const amat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97, metalness: 0, flatShading: false, transparent: true });
+    if (kind === 'asteroid') rockDetail(amat);
+    g.add(new THREE.Mesh(geo, amat));
   }
 
   if (kind === 'earth') {

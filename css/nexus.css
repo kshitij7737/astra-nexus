@@ -22,3 +22,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .nx-pill { font: 500 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .nx-pill:hover { color: var(--ink); border-color: var(--acc); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* imagery loading bar */
+html::before { content: ''; position: fixed; z-index: 100; left: 0; top: 0; height: 3px; width: calc(var(--load, 0) * 100%); background: linear-gradient(90deg, #4aa8ff, #a78bfa, #d0674c); opacity: 0; transition: width .3s, opacity .5s; pointer-events: none; }
+html.nx-loading::before { opacity: 1; }
+html.nx-loading::after { content: 'Loading imagery…'; position: fixed; z-index: 100; right: 12px; top: 8px; font: 10px var(--mono, monospace); letter-spacing: .12em; text-transform: uppercase; color: rgba(242,239,233,.7); pointer-events: none; }
+:focus-visible { outline: 2px solid var(--acc, #4aa8ff); outline-offset: 2px; }

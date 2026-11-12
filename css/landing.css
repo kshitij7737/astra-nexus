@@ -124,3 +124,7 @@
 .lx-card__meta { display: flex; justify-content: space-between; font: 11px var(--mono) !important; color: var(--muted) !important; }
 @media (max-width: 1000px) { .lx-cards { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 640px) { .lx-cards { grid-template-columns: 1fr; } }
+
+/* keep hero text readable over the orbits */
+.lx-hero__copy { position: relative; }
+.lx-hero__copy::before { content: ''; position: absolute; inset: -60px -120px -60px -80px; z-index: -1; background: radial-gradient(closest-side, rgba(2,3,10,.82), rgba(2,3,10,0)); pointer-events: none; }

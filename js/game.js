@@ -44,6 +44,25 @@ const audio = {
     const s = c.createBufferSource(); s.buffer = buf; const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 180;
     const g = c.createGain(); g.gain.value = 0.35 * settings.vol * 1.4; s.connect(f).connect(g).connect(c.destination); s.start();
   },
+  // rocket engine: deep brown-noise roar with a crackle layer, fading as the rocket climbs away
+  roar(d = 7) {
+    if (!this.on) return; this.init(); if (!this.ctx) return; this.hush();
+    const c = this.ctx, t = c.currentTime, n = c.sampleRate * 2, buf = c.createBuffer(1, n, c.sampleRate), ch = buf.getChannelData(0);
+    let last = 0; for (let i = 0; i < n; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; ch[i] = last * 3.5; }
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(1400, t); lp.frequency.exponentialRampToValueAtTime(160, t + d);
+    const g = c.createGain(), v = 0.9 * settings.vol; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.5); g.gain.setValueAtTime(v, t + d * 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    src.connect(lp).connect(g).connect(c.destination);
+    const cr = c.createBufferSource(); cr.buffer = buf; cr.loop = true; cr.playbackRate.value = 2.7;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 0.7;
+    const cg = c.createGain(); cg.gain.value = 0; const lfo = c.createOscillator(); lfo.type = 'sawtooth'; lfo.frequency.value = 23; const lg = c.createGain(); lg.gain.setValueAtTime(0.16 * settings.vol, t); lg.gain.linearRampToValueAtTime(0, t + d * 0.7);
+    lfo.connect(lg).connect(cg.gain); cr.connect(bp).connect(cg).connect(c.destination);
+    src.start(t); cr.start(t); lfo.start(t); [src, cr, lfo].forEach(x => x.stop(t + d + 0.1));
+    this._roar = [g, cg];
+  },
+  hush() { if (this._roar && this.ctx) { this._roar.forEach(g => { g.gain.cancelScheduledValues(this.ctx.currentTime); g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08); }); this._roar = null; } },
+  thunk() { this.beep(70, 0.25, 0.14); this.beep(140, 0.08, 0.05); },
+  click() { this.beep(540, 0.035, 0.022); },
   chime() { [660, 880, 1320].forEach((f, i) => setTimeout(() => this.beep(f, 0.25, 0.05), i * 120)); },
   fail() { [300, 220].forEach((f, i) => setTimeout(() => this.beep(f, 0.4, 0.06), i * 220)); },
   alarm() { [880, 660, 880, 660].forEach((f, i) => setTimeout(() => this.beep(f, 0.14, 0.05), i * 160)); },
@@ -86,6 +105,7 @@ async function boot() {
   syncSound(); soundBtn.onclick = () => { audio.on = !audio.on; const s = store.get(); s.sound = audio.on; store.set(s); syncSound(); if (audio.on && settings.music) music.start(); else music.stop(); };
   $('#gx-settings').onclick = openSettings; $('#gx-help').onclick = () => openHelp();
   document.addEventListener('keydown', onKey);
+  document.addEventListener('click', e => { if (e.target.closest?.('button, a.gx-btn, a.nx-pill, summary, label')) audio.click(); }, true);
   try {
     const g3 = await import('./game3d.js');
     if (!g3.webglOK()) throw new Error('no WebGL');
@@ -106,6 +126,7 @@ function pickMission() {
       ${diffPicker()}
       <div class="gx-picks">${ORDER.map((id, i) => { const m = GAME[id]; return `
         <button class="gx-pickcard" data-go="${id}" style="--acc:${m.accent}">
+          <span class="gx-thumb gx-thumb--${id}" aria-hidden="true"></span>
           <span class="gx-n">${String(i + 1).padStart(2, '0')}</span>
           <b>${esc(m.name)}</b><span>${esc(m.world)} · ${ {astra: 'Asteroid flyby', lunaris: 'Moon orbiter', earth: 'Earth observer', mars: 'Mars orbiter'}[id] }</span><em>${esc(m.tagline)}</em>
           <small class="gx-chal">Challenge: ${'●'.repeat(CHAL[id])}${'○'.repeat(3 - CHAL[id])} ${['', 'gentle', 'medium', 'hard'][CHAL[id]]}</small>
@@ -286,8 +307,8 @@ function refreshBuild(light) {
       </div>
       <div class="gx-est"><span>Estimated science score</span>${ring(est ? est.score : 0, 90, est ? '' : '—')}<small>${est ? (est.failed?.reason === 'lost' ? '<b class="gx-red">Spacecraft would be lost</b> to battery blackouts' : `if flown with no surprises (max 90 before questions)`) : 'fix mass or budget to estimate'}</small></div>
       <div class="gx-launchbox">
+        <div class="gx-opts--row gx-go"><button class="gx-btn gx-btn--go" id="gx-launch" ${d.launchable ? '' : 'disabled'}>Go to launch</button><button class="gx-btn gx-btn--ghost" id="gx-suggest" title="Loads the best build found by testing every combination of parts">Suggest a build</button></div>
         <p class="gx-hint">${esc(hint)}</p>
-        <div class="gx-opts--row"><button class="gx-btn gx-btn--go" id="gx-launch" ${d.launchable ? '' : 'disabled'}>Go to launch</button><button class="gx-btn gx-btn--ghost" id="gx-suggest" title="VEGA tries changes one part at a time and keeps whatever flies best">Suggest a build</button></div>
         <details class="gx-formulas"><summary>Show the maths</summary>
           <p>Orbital period T = 2π √(a³/μ) = ${fmt(d.periodMin, 1)} min${d.a ? ` (a = ${fmt(d.a, 1)} km)` : ' (conceptual survey loop)'}</p>
           <p>Eclipse = asin(R/a)/π of each orbit = ${fmt(d.eclipseMin, 1)} min, needs ${fmt(d.eclipseWh)} Wh for the bus and heaters</p>
@@ -348,7 +369,8 @@ function runLaunch() {
   const show = (txt, k) => {
     box.innerHTML = `<b class="${k === 'bad' ? 'gx-red' : ''}">${esc(txt)}</b>`;
     if (k === 'count') audio.beep(880, 0.12);
-    if (k === 'ignite') { audio.rumble(7); }
+    if (k === 'ignite') { audio.roar(7); }
+    if (k === 'sep') audio.thunk();
     if (k === 'lift') { stage?.shake(0.8); }
     if (k === 'sep' || k === 'arrays') audio.beep(660, 0.08);
   };
@@ -356,6 +378,7 @@ function runLaunch() {
     [[0, 'T-3', 'count'], [0.7, 'T-2', 'count'], [1.4, 'T-1', 'count'], [2.6, 'Liftoff', 'lift'], [4, reachesOrbit ? 'Orbit reached' : 'Propellant exhausted']].forEach(([t, txt, k]) => { if (!(explodeAt && t > explodeAt)) timers.push(setTimeout(() => show(txt, k), t * 1000)); });
   }
   const finish = (ok, why) => {
+    audio.hush();
     timers.forEach(clearTimeout);
     if (why === 'launch' || (rocketFails && !stage)) {
       sim = new Sim(m, cfg, { diff: settings.diff });
@@ -365,7 +388,7 @@ function runLaunch() {
     if (ok) { audio.chime(); box.innerHTML = `<b>Orbit achieved</b>`; setTimeout(startOps, 900); }
     else { audio.fail(); box.innerHTML = `<b>Missed ${esc(m.world)}</b>`; sim = new Sim(m, cfg, { diff: settings.diff }); setTimeout(() => showDebrief(sim.result()), 1400); }
   };
-  const cues = { say: show, boom: () => { timers.forEach(clearTimeout); box.innerHTML = '<b class="gx-red">Vehicle lost</b>'; audio.boom(); document.body.classList.add('gx-flash'); setTimeout(() => document.body.classList.remove('gx-flash'), 900); } };
+  const cues = { say: show, boom: () => { audio.hush(); timers.forEach(clearTimeout); box.innerHTML = '<b class="gx-red">Vehicle lost</b>'; audio.boom(); document.body.classList.add('gx-flash'); setTimeout(() => document.body.classList.remove('gx-flash'), 900); } };
   $('#gx-skip').onclick = () => { stage?.skipLaunch?.(); if (!stage) finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : ''); };
   if (stage) stage.playLaunch(m, reachesOrbit, finish, cues, { explodeAt });
   else setTimeout(() => finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : ''), 1500);
@@ -380,10 +403,10 @@ function startOps() {
     <aside class="gx-hud" aria-label="Mission control">
       <div class="gx-hud__top"><p class="gx-kicker">Step 04 · Mission control</p>
         <div class="gx-clock"><b id="gx-orbit"></b><span id="gx-time"></span></div>
-        <div class="gx-speed" role="group" aria-label="Simulation speed">${[0, 1, 2, 4].map(s => `<button type="button" data-speed="${s}" aria-pressed="${s === simSpeed}">${s ? s + '×' : 'Pause'}</button>`).join('')}</div></div>
+        <div class="gx-speed" role="group" aria-label="Simulation speed">${[0, 1, 2, 4].map(s => `<button type="button" data-speed="${s}" aria-pressed="${s === simSpeed}">${s ? s + '×' : 'Pause'}</button>`).join('')}<button type="button" id="gx-ff" title="Fast-forward until something needs you (key N)">Skip ahead ⏭</button></div></div>
       <div class="gx-chipsrow" id="gx-phase"></div>
       <div class="gx-timeline" aria-hidden="true"><div class="gx-tl" id="gx-tl"></div><i id="gx-play"></i></div>
-      <div class="gx-legend"><span class="e">Eclipse</span><span class="p">Target pass</span><span class="c">Contact</span></div><p class="gx-keys">Space pause · 1 2 4 speed · drag the view to look around · scroll to zoom</p>
+      <div class="gx-legend"><span class="e">Eclipse</span><span class="p">Target pass</span><span class="c">Contact</span></div><p class="gx-keys">Space pause · 1 2 4 speed · N skip ahead · drag the view to look around</p>
       <div class="gx-gauges">
         <div class="gx-gauge"><span>Battery</span><div><i id="gx-batt"></i></div><b id="gx-battv"></b></div>
         <div class="gx-gauge"><span>Recorder</span><div><i id="gx-stor"></i></div><b id="gx-storv"></b></div>
@@ -398,9 +421,10 @@ function startOps() {
       <h3>Log</h3>
       <ol class="gx-log" id="gx-log" aria-live="polite"></ol>
     </aside>
-    <div class="gx-chart"><canvas id="gx-chart" width="560" height="140" aria-label="Battery and recorder over time"></canvas><div class="gx-chartkey"><span class="b">Battery</span><span class="s">Recorder</span><span class="r">Data home</span></div></div>
+    <div class="gx-chart"><canvas id="gx-chart" width="560" height="140" aria-label="Battery and recorder over time"></canvas><div class="gx-chartkey"><span class="b">Battery</span><span class="s">Recorder</span><span class="r">Data home</span><span class="t">last few orbits</span></div></div>
     <div class="gx-modal" id="gx-modal" hidden></div>`;
   $$('[data-speed]').forEach(b => b.onclick = () => { simSpeed = +b.dataset.speed; $$('[data-speed]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.speed === simSpeed))); });
+  $('#gx-ff').onclick = e => { flags.ff = !flags.ff; e.currentTarget.setAttribute('aria-pressed', String(flags.ff)); if (simSpeed === 0) simSpeed = settings.speed || 1; };
   $$('[data-tog]').forEach(c => c.onchange = () => { c.checked ? sim.enabled.add(c.dataset.tog) : sim.enabled.delete(c.dataset.tog); });
   // timeline segments
   const o = sim.d.orbit, tl = $('#gx-tl'), seg = (w, cls) => { const [a, b] = w; const parts = a <= b ? [[a, b]] : [[a, 1], [0, b]]; parts.forEach(([x, y]) => { const s = document.createElement('i'); s.className = cls; s.style.left = x * 100 + '%'; s.style.width = (y - x) * 100 + '%'; tl.appendChild(s); }); };
@@ -416,11 +440,11 @@ function log(text, kind = 'info') {
   const el = $('#gx-log'); if (!el) return; el.prepend(li); while (el.children.length > 30) el.lastChild.remove();
 }
 function loop(now) {
-  const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+  const dt = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
   if (screen !== 'ops') return;
   const modalOpen = !$('#gx-modal').hidden;
   if (!sim.pending && simSpeed > 0 && !modalOpen) {
-    const stepsPerSec = (sim.T / sim.dt) / 9 * simSpeed; // one orbit ≈ 9 s at 1×
+    const stepsPerSec = (sim.T / sim.dt) / 9 * (flags.ff ? 22 : simSpeed); // one orbit ≈ 9 s at 1×; skip-ahead runs an orbit in under half a second
     acc += dt * stepsPerSec;
     let n = Math.floor(acc); acc -= n;
     const logLen = sim.log.length;
@@ -433,10 +457,11 @@ function loop(now) {
       if (st.inContact && !before.inContact && !flags.con && storeBefore > 0) { flags.con = 1; log(VEGA.contact); }
       if (sim.lost > lostBefore && !flags.full) { flags.full = 1; log(VEGA.full, 'warn'); audio.beep(300, 0.2); }
     }
+    if (flags.ff && (sim.pending || sim.done || sim.safe || sim.log.slice(logLen).some(e => e.kind === 'warn' || e.kind === 'bad'))) flags.ff = false;
     for (const e of sim.log.slice(logLen)) { log(e.text, e.kind); if (e.kind === 'warn') { audio.alarm(); alert('Power blackout. Spacecraft damaged.'); } }
     // hook: reward clean downlinks
     const sent = sim.sentTotal;
-    if (sent - (flags.lastMilestone || 0) >= milestoneStep()) { flags.lastMilestone = Math.floor(sent / milestoneStep()) * milestoneStep(); toast(`${fmt(flags.lastMilestone, 0)} Gbit home`); audio.beep(1100, 0.08); }
+    if (sent - (flags.lastMilestone || 0) >= milestoneStep()) { flags.lastMilestone = Math.floor(sent / milestoneStep()) * milestoneStep(); if (!flags.ff) { toast(`${fmt(flags.lastMilestone, 0)} Gbit home`); audio.beep(1100, 0.08); } }
   }
   paintOps();
   if (sim.pending && $('#gx-modal').hidden) showCard(sim.pending);
@@ -454,6 +479,7 @@ function paintOps() {
   const transmitting = !sim.safe && s.inContact && used > 1e-6;
   const bf0 = sim.batt / sim.d.battWh;
   stage?.setOps({ phase: s.phase, orbitFloat: sim.t / sim.T, observing, transmitting, sunlit: s.sunlit, alert: sim.safe || bf0 < 0.15 || sim.health < 30 });
+  const ffb = $('#gx-ff'); if (ffb) { ffb.setAttribute('aria-pressed', String(!!flags.ff)); ffb.textContent = flags.ff ? 'Skipping… ⏸' : 'Skip ahead ⏭'; }
   $('#gx-homev').textContent = `${fmt(sim.sentTotal, 1)} Gbit`;
   const coachTxt = coach(s); if (coachTxt !== flags.coach) { flags.coach = coachTxt; $('#gx-coach').innerHTML = coachTxt; }
   const danger = sim.health < 30 || sim.safe; document.body.classList.toggle('gx-danger', danger); music.setMood(danger ? 'tense' : 'ops');
@@ -483,7 +509,10 @@ function drawChart() {
   const h = sim.history.slice(-300); if (h.length < 2) return;
   const maxRet = Math.max(1, ...sim.history.map(x => x.ret));
   const line = (key, col, scale = 1) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); h.forEach((p, i) => { const x = i / (h.length - 1) * W, y = H - 6 - (p[key] / scale) * (H - 12); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); };
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1; [6, H / 2, H - 6].forEach(y => { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); });
   line('batt', '#ffd166'); line('store', '#ff7a3d'); line('ret', '#6fffd0', maxRet);
+  g.font = '11px monospace'; g.fillStyle = 'rgba(242,239,233,.55)'; g.textAlign = 'left'; g.fillText('full', 4, 17); g.fillText('empty', 4, H - 10);
+  g.textAlign = 'right'; g.fillText('now', W - 4, H - 10); g.fillText(`${fmt(maxRet, 0)} Gbit home`, W - 4, 17);
 }
 function showCard(p) {
   const mo = $('#gx-modal'); mo.hidden = false;
@@ -570,6 +599,14 @@ function lostSequence() {
   setTimeout(() => { l.hidden = true; showDebrief(sim.result()); }, reduced ? 600 : 3200);
 }
 function onKey(e) {
+  if (e.key === 'Tab') { // keep keyboard focus inside the open pop-up
+    const mo = ['#gx-helpbox', '#gx-setbox', '#gx-pollbox', '#gx-modal'].map(q => $(q)).find(x => x && !x.hidden);
+    if (mo) { const f = $$('button, [href], input, select, summary', mo).filter(x => !x.disabled && x.offsetParent !== null); if (f.length) {
+      const first = f[0], last = f[f.length - 1];
+      if (!mo.contains(document.activeElement)) { first.focus(); e.preventDefault(); }
+      else if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+      else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); } } }
+  }
   if (e.key === 'Escape' && !$('#gx-setbox').hidden) { $('#gx-setbox').hidden = true; return; }
   if (e.key === 'Escape' && !$('#gx-pollbox').hidden) { $('#gx-pollbox').hidden = true; return; }
   if (e.key === 'Escape' && !$('#gx-helpbox').hidden) { $('#gx-helpok').click(); return; }
@@ -580,6 +617,7 @@ function onKey(e) {
   const set = v => { simSpeed = v; $$('[data-speed]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.speed === simSpeed))); };
   if (e.key === ' ') { set(simSpeed ? 0 : (settings.speed || 1)); e.preventDefault(); }
   if (e.key === '1') set(1); if (e.key === '2') set(2); if (e.key === '4') set(4);
+  if (e.key === 'n' || e.key === 'N') $('#gx-ff')?.click();
 }
 
 // ---------- how to play
@@ -592,7 +630,7 @@ function openHelp(first) {
       <li><b>1 · Brief</b><span>Pick a mission and a difficulty. Cadet is the gentle one. VEGA, your mission controller, tells you the three things to find out.</span></li>
       <li><b>2 · Build</b><span>Choose parts for your spacecraft. Each one costs weight, money or power. Checks on the right say <i class="ok">GO</i>, <i class="warn">CAUTION</i> or <i class="bad">NO-GO</i>. Stuck? Press <b>Suggest a build</b>.</span></li>
       <li><b>3 · Launch</b><span>Every station gives a go or no-go. Then watch your rocket fly. You can skip the film.</span></li>
-      <li><b>4 · Operate</b><span>Your spacecraft circles its target on its own. Your job: keep the battery and recorder healthy, answer alarms fast, and answer VEGA's questions. Science only counts once it is sent home.</span></li>
+      <li><b>4 · Operate</b><span>Your spacecraft circles its target on its own. In a hurry? Press <b>Skip ahead</b>. Your job: keep the battery and recorder healthy, answer alarms fast, and answer VEGA's questions. Science only counts once it is sent home.</span></li>
       <li><b>5 · Debrief</b><span>See what worked, what failed and why, with one tip for next time. Unlock real NASA discoveries.</span></li>
     </ol>
     <details class="gx-gloss" ${first ? '' : 'open'}><summary>Words you will see</summary><dl>
@@ -605,7 +643,7 @@ function openHelp(first) {
       <dt>Contact / downlink</dt><dd>The moments your radio can send data to Earth.</dd>
       <dt>Health</dt><dd>How damaged the spacecraft is. At 0% it is lost.</dd>
     </dl></details>
-    <p class="gx-fine">Controls: drag the 3D view to look around, scroll to zoom, Space to pause, 1 / 2 / 4 for speed, number keys to answer.</p>
+    <p class="gx-fine">Controls: drag the 3D view to look around, scroll to zoom, Space to pause, 1 / 2 / 4 for speed, N or the Skip ahead button to jump to the next thing that needs you, number keys to answer.</p>
     <div class="gx-opts gx-opts--row"><button class="gx-btn gx-btn--go" id="gx-helpok">${first ? 'Let\'s fly' : 'Got it'}</button></div></div>`;
   $('#gx-helpok').onclick = () => { mo.hidden = true; const st = store.get(); st.helped = 1; store.set(st); };
   $('#gx-helpok').focus();
@@ -709,6 +747,7 @@ function showDebrief(r) {
       <div class="gx-row gx-deb__actions">
         <button class="gx-btn gx-btn--go" id="gx-again">Fly the same build again</button>
         <button class="gx-btn" id="gx-retry">Change the design</button>
+        <button class="gx-btn" id="gx-share">Share result</button>
         ${r.outcome !== 'failure' && settings.diff !== 'commander' ? `<button class="gx-btn" id="gx-harder">Try ${settings.diff === 'cadet' ? 'Flight' : 'Commander'}</button>` : ''}
         <a class="gx-btn" href="play.html?mission=${next}">Next mission: ${esc(GAME[next].name)}</a>
         <a class="gx-btn gx-btn--ghost" href="play.html">All missions</a>
@@ -730,6 +769,12 @@ function showDebrief(r) {
       </div>
     </div>`;
   $('#gx-again').onclick = () => { runLaunch(); };
+  $('#gx-share').onclick = async () => {
+    const url = location.origin + location.pathname.replace(/play\.html$/, '') + `play.html?mission=${m.id}`;
+    const text = `${OUT[r.outcome]} on ${m.name} (${m.world}): score ${r.score}, grade ${grade}, ${diff().label} difficulty, ${fmt(r.sent || 0, 1)} Gbit of science home. Can you beat it?`;
+    try { if (navigator.share) await navigator.share({ title: 'NEXUS//04', text, url }); else { await navigator.clipboard.writeText(`${text} ${url}`); toast('Result copied. Paste it anywhere.'); } }
+    catch { try { await navigator.clipboard.writeText(`${text} ${url}`); toast('Result copied. Paste it anywhere.'); } catch { toast('Could not share from this browser'); } }
+  };
   $('#gx-retry').onclick = () => { setScreen('build'); renderBuild(); };
   const hb = $('#gx-harder'); if (hb) hb.onclick = () => { settings.diff = settings.diff === 'cadet' ? 'flight' : 'commander'; saveSettings(); setScreen('build'); renderBuild(); };
   newAch.forEach((a, i) => setTimeout(() => { toast(`Achievement: ${a.name}`); audio.chime(); }, 900 + i * 900));

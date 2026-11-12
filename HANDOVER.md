@@ -29,5 +29,13 @@ Live: https://kshitij7737.github.io/astra-nexus/
 - Accents: ASTRA ion blue #4aa8ff, LUNARIS silver-cyan #9fe0ea, HALO violet #a78bfa, JEZERO ECHO Mars red #d0674c with pale blue #a9d4ff.
 - Music: js/music.js, generated with Web Audio. Moods: calm, launch, ops, tense.
 
+## Performance and polish
+- textures/sm holds half-size maps. js/scene.js picks them on phones, low-memory devices and data-saver mode.
+- A thin bar at the top of the page shows imagery loading (css/nexus.css).
+- The 3D stage lowers its render resolution automatically if frames get slow (js/game3d.js, tick()).
+- Skip ahead (mission control) fast-forwards to the next decision, alarm or blackout.
+- og.jpg and the og: tags in each page give the link a preview picture in chats. favicon.svg is the tab icon.
+- LUNARIS budget is 1300 so that a fully GO build exists on every difficulty.
+
 ## Roles
 Sneha: ASTRA, landing and navigation. Karishma: LUNARIS, QA. Kshitij: HALO, worlds and spacecraft. Anthariksha: JEZERO ECHO, mission control and challenges.

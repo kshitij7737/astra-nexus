@@ -169,7 +169,7 @@ async function sky() {
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { focus = e.target.dataset.focus; document.body.dataset.focus = focus; document.body.style.setProperty('--acc', GAME[focus]?.accent || '#ff7a3d'); } }), { rootMargin: '-45% 0px -45% 0px' });
   $$('[data-focus]').forEach(s => io.observe(s));
   const clock = new THREE.Clock(), v3 = new THREE.Vector3();
-  let first = true;
+  let first = true, frameN = 0, copyBox = null;
   r.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!reduced) t0 += dt * 0.03;
@@ -210,8 +210,9 @@ async function sky() {
     ['Jupiter', 'Saturn', 'Uranus', 'Neptune'].forEach(nm => { bodies[nm].visible = !near; });
     // planet labels only on the overview
     const showLabels = focus === 'sun';
+    if (showLabels && (frameN++ % 20 === 0)) { const a = $('.lx-hero__copy h2')?.getBoundingClientRect(), b = $('.lx-hero .lx-row')?.getBoundingClientRect() || a, r = document.createRange(); r.selectNodeContents($('.lx-hero__copy .lx-lede')); const c = r.getBoundingClientRect(); copyBox = a && { left: a.left, right: Math.max(c.right, a.left + 380), top: a.top - 30, bottom: Math.max(b.bottom, c.bottom) }; }
     lbBox.classList.toggle('on', showLabels);
-    if (showLabels) labels.forEach(({ b, lb, size }) => { v3.copy(b.position); v3.y += size + 0.8; v3.project(cam); lb.style.transform = `translate(${(v3.x * 0.5 + 0.5) * innerWidth}px, ${(-v3.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -100%)`; lb.style.opacity = v3.z < 1 ? 1 : 0; });
+    if (showLabels) labels.forEach(({ b, lb, size }) => { v3.copy(b.position); v3.y += size + 0.8; v3.project(cam); lb.style.transform = `translate(${(v3.x * 0.5 + 0.5) * innerWidth}px, ${(-v3.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -100%)`; const px = (v3.x * 0.5 + 0.5) * innerWidth, py = (-v3.y * 0.5 + 0.5) * innerHeight; lb.style.opacity = v3.z < 1 && !(copyBox && px > copyBox.left - 30 && px < copyBox.right + 30 && py > copyBox.top && py < copyBox.bottom + 16) ? 1 : 0; });
     first = false;
     r.render(scene, cam);
   });
