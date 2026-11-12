@@ -1,7 +1,7 @@
 // NEXUS//04 game: Brief → Build → Launch → Operate → Debrief.
 import { GAME, ORDER, COMMON, ISP, rankFor, gradeFor, DIFFICULTY } from './game-data.js';
 import { SOURCES } from './data.js';
-import { derive, estimate, Sim, defaultConfig } from './sim.js';
+import { derive, estimate, Sim, defaultConfig, starterConfig } from './sim.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -17,7 +17,7 @@ const store = {
 };
 
 // ---------- settings (saved per browser)
-const SET_DEF = { diff: 'flight', rot: 1, zoom: 1, invert: false, vol: 0.7, speed: 1, shake: true, timers: true };
+const SET_DEF = { diff: 'cadet', rot: 1, zoom: 1, invert: false, vol: 0.7, speed: 1, shake: true, timers: true };
 const settings = { ...SET_DEF, ...(store.get().settings || {}) };
 function saveSettings() { const s = store.get(); s.settings = settings; store.set(s); stage?.setControls?.(settings); }
 const diff = () => DIFFICULTY[settings.diff] || DIFFICULTY.flight;
@@ -185,7 +185,7 @@ function renderBuild() {
       <div class="gx-build__intro">
         <p class="gx-kicker">Step 02 · Mission builder</p>
         <h1 class="gx-h2">Build your <span>${esc(m.world)}</span> ${m.id === 'astra' ? 'probe' : m.id === 'earth' ? 'satellite' : 'orbiter'}</h1>
-        <p>Every part costs mass, money or power. VEGA checks your design live.</p>
+        <p>Every part costs mass, money or power. VEGA checks your design live.</p><button type="button" class="gx-btn" id="gx-starter">Use a Cadet starter build</button><p class="gx-fine">Sets Cadet difficulty and replaces this design with a tested starting configuration. You can customise it afterward.</p>
         <ul class="gx-hints"><li>Drag to rotate</li><li>Scroll to zoom</li></ul>
       </div>
       <aside class="gx-cat" aria-label="Component catalogue">
@@ -208,6 +208,7 @@ function renderBuild() {
   $$('#gx-build [data-inst]').forEach(b => b.onclick = () => {
     const id = b.dataset.inst; cfg.inst = cfg.inst.includes(id) ? cfg.inst.filter(x => x !== id) : [...cfg.inst, id]; audio.beep(600, 0.04); refreshBuild();
   });
+  $('#gx-starter').onclick = () => { settings.diff = 'cadet'; saveSettings(); cfg = starterConfig(mission); saveCfg(); renderBuild(); toast('Starter loaded. Try changing one part and watch the checks.'); };
   $('#gx-prop').oninput = e => { cfg.propKg = +e.target.value; refreshBuild(true); };
   refreshBuild();
 }
@@ -355,7 +356,7 @@ function log(text, kind = 'info') {
 function loop(now) {
   const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
   if (screen !== 'ops') return;
-  const modalOpen = !$('#gx-modal').hidden;
+  const modalOpen = !$('#gx-modal').hidden || !$('#gx-setbox').hidden || !!document.querySelector('dialog[open]') || document.hidden;
   if (!sim.pending && simSpeed > 0 && !modalOpen) {
     const stepsPerSec = (sim.T / sim.dt) / 9 * simSpeed; // one orbit ≈ 9 s at 1×
     acc += dt * stepsPerSec;
@@ -450,9 +451,11 @@ function showCard(p) {
   $$('[data-opt]', mo).forEach(b => b.onclick = () => pick(+b.dataset.opt));
   mo.onkey = k => { const n = +k - 1; const bs = $$('[data-opt]', mo); if (bs[n]) pick(n); };
   if (timed) {
-    const t0 = performance.now(), T = p.timer * 1000; let lastSec = p.timer;
+    const T = p.timer * 1000; let remaining = T, previous = performance.now(), lastSec = p.timer;
     timerId = setInterval(() => {
-      const left = Math.max(0, T - (performance.now() - t0)); const sec = Math.ceil(left / 1000);
+      const now = performance.now(), elapsed = now - previous; previous = now;
+      if (document.hidden || document.querySelector('dialog[open]') || !$('#gx-setbox').hidden) return;
+      const left = remaining = Math.max(0, remaining - elapsed); const sec = Math.ceil(left / 1000);
       $('#gx-timer').style.width = left / T * 100 + '%';
       if (sec !== lastSec) { lastSec = sec; $('#gx-timerv').textContent = `${sec} s to respond. If time runs out, nothing is done.`; if (sec <= 3) audio.tick(); }
       if (left <= 0) { clearInterval(timerId); toast('Too slow. No action taken.'); pick(it.options.length - 1); }
@@ -494,12 +497,13 @@ function lostSequence() {
   setTimeout(() => { l.hidden = true; showDebrief(sim.result()); }, reduced ? 600 : 3200);
 }
 function onKey(e) {
+  if (document.querySelector('dialog[open]')) return;
   if (e.key === 'Escape' && !$('#gx-setbox').hidden) { $('#gx-setbox').hidden = true; return; }
   if (e.key === 'Escape' && !$('#gx-pollbox').hidden) { $('#gx-pollbox').hidden = true; return; }
   if (e.target.matches?.('input, textarea, select')) return;
   const mo = $('#gx-modal');
   if (mo && !mo.hidden && /^[1-4]$/.test(e.key) && mo.onkey && $('[data-opt]', mo)) { mo.onkey(e.key); e.preventDefault(); return; }
-  if (screen !== 'ops') return;
+  if (screen !== 'ops' || !$('#gx-setbox').hidden) return;
   const set = v => { simSpeed = v; $$('[data-speed]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.speed === simSpeed))); };
   if (e.key === ' ') { set(simSpeed ? 0 : (settings.speed || 1)); e.preventDefault(); }
   if (e.key === '1') set(1); if (e.key === '2') set(2); if (e.key === '4') set(4);

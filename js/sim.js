@@ -18,6 +18,13 @@ export function defaultConfig(m) {
   };
 }
 
+// Starter designs are checked by tests/starter-builds.mjs against the Cadet forecast.
+export function starterConfig(m) {
+  const propellant = { astra: 60, lunaris: 120, earth: 25, mars: 120 };
+  return { ...defaultConfig(m), battery: m.id === 'astra' ? 'S' : 'L',
+    radio: 'L', recorder: 'L', propKg: propellant[m.id] };
+}
+
 export function derive(m, cfg, diffId) {
   const diff = diffOf(diffId);
   const O = COMMON.options;
