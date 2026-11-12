@@ -1,5 +1,5 @@
 // NEXUS//04 landing: intro, eight-planet solar system, the spacecraft's route story, mission dashboard, archive.
-import { GAME, ORDER } from './game-data.js';
+import { GAME, ORDER, RECOMMENDED } from './game-data.js';
 import { SOURCES } from './data.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -48,7 +48,7 @@ function chapters() {
       </div>
       <p class="lx-giant" aria-hidden="true">${esc(m.world)}</p>
     </section>`;
-  }).join('') + `<section class="lx-ch lx-handoff" data-focus="exit"><div class="lx-ch__copy"><p class="lx-k">End of the tour</p><h2>The spacecraft is yours now.</h2><p class="lx-lede">It leaves Mars behind. Mission control takes over below: pick where it goes next.</p><a class="lx-btn lx-btn--go" href="#dash">To mission control ↓</a></div></section>
+  }).join('') + `<section class="lx-ch lx-handoff" data-focus="exit"><div class="lx-ch__copy"><p class="lx-k">End of the tour</p><h2>The fleet is yours to fly.</h2><p class="lx-lede">Choose a destination and build the spacecraft for your mission.</p><a class="lx-btn lx-btn--go" href="#dash">To mission control ↓</a></div></section>
   <section class="lx-dash" id="dash" data-focus="dash">
     <p class="lx-k">Mission control</p><h2>Choose a mission.</h2>
     <p class="lx-lede">Each run goes Brief → Build → Launch → Operate → Debrief. First time? Start with HALO on Cadet.</p>
@@ -154,16 +154,22 @@ async function sky() {
   const earth = bodies.Earth, mars = bodies.Mars;
   const focusBody = { astra: apo, earth, lunaris: moon, mars };
   const sizeOf = { astra: 0.32, earth: 1.1, lunaris: 0.32, mars: 0.8 };
-  // the spacecraft (same model and colours as in the game)
-  const { group: craft } = buildCraft({ solar: 'L', battery: 'S', radio: 'L', recorder: 'S', propKg: 80, inst: [] }, GAME.earth);
-  lightCraft(craft, env);
+  // Reuse the game models with their recommended loadouts on the home tour.
+  const craft = new THREE.Group();
+  scene.add(craft);
+  const tourCraft = Object.fromEntries(ORDER.map(id => {
+    const { group } = buildCraft(RECOMMENDED[id].cadet, GAME[id]);
+    lightCraft(group, env);
+    group.visible = false;
+    craft.add(group);
+    return [id, group];
+  }));
+  let shownCraft = null;
   // A neutral fill makes the antenna and blue arrays legible against the dark sky.
   const craftFill = new THREE.PointLight(0xe3eeff, 0.1);
   craftFill.distance = 0.8;
   scene.add(craftFill);
   craft.scale.setScalar(0.09);
-  scene.add(craft);
-  const plume = craft.userData.plume;
   let t0 = 0.9, focus = 'sun';
   const HERO = new THREE.Vector3(0, 62, 96);
   const camPos = HERO.clone(), camLook = new THREE.Vector3();
@@ -211,6 +217,13 @@ async function sky() {
     if (reduced || first) craft.rotation.set(0.42, -0.5, -0.12);
     else if (sp > 0.05) { const ahead = craftPos.clone().add(craftPos.clone().sub(lastCraft)); craft.up.set(0, 1, 0); craft.lookAt(ahead); craft.rotateX(Math.PI / 2); }
     else craft.rotation.y += dt * 0.2;
+    const model = tourCraft[focus === 'exit' ? 'mars' : focus] || tourCraft.earth;
+    if (shownCraft !== model) {
+      if (shownCraft) shownCraft.visible = false;
+      model.visible = true;
+      shownCraft = model;
+    }
+    const plume = model.userData.plume;
     if (plume) plume.material.opacity = !reduced && !first && sp > 1.5 ? Math.min(0.9, (sp - 1.5) * 0.2) : 0;
     const near = focus !== 'sun' && focus !== 'dash';
     craft.scale.setScalar(near ? 0.14 * Math.max(0.75, sizeOf[focus === 'exit' ? 'mars' : focus]) / 0.6 : 0.09);

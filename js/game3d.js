@@ -121,90 +121,170 @@ export function lightCraft(craft, environment) {
   });
 }
 
+// Visual proportions are illustrative. Flight specs still come from game-data.js.
+const FLEET = {
+  astra:   { size: [0.80, 0.77, 0.94], sides: [-1, 1], panel: [0.55, 0.51], antenna: [0, -0.18, 0.43], tint: 0xe8c99c },
+  lunaris: { size: [0.73, 0.66, 1.04], sides: [1],     panel: [0.62, 0.69], antenna: [-0.19, -0.25, 0.40], tint: 0xe3e8f0 },
+  earth:   { size: [0.63, 0.58, 1.36], sides: [-1],    panel: [0.57, 0.65], antenna: [0.16, -0.38, 0.28], tint: 0xddd1bc },
+  mars:    { size: [0.92, 0.88, 1.20], sides: [-1, 1], panel: [0.65, 0.74], antenna: [0, -0.21, 0.57], tint: 0xe3bb80 },
+};
+
+export function deployArrays(craft, open) {
+  for (const hinge of craft.userData.arrayHinges) {
+    hinge.rotation.z = hinge.userData.stowedAngle * (1 - open);
+  }
+}
+
 export function buildCraft(cfg, mission) {
   const g = new THREE.Group(), labels = [];
-  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.8), M.foil());
-  g.add(bus);
-  const alloy = M.grey();
-  const deckGeometry = new THREE.BoxGeometry(0.94, 0.045, 0.84);
-  for (const y of [-0.4, 0.42]) {
-    const deck = new THREE.Mesh(deckGeometry, alloy);
-    deck.position.y = y;
-    g.add(deck);
-  }
-  // A continuous spar connects the hinged sections back to the bus.
-  const nPanels = cfg.solar === 'L' ? 3 : 2;
-  const panelGeometry = new THREE.BoxGeometry(0.62, 0.024, 0.5);
-  const back = M.panelBack();
-  const face = M.panel();
-  const panelMaterials = [back, back, face, back, back, back];
-  const edgeGeometry = new THREE.EdgesGeometry(panelGeometry);
-  const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xb1bccb });
-  const sparLength = 0.37 + (nPanels - 1) * 0.64 + 0.53;
-  const sparGeometry = new THREE.BoxGeometry(sparLength, 0.028, 0.055);
-  const hingeGeometry = new THREE.CylinderGeometry(0.044, 0.044, 0.13, 12);
-  for (const side of [-1, 1]) {
-    const wing = new THREE.Group();
-    wing.position.set(side * 0.45, 0.05, 0);
-    wing.rotation.x = 0.25;
-    const spar = new THREE.Mesh(sparGeometry, alloy);
-    spar.position.set(side * sparLength / 2, -0.025, 0);
-    wing.add(spar);
-    for (let i = 0; i < nPanels; i++) {
-      const panel = new THREE.Mesh(panelGeometry, panelMaterials);
-      panel.position.x = side * (0.68 + i * 0.64);
-      panel.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
-      wing.add(panel);
-      if (i === nPanels - 1 && side === 1) labels.push({ obj: panel, text: 'Solar arrays' });
+  const profile = FLEET[mission.id];
+  const [width, height, depth] = profile.size;
+  const [panelLength, panelDepth] = profile.panel;
+  const [dishX, dishZ, dishRadius] = profile.antenna;
+  const alloy = M.grey(), ceramic = M.white(), dark = M.dark();
+  const foil = M.foil();
+  foil.color.setHex(profile.tint);
+  const add = (geometry, material, x, y, z, parent = g) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    parent.add(mesh);
+    return mesh;
+  };
+  const box = (w, h, d, mat, x, y, z, parent) =>
+    add(new THREE.BoxGeometry(w, h, d), mat, x, y, z, parent);
+
+  const bus = box(width, height, depth, foil, 0, 0, 0);
+  labels.push({ obj: bus, text: 'Spacecraft bus' });
+  for (const y of [-height / 2, height / 2]) {
+    box(width + 0.045, 0.035, depth + 0.045, alloy, 0, y, 0);
+    for (const side of [-1, 1]) {
+      box(0.045, 0.06, depth + 0.05, ceramic, side * width / 2, y, 0);
     }
-    const hinge = new THREE.Mesh(hingeGeometry, alloy);
-    hinge.position.x = side * 0.07;
-    hinge.rotation.x = Math.PI / 2;
-    wing.add(hinge);
-    g.add(wing);
   }
-  // antenna
-  const dr = cfg.radio === 'L' ? 0.42 : 0.26;
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3), M.grey()); mast.position.set(0.1, 0.58, 0); g.add(mast);
-  const d = dish(dr); d.position.set(0.1, 0.72, 0); d.rotation.z = -0.35; g.add(d); labels.push({ obj: d, text: 'High-gain antenna' });
+  for (const x of [-width / 2, width / 2]) {
+    for (const z of [-depth / 2, depth / 2]) {
+      box(0.045, height, 0.045, alloy, x, 0, z);
+    }
+  }
+
+  // The reference designs use twin wings for ASTRA and Mars, and single wings
+  // for the lunar and Earth orbiters. Power choices still change the panel count.
+  const panelCount = cfg.solar === 'L' ? 3 : 2;
+  const panelGeometry = new THREE.BoxGeometry(panelLength, 0.025, panelDepth);
+  const edges = new THREE.EdgesGeometry(panelGeometry);
+  const frame = new THREE.LineBasicMaterial({ color: 0xbec8d5 });
+  const back = M.panelBack();
+  const panelMaterials = [back, back, M.panel(), back, back, back];
+  const hingeGeometry = new THREE.CylinderGeometry(0.025, 0.025, panelDepth * 0.9, 10);
+  g.userData.arrayHinges = [];
+  for (const side of profile.sides) {
+    const wing = new THREE.Group();
+    wing.position.set(side * width / 2, 0.01, 0);
+    wing.rotation.y = side < 0 ? Math.PI : 0;
+    wing.rotation.x = mission.id === 'lunaris' ? 0.75 : 0.22;
+    g.add(wing);
+    box(0.22, 0.055, 0.11, alloy, 0.11, 0, 0, wing);
+    let parent = wing;
+    for (let i = 0; i < panelCount; i++) {
+      const hinge = new THREE.Group();
+      hinge.position.x = i ? panelLength + 0.028 : 0.22;
+      hinge.userData.stowedAngle = i === 0 ? side * 1.5 : side * (i % 2 ? -2.92 : 2.92);
+      parent.add(hinge);
+      g.userData.arrayHinges.push(hinge);
+      const axle = add(hingeGeometry, alloy, 0, 0, 0, hinge);
+      axle.rotation.x = Math.PI / 2;
+      const panel = add(panelGeometry, panelMaterials, panelLength / 2, 0, 0, hinge);
+      panel.add(new THREE.LineSegments(edges, frame));
+      if (i === panelCount - 1 && side === profile.sides.at(-1)) {
+        labels.push({ obj: panel, text: profile.sides.length === 1 ? 'Solar array' : 'Solar arrays' });
+      }
+      parent = hinge;
+    }
+  }
+  const mastHeight = mission.id === 'mars' ? 0.39 : 0.26;
+  add(new THREE.CylinderGeometry(0.065, 0.095, 0.075, 16), alloy, dishX, height / 2 + 0.035, dishZ);
+  add(new THREE.CylinderGeometry(0.027, 0.042, mastHeight, 16), alloy, dishX, height / 2 + mastHeight / 2, dishZ);
+  const antenna = dish(dishRadius * (cfg.radio === 'L' ? 1 : 0.72));
+  antenna.position.set(dishX, height / 2 + mastHeight, dishZ);
+  antenna.rotation.set(0.5, 0, -0.25);
+  g.add(antenna);
+  labels.push({ obj: antenna, text: 'High-gain antenna' });
+
+  if (mission.id === 'earth' || mission.id === 'mars') {
+    const fins = mission.id === 'earth' ? 7 : 5;
+    for (let i = 0; i < fins; i++) {
+      box(width * 0.82, 0.024, 0.15, ceramic, 0, (i / (fins - 1) - 0.5) * height * 0.85, -depth / 2 - 0.065);
+    }
+  }
+  if (mission.id === 'lunaris') {
+    box(width * 0.94, height * 0.54, 0.12, ceramic, 0, -0.08, depth / 2);
+  }
   // propellant tank (visible on the anti-sun side) and thrusters
   const tr = 0.16 + 0.12 * Math.min(1, cfg.propKg / 150);
-  const tank = new THREE.Mesh(new THREE.SphereGeometry(tr, 24, 16), M.grey()); tank.position.set(-0.2, -0.4 - tr * 0.6, -0.15); g.add(tank);
+  const tank = new THREE.Mesh(new THREE.SphereGeometry(tr, 24, 16), M.grey()); tank.position.set(-0.2, -height / 2 - tr * 0.48, -0.19); g.add(tank);
   labels.push({ obj: tank, text: `Propellant ${cfg.propKg} kg` });
   for (const [x, z] of [[0.3, 0.3], [-0.3, 0.3], [0.3, -0.3], [-0.3, -0.3]]) {
-    const n = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 12, 1, true), M.dark()); n.position.set(x, -0.46, z); n.rotation.x = Math.PI; g.add(n);
+    const n = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 12, 1, true), M.dark()); n.position.set(x * width, -height / 2 - 0.055, z * depth); n.rotation.x = Math.PI; g.add(n);
   }
   // main engine with a blue-white plume (shown only while it fires)
-  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.15, 0.22, 32, 1, true), M.dark()); bell.position.set(0, -0.55, 0); g.add(bell);
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.15, 0.22, 32, 1, true), M.dark()); bell.position.set(0, -height / 2 - 0.11, 0); g.add(bell);
   const plume = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowSprite(), color: 0xbfe0ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
-  plume.scale.set(0.5, 1.1, 1); plume.position.set(0, -1.05, 0); g.add(plume); g.userData.plume = plume;
+  plume.scale.set(0.5, 1.1, 1); plume.position.set(0, -height / 2 - 0.65, 0); g.add(plume); g.userData.plume = plume;
   // star trackers and sun sensor
-  for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.1, 16), M.dark()); st.position.set(sx * 0.3, 0.5, -0.32); st.rotation.x = -0.5; g.add(st); }
-  const rad = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.55), new THREE.MeshStandardMaterial({ color: 0xf4f5f6, roughness: 0.3, metalness: 0.1 })); rad.position.set(0.461, 0, 0); g.add(rad);
+  for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.1, 16), M.dark()); st.position.set(sx * width * 0.35, height / 2 + 0.06, -depth * 0.30); st.rotation.x = -0.5; g.add(st); }
   // battery and recorder boxes on the side face, sized by option
-  const bat = new THREE.Mesh(new THREE.BoxGeometry(0.06, cfg.battery === 'L' ? 0.32 : 0.18, 0.22), M.dark()); bat.position.set(-0.48, 0, 0.18); g.add(bat);
+  const bat = new THREE.Mesh(new THREE.BoxGeometry(0.06, cfg.battery === 'L' ? 0.32 : 0.18, 0.22), M.dark()); bat.position.set(-width / 2 - 0.03, 0, depth * 0.24); g.add(bat);
   labels.push({ obj: bat, text: cfg.battery === 'L' ? 'Battery 500 Wh' : 'Battery 100 Wh' });
-  const recb = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, cfg.recorder === 'L' ? 0.3 : 0.16), M.grey()); recb.position.set(-0.48, 0.1, -0.2); g.add(recb);
-  // instruments on the nadir (front, +z) face
+  const recb = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, cfg.recorder === 'L' ? 0.3 : 0.16), M.grey()); recb.position.set(-width / 2 - 0.03, 0.1, -depth * 0.24); g.add(recb);
+  labels.push({ obj: recb, text: 'Data recorder' });
+  // Keep each payload on its own mount when the player changes instruments.
   const insts = mission.instruments.filter(i => cfg.inst.includes(i.id));
-  insts.forEach((ins, k) => {
-    const x = -0.28 + (k % 3) * 0.28, y = k < 3 ? -0.12 : 0.22;
+  insts.forEach(ins => {
+    const slot = mission.instruments.indexOf(ins);
+    let x = (slot % 3 - 1) * width * 0.34;
+    let y = slot < 3 ? -0.13 : 0.19;
+    let z = depth / 2 + 0.07;
     let o;
     if (/camera|Imager/i.test(ins.name)) {
-      const big = /High-res/i.test(ins.name);
+      const big = ins.id === 'hir';
+      if (big) { x = 0; y = -0.16; }
+      if (ins.id === 'ctx') { x = -width * 0.28; y = 0.23; }
+      if (mission.id === 'earth') { x = -width * 0.3; y = -0.12; }
       o = new THREE.Group();
-      const tube = new THREE.Mesh(new THREE.CylinderGeometry(big ? 0.15 : 0.09, big ? 0.15 : 0.09, big ? 0.5 : 0.28, 24), M.white()); tube.rotation.x = Math.PI / 2; o.add(tube);
-      const lens = new THREE.Mesh(new THREE.CircleGeometry(big ? 0.13 : 0.075, 24), M.lens()); lens.position.z = big ? 0.251 : 0.141; o.add(lens);
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(big ? 0.19 : 0.09, big ? 0.16 : 0.09, big ? 0.64 : 0.28, 24), M.white()); tube.rotation.x = Math.PI / 2; o.add(tube);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(big ? 0.155 : 0.075, 24), M.lens()); lens.position.z = big ? 0.321 : 0.141; o.add(lens);
     } else if (/Radar/i.test(ins.name)) {
       o = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.03), M.dark());
     } else if (/Relay/i.test(ins.name)) {
-      o = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.06, 0.24, 12), M.white()); o.rotation.x = Math.PI / 2;
+      o = new THREE.Group();
+      const points = Array.from({ length: 49 }, (_, i) => {
+        const turn = i * Math.PI / 6;
+        return new THREE.Vector3(Math.cos(turn) * 0.068, -i * 0.007, Math.sin(turn) * 0.068);
+      });
+      add(new THREE.CylinderGeometry(0.018, 0.018, 0.35, 12), alloy, 0, -0.17, 0, o);
+      add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 48, 0.009, 5), ceramic, 0, 0, 0, o);
+      x = width * 0.32; y = -height / 2; z = depth * 0.3;
+    } else if (ins.id === 'limb') {
+      o = new THREE.Group();
+      box(0.22, 0.24, 0.26, alloy, 0, 0, 0, o);
+      const reflector = dish(0.17);
+      reflector.position.z = 0.13;
+      reflector.rotation.x = Math.PI / 2;
+      o.add(reflector);
+      x = 0; y = height / 2 - 0.11;
+    } else if (mission.id === 'earth' && ins.id === 'uv') {
+      o = new THREE.Group();
+      box(0.35, 0.18, 0.29, ceramic, 0, 0, 0, o);
+      box(0.25, 0.025, 0.12, M.lens(), 0, -0.095, 0, o);
+      x = 0; y = -height / 2 - 0.07; z = 0.21;
     } else {
       o = new THREE.Group();
       const box = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.16), M.dark()); o.add(box);
       const ap = new THREE.Mesh(new THREE.CircleGeometry(0.05, 20), M.lens()); ap.position.z = 0.081; o.add(ap);
     }
-    o.position.set(x, y, 0.48); g.add(o);
+    if (ins.id === 'cri') { x = width * 0.29; y = 0.22; }
+    if (mission.id === 'earth' && ins.id === 'ir') { x = width * 0.29; y = -0.12; }
+    o.position.set(x, y, z); g.add(o);
     labels.push({ obj: o, text: `${ins.name} (${ins.heritage}-type)` });
   });
   return { group: g, labels };
@@ -299,6 +379,7 @@ export class GameStage {
 
   // ---------------- builder: planet below, spacecraft centre stage
   showBuild(mission, cfg, offsetX = 0, hideCraft = false) {
+    this.lastCfg = cfg;
     const keepView = this.mode === 'build' && this.missionId === mission.id;
     this.offsetX = offsetX;
     this.mode = 'build'; this.missionId = mission.id;
@@ -311,15 +392,18 @@ export class GameStage {
       this.craftHolder = new THREE.Group(); this.scene.add(this.craftHolder);
       this.cam.position.set(0, 0.5, 6.2); this.cam.lookAt(0, 0.1, 0); this.zoom = 1;
     }
-    this.craftHolder.children.forEach(c => { this.craftHolder.remove(c); disposeTree(c); });
+    for (const child of [...this.craftHolder.children]) {
+      this.craftHolder.remove(child);
+      disposeTree(child);
+    }
     const { group, labels } = buildCraft(cfg, mission);
     lightCraft(group, this.env);
-    group.scale.setScalar(1.25);
     this.craftHolder.add(group); this.craft = group;
     this.craftHolder.visible = !hideCraft;
     this.setLabels(hideCraft ? [] : labels);
     this.update = dt => {
       if (!this.userTurned && !this.paused && !this.reduced) this.drag.yaw += dt * 0.15;
+      this.craft.scale.setScalar(Math.min(1.13, Math.max(0.55, this.cam.aspect * 1.25)));
       this.craft.rotation.set(this.drag.pitch * 0.5, this.drag.yaw, 0);
       this.craftHolder.position.y = Math.sin(this.clock.elapsedTime * 0.8) * (this.reduced ? 0 : 0.05);
       this.craftHolder.position.x += ((this.offsetX || 0) - this.craftHolder.position.x) * Math.min(1, dt * 4);
@@ -331,6 +415,7 @@ export class GameStage {
   // ---------------- launch cinematic. onDone(success) fires at the end.
   playLaunch(mission, success, onDone, cues = {}, opts = {}) {
     const boomAt = opts.explodeAt || 0; let boom = null;
+    const flightConfig = this.lastCfg;
     this.mode = 'launch'; this.clear(); this.setLabels([]);
     const s = this.scene, say = (txt, k) => cues.say?.(txt, k);
     const earthR = 40;
@@ -398,7 +483,9 @@ export class GameStage {
     const fairL = new THREE.Mesh(new THREE.LatheGeometry(prof, 32, 0, Math.PI), body);
     const fairR = new THREE.Mesh(new THREE.LatheGeometry(prof, 32, Math.PI, Math.PI), body);
     const fair = new THREE.Group(); fair.position.y = 2.36; fair.add(fairL, fairR); rocket.add(fair);
-    const { group: sat, labels: _l } = buildCraft({ solar: 'S', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
+    const { group: sat, labels: _l } = buildCraft(flightConfig, mission);
+    deployArrays(sat, 0);
+    lightCraft(sat, this.env);
     sat.scale.setScalar(0.1); sat.position.y = 2.48; sat.visible = false; rocket.add(sat);
     rocket.traverse(o => { if (o.material && !o.material.envMap) { o.material.envMap = this.env; o.material.envMapIntensity = 0.7; } });
     s.add(rocket);
@@ -552,12 +639,12 @@ export class GameStage {
           const ub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 0.8, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.3, metalness: 0.9, side: THREE.DoubleSide })); ub.position.y = -1.15; upper.add(ub);
           upper.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.7; } });
           upper.rotation.z = -0.25; orbitShot.add(upper);
-          const { group: craft } = buildCraft({ solar: 'L', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
+          const { group: craft } = buildCraft(flightConfig, mission);
           lightCraft(craft, this.env);
           craft.scale.setScalar(0.55); orbitShot.add(craft);
-          const wings = craft.children.filter(c => c.material && (Array.isArray(c.material) || c.material.map === cells()) || (c.isLineSegments));
+          deployArrays(craft, 0);
           craft.position.set(0, 1.35, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
-          orbitShot.userData = { upper, craft, wings, c0: craft.position.clone() };
+          orbitShot.userData = { upper, craft, c0: craft.position.clone() };
           this.cam.fov = 40; this.cam.updateProjectionMatrix();
           this.cam.position.set(2.6, 1.3, 3.6); camL.set(0, 0.9, 0); this.cam.lookAt(camL);
         }
@@ -569,7 +656,7 @@ export class GameStage {
         at(T.deploy, 'Spacecraft separation', 'sep');
         u.craft.position.copy(u.c0).add(new THREE.Vector3(0.08, 0.32, 0.05).multiplyScalar(k)); u.craft.rotation.y = k * 0.12; u.craft.rotation.z = -0.25 + k * 0.03;
         const open = Math.min(1, Math.max(0, (t - T.arrays) / 1.2)); const ease = open * open * (3 - 2 * open);
-        u.wings.forEach(w => { if (w.userData.x0 === undefined) w.userData.x0 = w.position.x; w.scale.x = Math.max(0.02, ease); w.position.x = Math.sign(w.userData.x0) * (0.62 + (Math.abs(w.userData.x0) - 0.62) * ease); });
+        deployArrays(u.craft, ease);
         if (t > T.arrays) at(T.arrays, 'Solar arrays deployed', 'arrays');
         u.upper.position.y -= dt * 0.04; u.upper.rotation.x += dt * 0.02;
         if (isEarth && t > T.burn) { at(T.burn, 'Raising to final orbit'); const pl = u.craft.userData.plume; if (pl) pl.material.opacity = 0.85 + Math.random() * 0.15; }
@@ -577,6 +664,7 @@ export class GameStage {
         if (!isEarth && t > T.transfer) {
           at(T.transfer, `Transfer to ${mission.world}`);
           s.remove(orbitShot);
+          disposeTree(u.craft);
           transfer = new THREE.Group(); s.add(transfer);
           const e = this.world('earth', 1); e.position.set(-4, 0, 0); transfer.add(e);
           const dest = this.world(target, target === 'astra' ? 0.35 : target === 'lunaris' ? 0.5 : 0.8); dest.position.set(4, 0.4, 0); transfer.add(dest);
@@ -585,7 +673,7 @@ export class GameStage {
           const pts = curve.getPoints(120);
           const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: new THREE.Color(mission.accent), dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.8 }));
           line.computeLineDistances(); transfer.add(line);
-          const { group: mini } = buildCraft({ solar: 'L', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission); mini.scale.setScalar(0.14); transfer.add(mini);
+          const { group: mini } = buildCraft(flightConfig, mission); lightCraft(mini, this.env); mini.scale.setScalar(0.14); transfer.add(mini);
           const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowSprite(), color: 0xd8ecff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 })); halo.scale.setScalar(0.5); mini.add(halo); halo.scale.setScalar(4);
           const ring = new THREE.Mesh(new THREE.TorusGeometry(target === 'astra' ? 0.6 : 0.95, 0.01, 8, 120), new THREE.MeshBasicMaterial({ color: new THREE.Color(mission.accent), transparent: true, opacity: 0 }));
           ring.position.copy(destPos); ring.rotation.x = Math.PI / 2.3; transfer.add(ring);
