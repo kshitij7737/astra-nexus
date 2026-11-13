@@ -493,6 +493,7 @@ function runLaunch() {
   const finish = (ok, why) => {
     if (finished || screen !== 'launch') return;
     finished = true;
+    $('#gx-cast').hidden = true;
     recoverLaunch = null;
     $('#gx-skip').disabled = true;
     audio.hush();
@@ -505,7 +506,20 @@ function runLaunch() {
     if (ok) { audio.chime(); box.innerHTML = `<b>Orbit achieved</b>`; setTimeout(startOps, 900); }
     else { audio.fail(); box.innerHTML = `<b>Missed ${esc(m.world)}</b>`; sim = new Sim(m, cfg, { diff: settings.diff }); setTimeout(() => showDebrief(sim.result()), 1400); }
   };
-  const cues = { say: show, boom: () => { audio.hush(); timers.forEach(clearTimeout); box.innerHTML = '<b class="gx-red">Vehicle lost</b>'; audio.boom(); document.body.classList.add('gx-flash'); setTimeout(() => document.body.classList.remove('gx-flash'), 900); } };
+  const cast = $('#gx-cast'), CAMS = ['Pad camera', 'Tracking camera', 'Long-range tracking', 'Onboard camera · stage 2', 'Chase view'];
+  const pad2 = n => String(Math.floor(n)).padStart(2, '0');
+  const tele = (d, shot) => {
+    if (!d) { cast.hidden = true; return; }
+    cast.hidden = false;
+    const a = Math.abs(d.m), sign = d.m < 0 ? 'T-' : 'T+';
+    $('#gx-castclock').textContent = `${sign}${pad2(a / 3600)}:${pad2(a / 60 % 60)}:${pad2(a % 60)}`;
+    $('#gx-castv').textContent = Math.round(d.v).toLocaleString('en-US');
+    $('#gx-casth').textContent = d.h.toFixed(d.h < 100 ? 1 : 0);
+    $('#gx-caststage').textContent = `Stage ${d.stage}`;
+    $('#gx-castfill').style.width = `${Math.max(0, Math.min(100, d.m / 520 * 100))}%`;
+    $('#gx-castcam').textContent = CAMS[shot] || '';
+  };
+  const cues = { say: show, tele, boom: () => { cast.hidden = true; audio.hush(); timers.forEach(clearTimeout); box.innerHTML = '<b class="gx-red">Vehicle lost</b>'; audio.boom(); document.body.classList.add('gx-flash'); setTimeout(() => document.body.classList.remove('gx-flash'), 900); } };
   const completeFallback = () => finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : '');
   const skip = $('#gx-skip');
   skip.disabled = false;

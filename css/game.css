@@ -396,3 +396,23 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
 
 @view-transition { navigation: auto; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }
+
+/* launch broadcast overlay (simulated telemetry) */
+.gx-cast { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 var(--pad) 22px; pointer-events: none; background: linear-gradient(0deg, rgba(3,5,12,.72), rgba(3,5,12,0)); }
+.gx-cast__cam { position: fixed; left: var(--pad); top: 86px; margin: 0; font: 600 10.5px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #fff; display: flex; align-items: center; gap: 8px; text-shadow: 0 1px 6px #000; }
+.gx-cast__cam::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #ff3b30; box-shadow: 0 0 8px #ff3b30; animation: gx-rec 1.4s infinite; }
+@keyframes gx-rec { 50% { opacity: .25; } }
+.gx-cast__bar { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: end; gap: clamp(14px, 3vw, 40px); max-width: 980px; margin: 0 auto; }
+.gx-cast__stage { justify-self: start; font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: #cfd8ea; padding-bottom: 6px; }
+.gx-cast__note { justify-self: end; font: 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #8f9ab0; padding-bottom: 6px; }
+.gx-cast__read { display: grid; justify-items: center; line-height: 1; }
+.gx-cast__read span { font: 600 9.5px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: #9fb0cc; margin-bottom: 6px; }
+.gx-cast__read b { font: 700 clamp(22px, 2.6vw, 32px) var(--mono); font-variant-numeric: tabular-nums; color: #fff; min-width: 5.2ch; text-align: center; }
+.gx-cast__read small { font: 9.5px var(--mono); color: #9fb0cc; margin-top: 4px; letter-spacing: .1em; }
+.gx-cast__clock { font: 700 clamp(26px, 3.4vw, 44px) var(--mono); font-variant-numeric: tabular-nums; letter-spacing: .02em; color: #fff; padding: 0 clamp(6px, 1.5vw, 16px); text-shadow: 0 0 24px rgba(255,255,255,.18); }
+.gx-cast__line { position: relative; max-width: 980px; height: 2px; margin: 16px auto 18px; background: rgba(255,255,255,.18); }
+.gx-cast__line i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc, #ff7a3d); box-shadow: 0 0 10px var(--acc, #ff7a3d); }
+.gx-cast__line em { position: absolute; top: 8px; transform: translateX(-50%); font: 9px var(--mono); font-style: normal; letter-spacing: .1em; text-transform: uppercase; color: #aab4c8; white-space: nowrap; }
+.gx-cast__line em::before { content: ''; position: absolute; left: 50%; top: -11px; width: 1px; height: 7px; background: rgba(255,255,255,.5); }
+.gx-cast:not([hidden]) ~ .gx-skip, #gx-launchscreen:has(.gx-cast:not([hidden])) .gx-launchtext { bottom: 150px; }
+@media (max-width: 640px) { .gx-cast__note, .gx-cast__stage { display: none; } .gx-cast__bar { grid-template-columns: auto auto auto; justify-content: center; } .gx-cast__line em:nth-child(3), .gx-cast__line em:nth-child(4) { display: none; } .gx-cast__cam { top: 70px; } }

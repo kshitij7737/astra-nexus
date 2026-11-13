@@ -30,6 +30,18 @@
   <section data-screen="build" id="gx-build" hidden></section>
   <section data-screen="launch" id="gx-launchscreen" hidden>
     <div class="gx-launchtext" id="gx-launchtext" aria-live="assertive"></div>
+    <div class="gx-cast" id="gx-cast" hidden aria-hidden="true">
+      <p class="gx-cast__cam" id="gx-castcam"></p>
+      <div class="gx-cast__bar">
+        <div class="gx-cast__stage" id="gx-caststage">Stage 1</div>
+        <div class="gx-cast__read"><span>Speed</span><b id="gx-castv">0</b><small>km/h</small></div>
+        <div class="gx-cast__clock" id="gx-castclock">T-00:00:03</div>
+        <div class="gx-cast__read"><span>Altitude</span><b id="gx-casth">0.0</b><small>km</small></div>
+        <div class="gx-cast__note">Simulated · time compressed</div>
+      </div>
+      <div class="gx-cast__line"><i id="gx-castfill"></i>
+        <em style="left:13.8%">Max-Q</em><em style="left:28.8%">MECO</em><em style="left:38.5%">Fairing</em><em style="left:100%">Orbit</em></div>
+    </div>
     <button class="gx-btn gx-skip" id="gx-skip">Skip</button>
   </section>
   <section data-screen="ops" id="gx-ops" hidden></section>
