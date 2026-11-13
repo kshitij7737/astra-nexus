@@ -54,7 +54,7 @@ function chapters() {
         <div class="lx-row"><a class="lx-btn lx-btn--go" href="play.html?mission=${id}">Play ${esc(m.name)}</a><a class="lx-btn" href="explore.html?mission=${id}">Explore ${esc(m.world)}</a></div>
       </div>
     </section>`;
-  }).join('') + `<section class="lx-ch lx-handoff" data-focus="exit"><div class="lx-ch__copy"><p class="lx-k">End of the tour</p><h2>The spacecraft is yours now.</h2><p class="lx-lede">It leaves Mars behind. Mission control takes over below: pick where it goes next.</p><a class="lx-btn lx-btn--go" href="#dash">To mission control ↓</a></div></section>
+  }).join('') + `<section class="lx-ch lx-handoff" data-focus="exit"><div class="lx-ch__copy"><p class="lx-k">End of the tour</p><h2>The fleet is yours to fly.</h2><p class="lx-lede">Choose a destination and build the spacecraft for your mission.</p><a class="lx-btn lx-btn--go" href="#dash">To mission control ↓</a></div></section>
   <section class="lx-dash" id="dash" data-focus="dash">
     <p class="lx-k">Mission control</p><h2>Choose a mission.</h2>
     <p class="lx-lede">Each run goes Brief → Build → Launch → Operate → Debrief. First time? Start with HALO on Cadet.</p>
