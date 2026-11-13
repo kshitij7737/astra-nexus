@@ -128,7 +128,7 @@
 .lx-jgrid article { padding: 20px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
 .lx-jgrid h3, .lx-teamh { margin: 0 0 8px; font: 500 11px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--acc); }
 .lx-jgrid p { margin: 0; color: #d8d4cc; }
-.lx-teamh { margin-top: 30px; }
+.lx-teamh { margin-top: 30px; scroll-margin-top: 90px; }
 .lx-team { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .lx-team li { display: grid; padding: 16px; border-radius: 12px; border: 1px solid var(--line); } .lx-team b { font-weight: 800; font-size: 18px; } .lx-team span { font-size: 13px; color: #cfcbc3; }
 .lx-team li { grid-template-rows: auto 1fr auto; }

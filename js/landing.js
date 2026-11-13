@@ -475,7 +475,13 @@ document.addEventListener('click', e => {
   e.preventDefault(); brief(id);
 });
 
-chapters(); archive(); intro();
+chapters(); archive();
+if (location.hash === '#team') {
+  $('#lx-intro').hidden = true;
+  $('#team').scrollIntoView();
+} else {
+  intro();
+}
 sky().catch(error=>{
   console.warn('Using the static Solar System illustration.',error);
   $('#lx-sky').replaceChildren();
