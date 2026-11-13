@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inside a Nebula · NEXUS//04</title>
+<meta name="description" content="Fly into a nebula: clouds of gas and dust, the material stars give back to space, and the birth of a protostar. An observation-informed 3D visualization.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="Inside a Nebula · NEXUS//04">
+<meta property="og:description" content="A 3D fly-through of a stellar nursery, from cloud to the first protostar.">
+<meta property="og:image" content="og.jpg">
+<meta name="theme-color" content="#18264f">
+<link rel="stylesheet" href="css/status.css">
+<link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/nebula.css">
+</head>
+<body class="nb-page">
+<div id="nb-sky" aria-hidden="true"></div>
+<div class="nb-veil" aria-hidden="true"></div>
+
+<header class="nb-top">
+  <a class="nb-brand" href="index.html"><b>NEXUS//04</b><small>Part 1 · Inside a nebula</small></a>
+  <div class="nb-ctl" role="toolbar" aria-label="View controls">
+    <button type="button" id="nb-mode" aria-pressed="false" title="Drag or use arrow keys to look around">Free look</button>
+    <button type="button" id="nb-layer" aria-pressed="false" title="Switch between visible-light-inspired and infrared-inspired views">Infrared view</button>
+    <button type="button" id="nb-pause" aria-pressed="false">Pause</button>
+    <button type="button" id="nb-sound" aria-pressed="false" title="Designed atmosphere. Space itself is silent.">Sound</button>
+  </div>
+</header>
+
+<div class="nb-labels" id="nb-labels" aria-hidden="false"></div>
+
+<section class="nb-panel" id="nb-panel" aria-live="polite">
+  <p class="nb-step" id="nb-step">01 / 07</p>
+  <h1 id="nb-title">A nebula is a vast cloud of gas and dust.</h1>
+  <p id="nb-text"></p>
+  <div class="nb-paths" id="nb-paths" hidden>
+    <button type="button" data-path="a">How star material spreads</button>
+    <button type="button" data-path="b">Inside a stellar nursery</button>
+  </div>
+  <div class="nb-nav">
+    <button type="button" id="nb-back" aria-label="Previous scene">←</button>
+    <div class="nb-dots" id="nb-dots" aria-hidden="true"></div>
+    <button type="button" id="nb-next" class="nb-go">Next →</button>
+  </div>
+  <p class="nb-badge" id="nb-badge" hidden>Time compressed</p>
+</section>
+
+<div class="nb-info" id="nb-info" role="dialog" aria-modal="false" hidden></div>
+<button type="button" class="nb-return" id="nb-return" hidden>Return to guided view</button>
+<p class="nb-note">Observation-informed artistic visualization. Distances compressed; colours are art direction, not what the eye would see. <a href="#nb-sources" id="nb-srclink">Sources</a></p>
+
+<aside class="nb-sources" id="nb-sources" hidden>
+  <h2>Sources and references</h2>
+  <ul>
+    <li><a href="https://science.nasa.gov/universe/stories/quick-reads/decoding-nebulae/" target="_blank" rel="noopener">NASA Science: Decoding Nebulae</a></li>
+    <li><a href="https://science.nasa.gov/exoplanets/stars/" target="_blank" rel="noopener">NASA Science: Stars and star formation</a></li>
+    <li><a href="https://science.nasa.gov/universe/stars/nasa-funded-study-explores-turbulence-in-molecular-clouds/" target="_blank" rel="noopener">NASA Science: Turbulence in molecular clouds</a></li>
+    <li><a href="https://science.nasa.gov/asset/hubble/the-pillars-of-creation-and-the-interplay-of-stars-and-dust/" target="_blank" rel="noopener">NASA Science: The Pillars of Creation in 3D</a></li>
+    <li><a href="https://science.nasa.gov/asset/webb/star-formation-from-the-carina-nebula-to-the-cosmic-cliffs/" target="_blank" rel="noopener">NASA Science: Star formation in the Carina Nebula</a></li>
+    <li><a href="https://science.nasa.gov/asset/hubble/3d-fly-through-of-the-orion-nebula/" target="_blank" rel="noopener">NASA Science: 3D fly-through of the Orion Nebula</a></li>
+  </ul>
+  <button type="button" id="nb-srcclose">Close</button>
+</aside>
+
+<noscript><div class="nb-fallback"><h1>Inside a Nebula</h1><p>This 3D chapter needs JavaScript. A nebula is a vast cloud of gas and dust. Some are stellar nurseries; others are material released by stars near the end of their lives. Dense pockets of cold clouds can collapse under gravity into protostars.</p></div></noscript>
+<script type="module" src="js/nebula.js"></script>
+</body>
+</html>
