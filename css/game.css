@@ -378,3 +378,13 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
 .gx-tx.on .ln { stroke: var(--ok); animation: gx-flow .6s linear infinite; } .gx-tx.on .pk { opacity: 1; } .gx-tx.on text { fill: var(--ok); }
 @keyframes gx-flow { to { stroke-dashoffset: -16; } }
 @media (prefers-reduced-motion: reduce) { .gx-tx.on .ln { animation: none; } }
+
+/* first-time guide (coach marks) */
+.gx-coachmark { position: relative; z-index: 46 !important; outline: 2px solid var(--acc); outline-offset: 4px; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(2,3,10,.55); transition: outline-color .3s; }
+.gx-coachbox { position: fixed; z-index: 60; width: min(340px, calc(100vw - 20px)); padding: 14px 16px; border-radius: 14px; background: #0d1222; border: 1px solid var(--acc); box-shadow: 0 18px 50px rgba(0,0,0,.6); color: #f2efe9; animation: gx-coachin .25s ease both; }
+.gx-coachbox::before { content: ''; position: absolute; left: var(--ax, 50%); width: 12px; height: 12px; background: #0d1222; border: 1px solid var(--acc); transform: translateX(-50%) rotate(45deg); }
+.gx-coachbox[data-side="below"]::before { top: -7px; border-right: 0; border-bottom: 0; } .gx-coachbox[data-side="above"]::before { bottom: -7px; border-left: 0; border-top: 0; }
+.gx-coachbox p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.45; } .gx-coach__k { font: 500 10.5px var(--mono) !important; letter-spacing: .14em; text-transform: uppercase; color: var(--acc); margin-bottom: 6px !important; }
+.gx-coach__row { display: flex; justify-content: flex-end; gap: 8px; } .gx-coach__row .gx-btn { padding: 8px 14px; font-size: 12px; }
+@keyframes gx-coachin { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .gx-coachbox { animation: none; } }

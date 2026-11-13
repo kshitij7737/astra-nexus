@@ -19,7 +19,7 @@ const store = {
 };
 
 // ---------- settings (saved per browser)
-const SET_DEF = { diff: 'cadet', rot: 1, zoom: 1, invert: false, vol: 0.7, speed: 2, shake: true, timers: true, music: true, musicVol: 0.5 };
+const SET_DEF = { tips: true, diff: 'cadet', rot: 1, zoom: 1, invert: false, vol: 0.7, speed: 2, shake: true, timers: true, music: true, musicVol: 0.5 };
 const settings = { ...SET_DEF, ...(store.get().settings || {}) };
 function saveSettings() { const s = store.get(); s.settings = settings; store.set(s); stage?.setControls?.(settings); }
 const diff = () => DIFFICULTY[settings.diff] || DIFFICULTY.flight;
@@ -110,7 +110,9 @@ async function boot() {
   try {
     const g3 = await import('./game3d.js');
     if (!g3.webglOK()) throw new Error('no WebGL');
-    stage = new g3.GameStage($('#gx-stage')); stage.setControls(settings);
+    const raw = new g3.GameStage($('#gx-stage')); raw.setControls(settings);
+    let warned = false;
+    stage = new Proxy(raw, { get(t, k) { const v = t[k]; if (typeof v !== 'function') return v; return (...a) => { try { return v.apply(t, a); } catch (err) { if (!warned) { warned = true; console.warn('NEXUS: 3D step failed, continuing without it', err); } } }; } });
   } catch (e) { console.warn('NEXUS: 3D disabled', e); document.body.classList.add('gx-no3d'); }
   if (!mission) pickMission(); else start(mission.id);
   if (!store.get().helped) openHelp(true);
@@ -158,11 +160,56 @@ function setScreen(name) {
   $$('[data-screen]').forEach(s => s.hidden = s.dataset.screen !== name);
   const order = ['brief', 'build', 'launch', 'ops', 'debrief'];
   $$('.gx-steps li').forEach((li, i) => { li.dataset.state = i < order.indexOf(name) ? 'done' : i === order.indexOf(name) ? 'now' : ''; });
-  const TR = { brief: 'Briefing opened', build: 'Spacecraft design started', launch: 'Launch sequence started', ops: `Orbit reached around ${mission.world}. Science operations started`, debrief: null };
-  if (mission && TR[name] !== undefined) trace(mission.id, TR[name], order.indexOf(name));
+  if (mission) { const TR = { brief: 'Briefing opened', build: 'Spacecraft design started', launch: 'Launch sequence started', ops: `Orbit reached around ${mission.world}. Science operations started` }; if (TR[name]) trace(mission.id, TR[name], order.indexOf(name)); }
   window.scrollTo(0, 0);
+  setTimeout(() => { if (screen === name) guide(name); }, name === 'ops' ? 1200 : 500);
   music.setMood(name === 'launch' ? 'launch' : name === 'ops' ? 'ops' : 'calm');
 }
+
+// ---------- first-time guide: short pointers on each screen, for players who know nothing about space
+const COACH = {
+  pick: [['.gx-diff', 'Pick a difficulty first. Cadet is the gentlest: more money, fewer surprises.'], ['.gx-pickcard[data-go="earth"]', 'Each card is a mission. New here? HALO around Earth is the easiest one to start with.']],
+  brief: [['.gx-transmission', 'This is VEGA, your mission controller. She tells you what this mission is trying to find out.'], ['.gx-objs', 'These are your goals. Each needs a set amount of data to arrive back on Earth.'], ['.gx-cons', 'Your limits: money, how heavy the rocket can lift, and how much fuel the trip needs.'], ['#gx-tobuild', 'Ready? Next you design your spacecraft.']],
+  build: [['.gx-cat', 'Pick the parts of your spacecraft here. Point at one to see it light up on the model.'], ['#gx-suggest', 'Not sure what to choose? VEGA can pick a build that works. You can change it after.'], ['.gx-ready', 'This says whether the design will work. Aim for GO. CAUTION can still fly. NO-GO will not.'], ['#gx-launch', 'When it says GO or CAUTION, launch.']],
+  ops: [['#gx-tl', 'The orbit timeline. Coloured: over the target, so instruments record. Green: Earth can hear you, so data is sent. Dark: shadow, no solar power.'], ['.gx-toggles', 'Switch instruments on or off. On means recording, but it uses power.'], ['.gx-gauges', 'Watch the battery and the recorder. A flat battery damages the spacecraft. A full recorder loses new data.'], ['#gx-tele', 'Live readings: power in and out, the radio link to Earth, and orbit status.'], ['#gx-play', 'Pause, play or speed up time. The mission waits while these tips are showing.']],
+  debrief: [['.gx-bigscore', 'Your result. Below it: what you achieved, what you used, and one tip for next time.'], ['#gx-again', 'Try again with what you learned, or pick another mission.']],
+};
+let coachOn = false;
+function guide(name, force) {
+  const st = store.get(); if (settings.tips === false && !force) return;
+  if (!force && st.tips?.[name]) return;
+  const steps = (COACH[name] || []).filter(([sel]) => { const el = document.querySelector(sel); return el && el.offsetParent !== null; });
+  if (!steps.length) return;
+  if ([...document.querySelectorAll('.gx-modal')].some(m => !m.hidden)) { setTimeout(() => { if (screen === name) guide(name, force); }, 700); return; }
+  coachOn = true; let i = 0;
+  const box = document.createElement('div'); box.className = 'gx-coachbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box);
+  let cur = null;
+  const outside = e => { if (!box.contains(e.target)) end(); };
+  setTimeout(() => document.addEventListener('pointerdown', outside, true), 50);
+  const end = () => { if (!coachOn) return; document.removeEventListener('pointerdown', outside, true); coachOn = false; cur?.classList.remove('gx-coachmark'); box.remove(); removeEventListener('resize', place); const s2 = store.get(); s2.tips = { ...(s2.tips || {}), [name]: 1 }; store.set(s2); };
+  function place() {
+    const el = document.querySelector(steps[i][0]); if (!el) return;
+    const r = el.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight;
+    const below = r.bottom + bh + 18 < innerHeight;
+    const top = below ? r.bottom + 12 : Math.max(10, r.top - bh - 12);
+    const left = Math.max(10, Math.min(innerWidth - bw - 10, r.left + r.width / 2 - bw / 2));
+    box.style.top = `${top}px`; box.style.left = `${left}px`; box.dataset.side = below ? 'below' : 'above';
+    box.style.setProperty('--ax', `${Math.max(16, Math.min(bw - 16, r.left + r.width / 2 - left))}px`);
+  }
+  function show() {
+    cur?.classList.remove('gx-coachmark');
+    const [sel, text] = steps[i]; cur = document.querySelector(sel);
+    cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); cur.classList.add('gx-coachmark');
+    box.innerHTML = `<p class="gx-coach__k">Tip ${i + 1} of ${steps.length}</p><p>${esc(text)}</p><div class="gx-coach__row"><button type="button" class="gx-btn gx-btn--ghost" data-c="skip">Skip tips</button><button type="button" class="gx-btn gx-btn--go" data-c="next">${i < steps.length - 1 ? 'Next' : 'Got it'}</button></div>`;
+    box.querySelector('[data-c="next"]').onclick = () => { if (++i < steps.length) show(); else end(); };
+    box.querySelector('[data-c="skip"]').onclick = () => { end(); if (confirmSkipAll()) { settings.tips = false; saveSettings(); toast('Tips off. Turn them back on in Settings.'); } };
+    box.querySelector('[data-c="next"]').focus({ preventScroll: true });
+    requestAnimationFrame(place); setTimeout(place, 350);
+  }
+  const confirmSkipAll = () => true;
+  addEventListener('resize', place); show();
+}
+window.__nxGuide = n => guide(n || screen, true);
 
 // ---------- 01 brief
 function renderBrief() {
@@ -457,7 +504,7 @@ function log(text, kind = 'info') {
 function loop(now) {
   const dt = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
   if (screen !== 'ops') return;
-  const modalOpen = !$('#gx-modal').hidden;
+  const modalOpen = !$('#gx-modal').hidden || coachOn;
   if (!sim.pending && simSpeed > 0 && !modalOpen) {
     const stepsPerSec = (sim.T / sim.dt) / 9 * (flags.ff ? 22 : simSpeed); // one orbit ≈ 9 s at 1×; skip-ahead runs an orbit in under half a second
     acc += dt * stepsPerSec;
@@ -673,8 +720,9 @@ function openHelp(first) {
       <dt>Health</dt><dd>How damaged the spacecraft is. At 0% it is lost.</dd>
     </dl></details>
     <p class="gx-fine">Controls: drag the 3D view to look around, scroll to zoom, Space to pause, 1 / 2 / 4 for speed, N or the Skip ahead button to jump to the next thing that needs you, number keys to answer.</p>
-    <div class="gx-opts gx-opts--row"><button class="gx-btn gx-btn--go" id="gx-helpok">${first ? 'Let\'s fly' : 'Got it'}</button></div></div>`;
+    <div class="gx-opts gx-opts--row"><button class="gx-btn gx-btn--go" id="gx-helpok">${first ? 'Let\'s fly' : 'Got it'}</button>${first ? '' : '<button class="gx-btn gx-btn--ghost" id="gx-helptips">Show tips for this screen</button>'}</div></div>`;
   $('#gx-helpok').onclick = () => { mo.hidden = true; const st = store.get(); st.helped = 1; store.set(st); };
+  const ht = $('#gx-helptips'); if (ht) ht.onclick = () => { mo.hidden = true; setTimeout(() => guide(screen, true), 200); };
   $('#gx-helpok').focus();
 }
 
@@ -694,6 +742,7 @@ function openSettings() {
     <label class="gx-check"><input type="checkbox" id="st-inv" ${settings.invert ? 'checked' : ''}> Invert vertical drag</label>
     <label class="gx-check"><input type="checkbox" id="st-shake" ${settings.shake ? 'checked' : ''}> Camera shake</label>
     <label class="gx-check"><input type="checkbox" id="st-timers" ${settings.timers ? 'checked' : ''}> Countdown on spacecraft faults</label>
+    <label class="gx-check"><input type="checkbox" id="st-tips" ${settings.tips !== false ? 'checked' : ''}> Beginner tips on each screen</label>
     <div class="gx-opts gx-opts--row"><button class="gx-btn gx-btn--go" id="st-done">Done</button><button class="gx-btn gx-btn--ghost" id="st-view">Reset camera</button><button class="gx-btn gx-btn--ghost" id="st-reset">Restore defaults</button></div></div>`;
   const bind = (id, key, fmtFn, num = true) => { $('#' + id).oninput = e => { settings[key] = num ? +e.target.value : e.target.value; $('#' + id + 'v') && ($('#' + id + 'v').textContent = fmtFn(settings[key])); saveSettings(); }; };
   bind('st-rot', 'rot', v => v + '×'); bind('st-zoom', 'zoom', v => v + '×'); bind('st-vol', 'vol', v => Math.round(v * 100) + '%'); bind('st-mvol', 'musicVol', v => { music.setVolume(v); return Math.round(v * 100) + '%'; });
@@ -702,6 +751,7 @@ function openSettings() {
   $('#st-inv').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
   $('#st-shake').onchange = e => { settings.shake = e.target.checked; saveSettings(); };
   $('#st-timers').onchange = e => { settings.timers = e.target.checked; saveSettings(); };
+  $('#st-tips').onchange = e => { settings.tips = e.target.checked; saveSettings(); if (settings.tips) { const s2 = store.get(); s2.tips = {}; store.set(s2); toast('Tips will show again on each screen'); } };
   wireDiff(() => { if (screen === 'build') refreshBuild(); if (screen === 'brief') renderBrief(); });
   $('#st-view').onclick = () => { stage?.resetView?.(); audio.beep(700, 0.05); };
   $('#st-reset').onclick = () => { Object.assign(settings, SET_DEF); saveSettings(); openSettings(); };
@@ -856,4 +906,14 @@ function patch(m, score, col) {
     <path id="arc" d="M18 60 A42 42 0 0 1 102 60" fill="none"/><text font-size="7" fill="#fff" letter-spacing="2" font-family="monospace"><textPath href="#arc" startOffset="50%" text-anchor="middle">NEXUS//04 · ${esc(m.world.toUpperCase())}</textPath></text></svg>`;
 }
 
-boot();
+// safety net: if anything fails, show a way forward instead of a blank screen
+function showFatal(e) {
+  console.error('NEXUS:', e);
+  const vis = [...document.querySelectorAll('main > section')].find(x => !x.hidden && x.innerHTML.trim());
+  if (vis) return;
+  const box = $('#gx-brief'); box.hidden = false;
+  box.innerHTML = `<div class="gx-wrap"><p class="gx-kicker">Mission control</p><h1 class="gx-h1">Something did not load.</h1><p class="gx-tag">Reload the page. If it keeps happening, update your browser or try Chrome, Edge, Firefox or Safari 16 or newer.</p><div class="gx-row"><button class="gx-btn gx-btn--go" onclick="location.reload()">Reload</button><a class="gx-btn" href="index.html">Home</a></div></div>`;
+}
+addEventListener('error', e => showFatal(e.error || e.message));
+addEventListener('unhandledrejection', e => showFatal(e.reason));
+boot().catch(showFatal);
