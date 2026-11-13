@@ -285,3 +285,8 @@ body.lx-pick { cursor: pointer; }
   .lx-intro { transition:none; }
   .lx-brief,.lx-brief__card,.lx-count { animation:none; }
 }
+
+/* the 3D sky fades in on its first frame; the static Earth is only for browsers without 3D (no flash on load) */
+#lx-sky canvas { opacity: 0; transition: opacity .8s ease; }
+.lx-ready #lx-sky canvas { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { #lx-sky canvas { transition: none; } }

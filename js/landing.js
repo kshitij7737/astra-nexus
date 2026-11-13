@@ -433,6 +433,7 @@ async function sky() {
     try {
       r.render(scene, cam);
       document.body.classList.remove('lx-no3d');
+      document.body.classList.add('lx-ready');
     } catch(error) {
       console.warn('Using the static Solar System illustration.',error);
       fallBack();
@@ -563,6 +564,7 @@ if (location.hash === '#team') {
 sky().catch(error=>{
   console.warn('Using the static Solar System illustration.',error);
   $('#lx-sky').replaceChildren();
+  document.body.classList.add('lx-no3d');
 });
 document.querySelectorAll('[data-sheet]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openSheet(a.dataset.sheet); }));
 import('./status.js').then(async ({ mountStatus }) => { const { Music } = await import('./music.js'); mountStatus({ music: new Music() }); });
