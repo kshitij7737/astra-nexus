@@ -84,7 +84,7 @@ export const chapters = [
     labels: ['Current anchor', 'Scale changes between scenes'],
     beats: [
       ['Earth and Moon', 'The Moon orbits Earth at an average distance of about 384,400 km. Their separation is compressed in this view.'],
-      ['Solar System', 'The Sun anchors eight planetary orbits. One astronomical unit is about 150 million km, roughly the Earth–Sun distance.'],
+      ['Solar System', 'The Solar System has eight planets. Their surface maps use mission imagery. One astronomical unit is about 150 million km, roughly the Earth–Sun distance.'],
       ['Nearby stars', 'Proxima Centauri is about 4.2 light-years away. A light-year is a distance: how far light travels in one year.'],
       ['Milky Way', 'Our Solar System sits in a smaller arm feature within a barred spiral galaxy. The marker is approximate.'],
       ['Local Group', 'The Milky Way and Andromeda are the two largest galaxies in this gravitationally associated group.'],
@@ -106,5 +106,5 @@ export function lensState(alignment, lens) {
   const radius = { star: 0.6, blackHole: 0.78, galaxy: 1, cluster: 1.32 }[lens];
   const root = Math.hypot(offset, 2 * radius);
   return { offset, radius, images: [(offset + root) / 2, (offset - root) / 2],
-    appearance: offset <= 0.03 ? 'Einstein ring' : offset <= 0.38 ? 'Stretched arcs' : 'Two images' };
+    appearance: offset === 0 ? 'Einstein ring' : offset <= 0.38 ? 'Stretched arcs' : 'Two images' };
 }

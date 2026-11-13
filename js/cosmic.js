@@ -1,5 +1,6 @@
-import { chapters, initialSettings, lensNames, lensState } from './cosmic-data.js';
-import { drawDiagram } from './cosmic-diagram.js';
+import { chapters, initialSettings, lensNames, lensState } from './cosmic-data.js?v=2';
+import { drawDiagram } from './cosmic-diagram.js?v=2';
+import { imagePath, observationFor, observations } from './cosmic-gallery.js';
 
 const $ = id => document.getElementById(id);
 const viewport = $('viewport'), canvas = $('diagram');
@@ -9,6 +10,56 @@ let chapter = chapters[0], beat = 0, state = {...initialSettings};
 let art, visual, free = false, labels = false, still = prefersStill.matches, guided = false, frameId = 0;
 let yaw = 0, pitch = 0, zoom = 1, clock = 0, previous = 0, deadline = 0, viewChanged = true;
 let pointer = null, diagramFrame = 0, pulseTimer = 0;
+let displayPreference = 'auto', activeDisplay = 'model', loadedObservation = null;
+const missingImages = new Set();
+
+function syncDisplay() {
+  const id = observationFor(chapter.id,beat,state);
+  const available = id && !missingImages.has(id);
+  const show = available && (displayPreference==='telescope' || displayPreference==='auto' && !visual);
+  activeDisplay = show ? 'telescope' : 'model';
+  $('observation').hidden = !show;
+  $('observation-notes').hidden = !show;
+  $('model-controls').hidden = show;
+  viewport.hidden = show;
+  $('model-labels').hidden = show || !labels;
+  $('scale').hidden = show || chapter.id!=='universe' || !state.scale;
+  $('show-observation').hidden = !available;
+  pressed($('show-model'),!show);
+  pressed($('show-observation'),Boolean(show));
+  $('show-model').parentElement.hidden=!available;
+  $('show-model').textContent = visual ? '3D model' : 'Diagram';
+  $('render-mode').hidden = show;
+  $('render-mode').textContent = visual ? 'Illustrative 3D model' : 'Interactive diagram';
+  $('free').hidden = show || !visual;
+  $('motion').hidden = show || !visual;
+  $('labels').hidden = show;
+  $('reset').hidden = show;
+  if (show && free) setFree(false);
+  if (!show || loadedObservation===id) return;
+  const photo = observations[id];
+  const img = $('observation-image');
+  loadedObservation = id;
+  img.alt = photo.alt;
+  img.style.setProperty('--photo-focus',photo.focus);
+  img.classList.toggle('cx-wide',id==='carina');
+  img.src = imagePath(id);
+  $('observation-title').textContent = photo.title;
+  $('observation-instrument').textContent = photo.instrument;
+  $('observation-note').textContent = photo.note;
+  $('observation-credit').textContent = photo.credit;
+  $('observation-credit').href = photo.link;
+}
+function switchDisplay(preference) {
+  setGuided(false);
+  displayPreference=preference;
+  rebuild();
+}
+$('observation-image').addEventListener('error',()=>{
+  if(!loadedObservation) return;
+  missingImages.add(loadedObservation);
+  rebuild();
+});
 
 function el(tag, content, className) {
   const e = document.createElement(tag);
@@ -36,11 +87,13 @@ function addressChapter() {
 }
 function resetCamera() { yaw=0; pitch=0; zoom=1; viewChanged=true; }
 function drawFallback(){
-  if(visual)return;
+  if(visual||activeDisplay==='telescope')return;
   cancelAnimationFrame(diagramFrame);
-  diagramFrame=requestAnimationFrame(()=>drawDiagram(canvas,chapter,beat,state));
+  diagramFrame=requestAnimationFrame(()=>drawDiagram(canvas,chapter,beat,state,drawFallback));
 }
 function rebuild() {
+  syncDisplay();
+  if(activeDisplay==='telescope') return;
   if(visual) visual.setChapter(chapter,beat,state);
   else drawFallback();
   viewChanged=true;
@@ -210,7 +263,7 @@ function showReading(){
   }
   if(chapter.id==='universe')text=state.compare?'1 AU ≈ 390 Earth–Moon distances. 1 light-year ≈ 63,000 AU. The display changes scale at each stop.':chapter.scales[beat]+'. Distances and object sizes are illustrative.';
   $('reading').textContent=text;
-  $('scale').hidden=chapter.id!=='universe'||!state.scale;
+  $('scale').hidden=activeDisplay==='telescope'||chapter.id!=='universe'||!state.scale;
   $('scale').textContent=chapter.scales?.[beat]||'';
 }
 function go(index, fromTour=false){
@@ -231,8 +284,8 @@ function go(index, fromTour=false){
   $('stage-beat').replaceChildren(el('b',chapter.beats[beat][0]),el('span',chapter.beats[beat][1]));
   $('timeline').value=beat;
   $('timeline-value').textContent=(beat+1)+' of '+chapter.beats.length;
-  $('previous').disabled=beat===0;
-  $('next').disabled=beat===chapter.beats.length-1;
+  $('stage-previous').disabled=$('previous').disabled=beat===0;
+  $('stage-next').disabled=$('next').disabled=beat===chapter.beats.length-1;
   Array.from($('stops').children).forEach((b,i)=>pressed(b,i===beat));
   setGuided(guided);
   for(const b of $('controls').querySelectorAll('[data-beat]')) pressed(b,+b.dataset.beat===beat);
@@ -242,11 +295,15 @@ function go(index, fromTour=false){
 }
 function openChapter(item){
   chapter=item;
+  displayPreference='auto';
   clearTimeout(pulseTimer);
   state={...initialSettings,feature:'gas'};
   document.documentElement.style.setProperty('--accent',item.accent);
   const index=chapters.indexOf(item);
   menu.forEach((a,i)=>i===index?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current'));
+  const chapterStrip=$('chapters');
+  const link=menu[index];
+  chapterStrip.scrollTo({left:link.offsetLeft-chapterStrip.offsetLeft-(chapterStrip.clientWidth-link.offsetWidth)/2});
   $('chapter-number').textContent='Chapter '+String(index+1).padStart(2,'0')+' / 06';
   $('chapter-title').textContent=item.title;
   $('chapter-intro').textContent=item.intro;
@@ -282,7 +339,7 @@ function loop(now){
     if(beat<chapter.beats.length-1)go(beat+1,true);
     else setGuided(false);
   }
-  if(!visual)return;
+  if(!visual||activeDisplay==='telescope')return;
   if(!still)clock+=dt;
   if(still&&!viewChanged)return;
   const width=viewport.clientWidth,height=viewport.clientHeight;
@@ -310,11 +367,8 @@ function useFallback(){
     visual=null;
   }
   canvas.hidden=false;
-  $('render-mode').textContent='Interactive diagram';
-  $('free').hidden=true;
-  $('motion').hidden=true;
   setFree(false);
-  drawFallback();
+  rebuild();
 }
 async function init(){
   openChapter(addressChapter());
@@ -324,17 +378,27 @@ async function init(){
   try{
     const context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
     if(!context) return useFallback();
-    art=await import('./cosmic-art.js');
+    art=await import('./cosmic-art.js?v=2');
     visual=art.createRenderer(viewport,lite,context);
     visual.renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();useFallback();},{once:true});
-    $('render-mode').textContent='Live 3D · Illustrative';
     canvas.hidden=true;
     rebuild();
   }catch{useFallback();}
 }
-$('previous').onclick=()=>go(beat-1);
-$('next').onclick=()=>go(beat+1);
-$('stage-play').onclick=$('play').onclick=()=>{if(!guided&&beat===chapter.beats.length-1)go(0);setGuided(!guided);};
+$('stage-previous').onclick=$('previous').onclick=()=>go(beat-1);
+$('stage-next').onclick=$('next').onclick=()=>go(beat+1);
+$('stage-play').onclick=$('play').onclick=()=>{
+  if(guided){setGuided(false);return;}
+  switchDisplay('model');
+  if(beat===chapter.beats.length-1) go(0);
+  setGuided(true);
+};
+$('show-model').onclick=()=>switchDisplay('model');
+$('show-observation').onclick=()=>switchDisplay('telescope');
+$('inspect-model').onclick=()=>{
+  switchDisplay('model');
+  $('controls').querySelector('button, input, select')?.focus();
+};
 $('timeline').oninput=e=>go(+e.target.value);
 $('free').onclick=()=>setFree(!free);
 $('labels').onclick=()=>{

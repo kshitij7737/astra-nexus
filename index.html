@@ -15,9 +15,9 @@
 <link rel="stylesheet" href="css/status.css">
 <link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/nexus.css">
-<link rel="stylesheet" href="css/landing.css">
+<link rel="stylesheet" href="css/landing.css?v=2">
 </head>
-<body class="lx">
+<body class="lx lx-no3d">
 <noscript><p style="padding:24px;font:16px sans-serif;color:#fff;background:#111">NEXUS//04 needs JavaScript switched on to run.</p></noscript>
 <div id="lx-sky" aria-hidden="true"></div>
 
@@ -61,7 +61,8 @@
       <div class="lx-row"><a class="lx-btn lx-btn--go" href="#dash">Enter mission control</a><a class="lx-btn" href="#ch-astra">Follow the route</a><a class="lx-btn" href="cosmic.html">Explore the universe</a></div>
     </div>
     <ul class="lx-bodies" aria-label="Choose a world"></ul>
-    <p class="lx-scale">Solar System illustration. Sizes and distances are not to scale. Click Earth, Mars, the Moon or Apophis to preview its mission.</p>
+    <p class="lx-scale lx-sky-note">Solar System illustration. Planet sizes and distances are adjusted for readability. Select a mission world to preview it.</p>
+    <p class="lx-scale lx-static-note">Earth illustration using NASA Blue Marble and Black Marble maps.</p>
     <div class="lx-scrollcue">Scroll</div>
   </section>
 
@@ -81,12 +82,22 @@
       <p class="lx-k">The physics underneath</p>
       <ul>
         <li><code>T = 2π √(a³/μ)</code> orbital period</li>
-        <li><code>asin(R/a)/π</code> share of each orbit in shadow</li>
-        <li><code>P = rating × 0.8 ÷ d²</code> solar power far from the Sun</li>
-        <li><code>Δv = Isp g₀ ln(m_wet/m_dry)</code> can you even get there</li>
-        <li><code>D = rate × 0.8 × contact time</code> how much science gets home</li>
+        <li><code>asin(R/a)/π</code> eclipse fraction for a circular orbit crossing the center of the shadow</li>
+        <li><code>P = rating × 0.8 ÷ d²</code> solar-array power model with distance in AU</li>
+        <li><code>Δv = Isp g₀ ln(m_wet/m_dry)</code> ideal change in velocity from a burn</li>
+        <li><code>D = rate × 0.8 × contact time</code> downlinked data with 80% efficiency</li>
       </ul>
     </div>
+  </section>
+
+  <section class="lx-cosmic" aria-labelledby="lx-cosmic-title">
+    <img src="textures/cosmic/carina.webp" width="1500" height="869" loading="lazy" decoding="async" alt="">
+    <div class="lx-cosmic__copy">
+      <h2 id="lx-cosmic-title">Cosmic Explorer</h2>
+      <p>See where stars form, bend light around a galaxy, and travel from Earth to the edge of the observable universe.</p>
+      <a class="lx-btn lx-btn--go" href="cosmic.html">Explore the universe <span aria-hidden="true">↗</span></a>
+    </div>
+    <a class="lx-cosmic__credit" href="https://science.nasa.gov/asset/webb/cosmic-cliffs-in-the-carina-nebula-nircam-image/" target="_blank" rel="noopener">Cosmic Cliffs · NASA, ESA, CSA, STScI</a>
   </section>
 
   <section class="lx-archive" id="archive" data-focus="sun">
@@ -120,6 +131,6 @@
   <p>Built for the NASA Space Apps Challenge 2026 by team NEXUS//04. Not affiliated with or endorsed by NASA.</p>
   <p><a href="play.html">Play</a> · <a href="explore.html">Explore</a> · <a href="sources.html">Sources and data</a> · <button class="lx-linkbtn" id="lx-replay">Replay intro</button></p>
 </footer>
-<script type="module" src="js/landing.js"></script>
+<script type="module" src="js/landing.js?v=2"></script>
 </body>
 </html>

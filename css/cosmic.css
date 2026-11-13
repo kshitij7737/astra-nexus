@@ -1,5 +1,5 @@
 @font-face{font-family:Archivo;src:url(../fonts/archivo.woff2) format("woff2");font-display:swap;font-weight:100 900}
-:root{color-scheme:dark;--ink:#090e1c;--panel:#10192a;--line:#26334c;--muted:#afbdd4;--accent:#a99efc;--bright:#f3f5ff;font-family:Archivo,system-ui,sans-serif;background:var(--ink);color:var(--bright)}
+:root{color-scheme:dark;--ink:#080b15;--panel:#101724;--line:#273247;--muted:#b3bfd3;--accent:#a99efc;--bright:#f3f5ff;font-family:Archivo,system-ui,sans-serif;background:var(--ink);color:var(--bright)}
 *{box-sizing:border-box}
 body{margin:0}
 button,input,select{font:inherit}
@@ -21,21 +21,34 @@ button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);backgro
 .cx-chapters a{display:inline-flex;align-items:center;gap:.55rem;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;padding:.72rem .8rem;font-size:.88rem;color:var(--muted)}
 .cx-chapters a[aria-current=page]{border-color:var(--accent);color:var(--bright)}
 .cx-chapters b,.cx-eyebrow,.cx-scene-tag,.cx-scale{font:600 .72rem/1.35 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
-.cx-stage{position:relative;isolation:isolate;min-height:clamp(470px,64svh,770px);background:#101935;overflow:hidden}
+.cx-stage{position:relative;isolation:isolate;min-height:clamp(470px,64svh,770px);background:#070a12;overflow:hidden}
 .cx-viewport,.cx-viewport canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .cx-viewport{touch-action:pan-y}
 .cx-viewport.free{cursor:grab;touch-action:none}
 .cx-viewport.free:active{cursor:grabbing}
-.cx-stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,#090e1ceb,transparent 66%),linear-gradient(0deg,#090e1c,transparent 21%)}
+.cx-stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,#080b15 2%,#080b15e6 25%,#080b1522 58%,transparent 76%),linear-gradient(0deg,#080b15 0%,transparent 24%)}
 .cx-caption,.cx-viewbar,.cx-scene-tag,.cx-scale,.cx-model-labels{position:absolute;z-index:1}
 .cx-caption{left:clamp(1rem,4vw,4rem);top:clamp(1.2rem,7vh,5rem);max-width:min(420px,46%);pointer-events:none}
 h1,h2,p{margin:0}
 h1{font-size:clamp(2.4rem,5.7vw,5.8rem);line-height:.96;letter-spacing:-.06em;margin:.55rem 0 1rem;font-weight:780}
 .cx-caption p,.cx-story p{color:#d5def1;line-height:1.6;max-width:54ch}
-.cx-scene-tag{right:clamp(1rem,4vw,4rem);top:1.15rem;background:#0a1124df;border:1px solid #43516a;border-radius:2rem;padding:.4rem .75rem;color:#e2e9fb;letter-spacing:.06em}
-.cx-dot{display:inline-block;width:.45rem;height:.45rem;border-radius:50%;background:var(--accent);margin-right:.45rem}
-.cx-viewbar{left:clamp(1rem,4vw,4rem);right:1rem;bottom:1rem;display:flex;gap:.4rem;flex-wrap:wrap}
+.cx-scene-tag{right:clamp(1rem,4vw,4rem);bottom:1.75rem;color:var(--muted);letter-spacing:.07em}
+.cx-modes{position:absolute;z-index:2;top:1rem;right:clamp(1rem,4vw,4rem);display:flex;gap:.2rem;border:1px solid #53627d;border-radius:.65rem;background:#0b1121ed;padding:.2rem}
+.cx-modes button{font-size:.78rem;background:transparent;border-color:transparent;padding:.35rem .75rem;min-height:38px}
+.cx-modes button[aria-pressed=true]{border-color:#53627d;background:#23304b;color:#fff}
+.cx-observation{position:absolute;inset:0;margin:0;background:#080b15}
+.cx-observation img{position:absolute;inset:0 0 0 auto;display:block;width:72%;height:100%;object-fit:contain;object-position:var(--photo-focus,center)}
+.cx-observation img.cx-wide{object-fit:cover;mask-image:linear-gradient(90deg,transparent,#000 23%)}
+.cx-photo-credit{position:absolute;z-index:2;right:clamp(1rem,4vw,4rem);bottom:1rem;color:#e4ebf8;text-align:right;font-size:.72rem;line-height:1.5;max-width:min(420px,55%);text-shadow:0 1px 4px #000}
+.cx-photo-credit span{display:block;font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.cx-photo-credit a{color:#c6d5ef;text-underline-offset:.18em}
+.cx-observation-notes{margin:.65rem 0 1rem}
+.cx-observation-notes h2{font-size:1.25rem}
+.cx-observation-notes p{font-size:.93rem;line-height:1.55;color:#d5def1;margin:.6rem 0 .9rem}
+.cx-viewbar{left:clamp(1rem,4vw,4rem);right:12rem;bottom:1rem;display:flex;gap:.4rem;flex-wrap:wrap}
 .cx-viewbar button{font-size:.82rem;background:#10182beb}
+.cx-stage-navigation{display:flex;gap:.25rem}
+.cx-stage-navigation button:not(.cx-primary){padding-inline:.62rem}
 .cx-scale{right:clamp(1rem,4vw,4rem);bottom:4.4rem;border-bottom:1px solid currentColor;padding-bottom:.35rem}
 .cx-model-labels{left:51%;right:3%;bottom:17%;display:flex;gap:.35rem;flex-wrap:wrap;justify-content:center;pointer-events:none}
 .cx-model-labels span{font-size:.74rem;background:#0a1225e8;border:1px solid #5b6588;padding:.35rem .55rem;border-radius:.3rem}
@@ -62,12 +75,20 @@ details p{line-height:1.6}
 .cx-footer{color:var(--muted);font-size:.78rem}
 @media(max-width:760px){
   .cx-console{grid-template-columns:1fr}
-  .cx-stage{min-height:550px}
+  .cx-stage{min-height:clamp(560px,78svh,670px)}
+  .cx-modes{top:.55rem}
+  .cx-modes button{min-height:34px}
+  .cx-observation img{top:32%;width:100%;height:56%;object-position:center}
+  .cx-observation img.cx-wide{object-fit:cover;mask-image:linear-gradient(180deg,transparent,#000 17%,#000 78%,transparent);object-position:var(--photo-focus,center)}
+  .cx-photo-credit{right:1rem;bottom:1rem;max-width:55%}
+  .cx-scene-tag{top:.95rem;bottom:auto;left:1rem;right:auto}
+  .cx-viewbar{right:1rem}
+  .cx-stage:has(.cx-observation:not([hidden])) .cx-photo-credit{bottom:4.4rem}
   .cx-caption{max-width:88%;top:3.35rem}
   .cx-caption p{font-size:.91rem;max-width:34ch}
-  .cx-stage::after{background:linear-gradient(180deg,#090e1ce8,transparent 54%),linear-gradient(0deg,#090e1c,transparent 25%)}
+  .cx-stage::after{background:linear-gradient(180deg,#080b15 4%,#080b15ae 24%,transparent 51%),linear-gradient(0deg,#080b15,transparent 25%)}
   .cx-model-labels{left:4%;bottom:22%}
-  .cx-scale{bottom:5.6rem}
+  .cx-scale{bottom:6.9rem}
 }
 @media(max-width:360px){.cx-viewbar{bottom:.55rem}.cx-viewbar button{font-size:.73rem;padding:.45rem .55rem}.cx-footer{align-items:flex-start;flex-direction:column}}
 

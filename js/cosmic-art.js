@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import { lensState } from './cosmic-data.js';
+import { lensState } from './cosmic-data.js?v=2';
 
 const TAU = Math.PI * 2;
 const V = (x, y, z) => new T.Vector3(x, y, z);
@@ -55,19 +55,23 @@ function cloud(colors, { shell = 0, density = 1, lite = false } = {}) {
           float n=fbm(q+vec3(noise(q*.7),noise(q*.83),0.)*1.3);
           float r=length(p);
           float envelope=1.-smoothstep(.16,1.01,length(p*vec3(.82,1.15,1.)));
-          float dust=1.-smoothstep(.035,.20,abs(p.y+.12+.20*sin(p.x*4.5)+.23*(n-.5)));
-          float body=max(0.,n-.29)*envelope*2.9;
-          float ridge=smoothstep(.45,.71,n)*envelope;
+          float grain=noise(q*13.0);
+          float warp=fbm(q*.54+vec3(2.,4.,3.));
+          float edge=p.y+.15+.24*sin(p.x*4.5)+.48*(warp-.5)+.19*(n-.5);
+          float dust=(1.-smoothstep(.032,.23,abs(edge)))*smoothstep(.21,.55,warp);
+          float ridge=smoothstep(.45,.68,n)*envelope*(.56+.72*grain);
+          float wall=exp(-abs(edge+.17)*8.)*envelope*smoothstep(.32,.58,n);
+          float body=max(0.,n-.32)*envelope*2.7+wall*.87;
           if(shell>.5){
             float band=exp(-abs(r-(.59+.22*(n-.5)))*(shell>1.5?21.:15.));
             body=band*envelope*(shell>1.5?pow(n,2.3)*4.:.37+n);
             dust*=.15;
             ridge=band*pow(n,2.)*1.8;
           }
-          float light=exp(-4.7*length(p-vec3(.22,.06,-.11)))*.85;
-          vec3 color=mix(a,b,clamp(n*.67+ridge*.75,0.,1.));
-          color=mix(color,c,clamp(light+ridge*.44,0.,1.));
-          color*=1.-.81*dust;
+          float light=exp(-4.7*length(p-vec3(.22,.06,-.11)))*.93;
+          vec3 color=mix(a,b,clamp(n*.7+ridge*.55,0.,1.));
+          color=mix(color,c,clamp(light+ridge*.5+wall*.43,0.,1.));
+          color*=(.64+grain*.39)*(1.-.94*dust);
           float alpha=1.-exp(-body*stepSize*density*(1.+dust*1.4));
           sum.rgb+=(1.-sum.a)*color*alpha;
           sum.a+=(1.-sum.a)*alpha;
@@ -154,25 +158,32 @@ function star(radius, color, cutaway = false) {
   return group;
 }
 
-function disk(inner, outer, hot, cold, opacity = .9) {
+function disk(inner, outer, hot, cold, opacity = .9, relativistic = false) {
   const mesh = new T.Mesh(new T.PlaneGeometry(2,2), new T.ShaderMaterial({
     side:T.DoubleSide, transparent:true, depthWrite:false,
-    uniforms:{ inner:{value:inner/outer}, hot:{value:new T.Color(hot)}, cold:{value:new T.Color(cold)}, opacity:{value:opacity}, time:{value:0} },
+    uniforms:{ inner:{value:inner/outer}, hot:{value:new T.Color(hot)}, cold:{value:new T.Color(cold)}, opacity:{value:opacity}, time:{value:0}, relativistic:{value:relativistic} },
     vertexShader:vertex,
     fragmentShader:`
-      varying vec3 local; uniform float inner,opacity,time; uniform vec3 hot,cold;
+      varying vec3 local; uniform float inner,opacity,time; uniform vec3 hot,cold; uniform bool relativistic;
       ${noise}
       void main(){
         float r=length(local.xy),angle=atan(local.y,local.x);
         if(r<inner||r>1.) discard;
         float gap=smoothstep(inner,inner+.055,r)*(1.-smoothstep(.78,1.,r));
-        float spiral=angle+4.7*log(r+.07)-time*.15;
-        float fil=fbm(vec3(cos(spiral)*4.,sin(spiral)*4.,r*38.));
-        float bands=.71+.22*sin(r*101.+fil*5.);
-        float temp=pow(1.-r,.7);
-        vec3 tint=mix(cold,hot,smoothstep(.27,.8,temp));
-        tint*=.58+fil*1.55;
-        float alpha=gap*opacity*(.27+.73*fil)*bands;
+        float spiral=angle+4.7*log(r+.07)-time*.035/pow(r+.14,1.25);
+        vec3 flow=vec3(cos(spiral)*4.,sin(spiral)*4.,r*38.);
+        float fil=fbm(flow);
+        float grit=noise(flow*6.1);
+        float bands=.71+.22*sin(r*101.+fil*7.+grit);
+        float temp=1.-smoothstep(inner,1.,r);
+        vec3 tint=mix(cold,hot,pow(temp,2.2));
+        float alpha=gap*opacity*(.2+.8*fil)*bands;
+        if(relativistic){
+          float beam=.45+.75*pow(.5+.5*cos(angle+.8),1.7);
+          tint=mix(tint,vec3(1.,.78,.49),beam*temp*.42)*beam;
+          alpha*=.42+temp*.63;
+        }
+        tint*=.47+fil*1.52+grit*.29;
         gl_FragColor=vec4(tint,alpha); ${linearize}
       }`,
   }));
@@ -383,11 +394,19 @@ function blackHole(group, beat, state) {
   const shadow=new T.Mesh(new T.SphereGeometry(radius,48,30),new T.MeshBasicMaterial({color:'#080a14'}));
   group.add(shadow);
   if(beat>=3){
-    group.add(disk(radius*1.26,4.5,'#ffe3ab','#ba496b'));
+    group.add(disk(radius*1.26,4.45,'#fff1c7','#a13f24',.98,true));
     if(beat===4 || state.evidence==='light'){
-      const farSide=arc(radius*1.45,.15,Math.PI-.3,'#ffbd90',.042,1.05);
-      const nearSide=arc(radius*1.38,Math.PI+.28,Math.PI-.56,'#e184c0',.026,.72);
-      const image=new T.Group();image.add(farSide,nearSide);group.add(image);
+      const image=new T.Group();
+      for(const [r,from,length,tint,width,height,opacity] of [
+        [1.44,.09,Math.PI-.18,'#ffb45f',.10,1.05,.31],
+        [1.43,.15,Math.PI-.30,'#ffe0ac',.028,1.05,.91],
+        [1.61,.21,Math.PI-.42,'#d45f37',.045,1.06,.52],
+        [1.43,Math.PI+.20,Math.PI-.40,'#f7874f',.041,.76,.62],
+      ]){
+        const band=arc(radius*r,from,length,tint,width,height);
+        band.material.opacity=opacity;image.add(band);
+      }
+      group.add(image);
       image.userData.faceCamera=true;
     }
     if(state.jets) jets(group,4.3);
@@ -445,17 +464,30 @@ function lensing(group, beat, state, lite) {
     const foreground=foregroundLens(state.lens,.77,true);foreground.rotation.x=.85;group.add(foreground);
     const image=new T.Group();
     const scale=state.magnify?1.8:1.16;
-    if(l.appearance==='Einstein ring'){
-      image.add(arc(l.radius*scale,0,TAU,'#97dffb',.042),arc(l.radius*scale*1.06,.12,TAU-.2,'#b39af5',.025));
-    }else{
-      const spread=l.appearance==='Stretched arcs'?1.9:.65;
-      image.add(arc(Math.abs(l.images[0])*scale,-spread/2,spread,'#a3edff',.065));
-      image.add(arc(Math.abs(l.images[1])*scale,Math.PI-spread*.32,spread*.64,'#b29cf8',.043));
+    const ringImage=l.appearance==='Einstein ring';
+    const spread=l.appearance==='Stretched arcs'?1.9:.65;
+    const segments=ringImage?[[l.radius,0,TAU,0]]:[
+      [Math.abs(l.images[0]),-spread/2,spread,0],
+      [Math.abs(l.images[1]),Math.PI-spread*.32,spread*.64,1],
+    ];
+    const strata=[];
+    for(const [r,start,length,index] of segments){
+      for(const [mult,color,width,alpha] of [[1,'#686cd8',.12,.19],[1,'#b1bbff',.061,.44],[.981,'#d8efff',.021,.93]]){
+        const band=arc(r*scale*mult,start,length,color,width);
+        band.material.opacity=alpha;image.add(band);strata.push([band,alpha,index]);
+      }
+      const rng=random(96+index);
+      const knots=[];
+      for(let i=0;i<125;i++){
+        const a=start+length*rng(),radius=r*scale+(rng()-.5)*.13;
+        knots.push([radius*Math.cos(a),radius*Math.sin(a),.02,'#e8defe',.08+rng()**3*.45]);
+      }
+      image.add(pointField(knots,2.1));
     }
     group.add(image);
-    return t=>{
-      image.children.forEach((m,i)=>{m.material.opacity=pulse?.65+.35*Math.exp(-Math.pow((t-.4-i*.7)*4,2)):.88;});
-    };
+    return t=>strata.forEach(([band,alpha,index])=>{
+      band.material.opacity=alpha*(pulse?.6+.4*Math.exp(-Math.pow((t-.4-index*.7)*4,2)):1);
+    });
   }
   const source=galaxy(24,.25,'#ffbd77',true);
   source.position.set(-4.2,l.offset*2.5,0);
@@ -489,7 +521,7 @@ function lensing(group, beat, state, lite) {
 
 function universe(group, beat, state, lite, texture) {
   if(beat===0){
-    const earth=sphere(1.58,'#467faa',{map:texture('earth-day.jpg')});
+    const earth=sphere(1.58,'#467faa',{map:texture('earth-day.jpg'),bumpMap:texture('earth-bump.jpg'),bumpScale:.022});
     earth.material.color.set('#ffffff');earth.rotation.set(.12,-1.1,.09);
     const clouds=sphere(1.60,'#ffffff',{alphaMap:texture('earth-clouds.jpg'),transparent:true,opacity:.53,depthWrite:false});
     clouds.rotation.copy(earth.rotation);
@@ -498,7 +530,7 @@ function universe(group, beat, state, lite, texture) {
       vertexShader:`varying vec3 n,v;void main(){vec4 p=modelViewMatrix*vec4(position,1.);n=normalMatrix*normal;v=-p.xyz;gl_Position=projectionMatrix*p;}`,
       fragmentShader:`varying vec3 n,v;void main(){float f=pow(1.-max(0.,dot(normalize(n),normalize(v))),4.);gl_FragColor=vec4(.22,.61,1.,f*.62);}`,
     }));
-    const moon=sphere(.43,'#eeeeee',{map:texture('moon.jpg')});moon.position.set(3.65,.28,-.32);
+    const moon=sphere(.43,'#eeeeee',{map:texture('moon.jpg'),bumpMap:texture('moon-bump.jpg'),bumpScale:.024});moon.position.set(3.65,.28,-.32);
     earth.position.x=clouds.position.x=limb.position.x=-.65;
     group.add(earth,clouds,limb,moon);
     if(state.scale) group.add(line([V(-.65,-1.75,0),V(3.65,-1.75,0)],'#a7e8dc',.68));
@@ -506,10 +538,11 @@ function universe(group, beat, state, lite, texture) {
   }
   if(beat===1){
     group.add(star(.69,'#ffd584'));
-    const colors=['#aea29d','#d2af7e','#63add8','#ce8060','#d4b095','#e3c39b','#91c7ca','#5a82d6'];
-    const bodies=colors.map((color,i)=>{
+    const maps=['planets/mercury.jpg','planets/venus.jpg','sm/earth-day.jpg','sm/mars.jpg',
+      'planets/jupiter.jpg','planets/saturn.jpg','planets/uranus.jpg','planets/neptune.jpg'];
+    const bodies=maps.map((map,i)=>{
       const radius=[.09,.13,.16,.12,.43,.36,.25,.24][i], track=1.05+i*.72;
-      const body=i===4||i===5?stripedPlanet(radius,i):sphere(radius,color,{map:i===2?texture('earth-day.jpg'):null});
+      const body=sphere(radius,'#ffffff',{map:texture(map)});
       if(i===5) body.add(disk(radius*1.2,radius*1.9,'#e7d6b7','#bd9c82',.74));
       group.add(body,ring(track,'#7d9bb9',.28));return [body,track];
     });
@@ -555,11 +588,11 @@ export function cameraPreset(id, beat, state, narrow) {
   if(id==='stars') eye=V(2.4,2.6,[13,11,9,9.7,10.9,11.5][beat]);
   if(id==='planets') eye=beat===2?V(2.1,1.6,7):V(4.1,6.6,12.8);
   if(id==='black-holes') eye=V(1.4,beat===4?2.3:4.1,beat===2?8.3:11.7);
-  if(id==='lensing') eye=V(0,state.observer?.08:2.1,state.observer?8.2:13.5);
+  if(id==='lensing') eye=V(0,state.observer?.08:2.1,state.observer?6.7:13.5);
   if(id==='universe') eye=V(2.1,[1.2,6.3,2.1,6,4.7,4.3][beat],[8.7,13.2,11,11.9,13.3,14.2][beat]);
   if(state.angle==='top' && id!=='lensing') eye=V(0,eye.length(),.02);
   if(state.angle==='edge' && id!=='lensing') eye=V(0,.16,eye.length());
-  if(narrow){eye.multiplyScalar(id==='planets'||id==='lensing'?1.24:1.13);target.y=1.5;}
+  if(narrow){eye.multiplyScalar(id==='planets'||id==='lensing'?1.24:1.13);target.y=1.05;}
   return {eye,target};
 }
 
@@ -580,7 +613,7 @@ export function createRenderer(host, lite, context) {
   const texture=name=>{
     if(!textures.has(name)){
       const map=loader.load(new URL('../textures/'+name,import.meta.url).href);
-      if(!name.includes('clouds')) map.colorSpace=T.SRGBColorSpace;
+      if(!name.includes('clouds')&&!name.includes('bump')) map.colorSpace=T.SRGBColorSpace;
       map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
       textures.set(name,map);
     }
@@ -590,7 +623,7 @@ export function createRenderer(host, lite, context) {
   const size=new T.Vector2();
   scene.add(model);
   function setChapter(chapter, beat, state) {
-    scene.background=new T.Color(chapter.bg);
+    scene.background=new T.Color('#040710').lerp(new T.Color(chapter.bg),.13);
     scene.remove(model);
     const disposed=new Set();
     model.traverse(o=>{

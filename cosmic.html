@@ -7,7 +7,7 @@
 <meta name="description" content="Six interactive astronomy chapters from NEXUS//04, from stellar nurseries to the observable horizon.">
 <title>Cosmic Explorer · NEXUS//04</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/cosmic.css">
+<link rel="stylesheet" href="css/cosmic.css?v=2">
 </head>
 <body>
 <header class="cx-header">
@@ -20,17 +20,32 @@
     <div id="viewport" class="cx-viewport" role="region" aria-label="Cosmic scene. In free look use arrow keys to rotate and plus or minus to zoom." tabindex="0">
       <canvas id="diagram" aria-hidden="true"></canvas>
     </div>
+    <figure id="observation" class="cx-observation" hidden>
+      <img id="observation-image" alt="" decoding="async">
+      <figcaption class="cx-photo-credit">
+        <span id="observation-instrument"></span>
+        <a id="observation-credit" target="_blank" rel="noopener"></a>
+      </figcaption>
+    </figure>
     <div class="cx-caption">
       <div class="cx-eyebrow" id="chapter-number">Chapter 01 / 06</div>
       <h1 id="chapter-title">Inside a Nebula</h1>
       <p id="chapter-intro">Explore clouds of gas and dust and find where a star begins.</p>
       <div class="cx-current" id="stage-beat"></div>
     </div>
-    <div class="cx-scene-tag"><span class="cx-dot"></span><span id="render-mode">Illustrative view</span></div>
+    <div class="cx-modes" role="group" aria-label="Scene display">
+      <button id="show-model" type="button" aria-pressed="true">Model</button>
+      <button id="show-observation" type="button" aria-pressed="false" hidden>Telescope</button>
+    </div>
+    <div class="cx-scene-tag" id="render-mode">Interactive diagram</div>
     <div class="cx-model-labels" id="model-labels" hidden></div>
     <div class="cx-scale" id="scale" hidden></div>
     <div class="cx-viewbar">
-      <button id="stage-play" class="cx-primary" type="button">Play tour</button>
+      <div class="cx-stage-navigation" role="group" aria-label="Scene navigation">
+        <button id="stage-previous" type="button" aria-label="Previous scene in viewer">←</button>
+        <button id="stage-play" class="cx-primary" type="button">Play tour</button>
+        <button id="stage-next" type="button" aria-label="Next scene in viewer">→</button>
+      </div>
       <button id="free" type="button" aria-pressed="false">Free look</button>
       <button id="labels" type="button" aria-pressed="false">Labels</button>
       <button id="motion" type="button" aria-pressed="false">Still mode</button>
@@ -52,8 +67,15 @@
     </section>
     <section class="cx-lab" aria-label="Explore this scene">
       <div class="cx-eyebrow">Explore this scene</div>
-      <div id="controls"></div>
-      <p class="cx-reading" id="reading" aria-live="polite"></p>
+      <div id="observation-notes" class="cx-observation-notes" hidden>
+        <h2 id="observation-title"></h2>
+        <p id="observation-note"></p>
+        <button id="inspect-model" type="button">Explore the model</button>
+      </div>
+      <div id="model-controls">
+        <div id="controls"></div>
+        <p class="cx-reading" id="reading" aria-live="polite"></p>
+      </div>
       <details>
         <summary>Science notes &amp; sources</summary>
         <p id="science"></p>
@@ -61,9 +83,9 @@
       </details>
     </section>
   </div>
-  <footer class="cx-footer"><span>Illustrative colors, compressed time and distances. Models are schematic.</span><a id="next-chapter" href="#stars">Next chapter →</a></footer>
+  <footer class="cx-footer"><span>Models use illustrative colors, times and distances.</span><a id="next-chapter" href="#stars">Next chapter →</a></footer>
 </main>
 <noscript><p class="cx-noscript">Enable JavaScript to explore the six interactive chapters. <a href="https://science.nasa.gov/universe/">Explore NASA’s universe guide</a>.</p></noscript>
-<script type="module" src="js/cosmic.js"></script>
+<script type="module" src="js/cosmic.js?v=2"></script>
 </body>
 </html>

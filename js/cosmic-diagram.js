@@ -1,6 +1,16 @@
-import { lensState } from './cosmic-data.js';
+import { lensState } from './cosmic-data.js?v=2';
 
-export function drawDiagram(canvas, chapter, beat, state) {
+const globes = new Map();
+function globe(name, onLoad) {
+  if(!globes.has(name)){
+    const image=new Image();
+    image.addEventListener('load',onLoad,{once:true});
+    image.src=new URL('../textures/cosmic/'+name+'-globe.webp',import.meta.url).href;
+    globes.set(name,image);
+  }
+  return globes.get(name);
+}
+export function drawDiagram(canvas, chapter, beat, state, onLoad) {
   const {clientWidth:w,clientHeight:h}=canvas;
   if(!w||!h)return;
   const dpr=Math.min(devicePixelRatio,2);
@@ -8,9 +18,10 @@ export function drawDiagram(canvas, chapter, beat, state) {
   const g=canvas.getContext('2d');
   g.scale(dpr,dpr);
   const narrow=w<760;
-  const x=w*(narrow?.50:.71),y=h*(narrow?.64:.52),s=Math.min(w*(narrow?.073:.044),h*.105);
+  const x=w*(narrow?.50:.71),y=h*(narrow?.61:.52),s=Math.min(w*(narrow?.091:.049),h*.105);
   const bg=g.createRadialGradient(x,y,0,x,y,w*.68);
-  bg.addColorStop(0,chapter.bg);bg.addColorStop(1,'#0c1228');
+  bg.addColorStop(0,chapter.bg+'4d');bg.addColorStop(1,'#050812');
+  g.fillStyle='#050812';g.fillRect(0,0,w,h);
   g.fillStyle=bg;g.fillRect(0,0,w,h);
   let seed=98;
   const random=()=>((seed=(Math.imul(1664525,seed)+1013904223)>>>0)/4294967296);
@@ -22,7 +33,7 @@ export function drawDiagram(canvas, chapter, beat, state) {
   g.translate(x,y);g.scale(s,s);
   const circle=(a,b,r,color)=>{g.fillStyle=color;g.beginPath();g.arc(a,b,r,0,Math.PI*2);g.fill();};
   const stroke=(a,b,r,color,flat=1,from=0,to=2*Math.PI)=>{
-    g.strokeStyle=color;g.lineWidth=.027;g.beginPath();g.ellipse(a,b,r,r*flat,0,from,to);g.stroke();
+    g.strokeStyle=color;g.lineWidth=.036;g.beginPath();g.ellipse(a,b,r,r*flat,0,from,to);g.stroke();
   };
   const light=(a,b,r,inside,outside)=>{
     const gr=g.createRadialGradient(a,b,0,a,b,r);gr.addColorStop(0,inside);gr.addColorStop(1,outside);
@@ -94,8 +105,21 @@ export function drawDiagram(canvas, chapter, beat, state) {
     }else{
       const r=state.mass==='supermassive'?1.03:.65;
       if(beat===0||state.evidence==='orbits')for(let i=0;i<4;i++)stroke(0,0,1.6+i*.46,'#adc9ea75',.52+i*.07);
-      if(beat>=3)for(let i=0;i<14;i++)stroke(0,0,r+.32+i*.14,i<6?'#ffc489c8':'#dc829d83',.28);
-      if(beat===4||state.evidence==='light')stroke(0,0,r*1.42,'#e5acff',.95,Math.PI+.2,Math.PI*2-.2);
+      if(beat>=3){
+        const flat=state.angle==='top'?.91:state.angle==='edge'?.12:.32;
+        const inner=r*1.28,outer=r+2.1;
+        const band=g.createRadialGradient(0,0,inner,0,0,outer);
+        band.addColorStop(0,'#fff1bb');band.addColorStop(.13,'#ffad62e0');
+        band.addColorStop(.41,'#dd622e94');band.addColorStop(.76,'#7a304155');band.addColorStop(1,'#5d253500');
+        g.save();g.scale(1,flat);circle(0,0,outer,band);circle(0,0,inner,'#060913');
+        for(let i=0;i<36;i++)stroke(0,0,inner+(outer-inner)*i/36,i<10?'#ffcf9950':'#df8b7e21');
+        g.restore();
+      }
+      if(beat===4||state.evidence==='light'){
+        g.save();g.shadowBlur=12;g.shadowColor='#fa8c4b';
+        stroke(0,0,r*1.43,'#ffe0ae',1.06,Math.PI+.12,Math.PI*2-.12);
+        stroke(0,0,r*1.55,'#e87f5688',1.1,Math.PI+.28,Math.PI*2-.22);g.restore();
+      }
       if(state.jets&&beat>=3)path([[0,-2.7],[0,2.7]],'#88e5fd');
       circle(0,0,r,'#080b16');
       if(beat===2)stroke(0,0,r*.75,'#c7e5f3');
@@ -104,12 +128,20 @@ export function drawDiagram(canvas, chapter, beat, state) {
     const l=lensState(state.alignment,state.lens);
     if(state.observer){
       spiral(0,0,.65);
-      const m=state.magnify?1.65:1.04;
-      if(l.appearance==='Einstein ring')stroke(0,0,l.radius*m,'#b9f0ff');
+      const m=state.magnify?1.85:1.32;
+      const lensArc=(r,from,to,tint)=>{
+        g.save();
+        g.shadowColor=tint;g.shadowBlur=11;
+        stroke(0,0,r,tint,1,from,to);
+        g.shadowBlur=0;
+        stroke(0,0,r*.98,'#c7dbff62',1,from,to);
+        g.restore();
+      };
+      if(l.appearance==='Einstein ring')lensArc(l.radius*m,0,Math.PI*2,'#d3edff');
       else{
         const a=l.appearance==='Stretched arcs'?1.6:.58;
-        stroke(0,0,Math.abs(l.images[0])*m,'#9cdeff',1,-a/2,a/2);
-        stroke(0,0,Math.abs(l.images[1])*m,'#bca7ff',1,Math.PI-a*.4,Math.PI+a*.4);
+        lensArc(Math.abs(l.images[0])*m,-a/2,a/2,'#b4e5ff');
+        lensArc(Math.abs(l.images[1])*m,Math.PI-a*.4,Math.PI+a*.4,'#c9b7ff');
       }
     }else{
       const offset=-l.offset*1.5;
@@ -122,7 +154,14 @@ export function drawDiagram(canvas, chapter, beat, state) {
       g.fillStyle='#99e2fc';g.beginPath();g.moveTo(3.52,0);g.lineTo(3.02,.24);g.lineTo(3.02,-.24);g.fill();
     }
   }else{
-    if(beat===0){light(-.9,0,1.61,'#88c9fd80','#5ea3fc00');circle(-.9,0,1.3,'#377bad');circle(1.9,.1,.35,'#b9b4b0');if(state.scale)path([[-.9,1.55],[1.9,1.55]],'#a6e8ef');}
+    if(beat===0){
+      for(const [name,cx,cy,r,tint] of [['earth',-.9,0,1.82,'#377bad'],['moon',2.06,.1,.48,'#b9b4b0']]){
+        const image=globe(name,onLoad);
+        if(image.complete&&image.naturalWidth)g.drawImage(image,cx-r,cy-r,r*2,r*2);
+        else circle(cx,cy,r*.94,tint);
+      }
+      if(state.scale)path([[-.9,1.95],[2.06,1.95]],'#a6e8ef');
+    }
     if(beat===1){for(let i=1;i<=8;i++){stroke(0,0,i*.42,'#a1bdd168',.55);circle(i*.42*Math.cos(i*1.5),i*.42*.55*Math.sin(i*1.5),.06+i*.012,'#bad0e1');}circle(0,0,.3,'#ffd18b');}
     if(beat===2){circle(-1.7,0,.24,'#ffd18b');circle(1.6,0,.11,'#ff9b8e');if(state.scale)path([[-1.7,.8],[1.6,.8]],'#a6e8ef');}
     if(beat===3){spiral(0,0,3.5);circle(1.85,-.55,.09,'#ffab8a');}

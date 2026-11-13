@@ -89,23 +89,33 @@ function archive() {
 
 // ---------- 3D solar system that follows the story
 async function sky() {
-  let THREE, buildWorld, buildCraft, fullCfg, latLonToVec;
-  try {
-    THREE = await import('../vendor/three.module.min.js');
-    ({ buildWorld } = await import('./scene.js'));
-    ({ buildCraft, fullCfg } = await import('./craft.js'));
-    ({ latLonToVec } = await import('./scene.js'));
-    (await import('./craft.js')).setCraftEnv(null);
-    const c = document.createElement('canvas'); if (!(c.getContext('webgl2') || c.getContext('webgl'))) throw new Error('no webgl');
-  } catch (e) { document.body.classList.add('lx-no3d'); return; }
-  const { MISSIONS } = await import('./data.js');
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('webgl2',{antialias:true,alpha:true});
+  if (!context) return;
+  const [THREE, {buildWorld,latLonToVec}, craftModule, {MISSIONS}, {RoomEnvironment}] = await Promise.all([
+    import('../vendor/three.module.min.js'), import('./scene.js'), import('./craft.js'),
+    import('./data.js'), import('../vendor/RoomEnvironment.js')
+  ]);
+  const {buildCraft,fullCfg} = craftModule;
+  craftModule.setCraftEnv(null);
   const el = $('#lx-sky');
-  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true }); r.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-  r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; el.appendChild(r.domElement);
+  const r = new THREE.WebGLRenderer({canvas,context,antialias:true,alpha:true});
+  r.setPixelRatio(Math.min(devicePixelRatio,1.75));
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  el.appendChild(r.domElement);
+  const fallBack = () => {
+    r.setAnimationLoop(null);
+    el.replaceChildren();
+    document.body.classList.add('lx-no3d');
+    document.body.classList.remove('lx-pick');
+    lbBox.classList.remove('on');
+    tgt.classList.remove('on');
+    mk.classList.remove('on');
+  };
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, 1, 0.02, 3000);
   scene.add(new THREE.AmbientLight(0xffffff, 0.06));
   const sunLight = new THREE.PointLight(0xfff0dd, 2600, 0, 1.6); scene.add(sunLight);
-  const { RoomEnvironment } = await import('../vendor/RoomEnvironment.js');
   const pmrem = new THREE.PMREMGenerator(r); const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   // stars
   const n = 4000, p = new Float32Array(n * 3);
@@ -251,7 +261,7 @@ async function sky() {
   const project = p => { v4.copy(p).project(cam); return { x: (v4.x * 0.5 + 0.5) * innerWidth, y: (-v4.y * 0.5 + 0.5) * innerHeight, z: v4.z }; };
   // click a mission world in the overview to preview its mission
   const pickBody = (x, y) => {
-    if (focus !== 'sun' || document.body.classList.contains('lx-locked') || scrollY > innerHeight * 0.6) return null;
+    if (document.body.classList.contains('lx-no3d') || focus !== 'sun' || document.body.classList.contains('lx-locked') || scrollY > innerHeight * 0.6) return null;
     let best = null, bd = 1e9;
     for (const [id, bb] of Object.entries(focusBody)) { if (!bb.visible) continue; const q = project(bb.position); if (q.z > 1) continue; const d = Math.hypot(q.x - x, q.y - y); if (d < 38 && d < bd) { bd = d; best = id; } }
     return best;
@@ -261,6 +271,7 @@ async function sky() {
   let hov = null;
   document.addEventListener('pointermove', e => { const id = busy(e.target) ? null : pickBody(e.clientX, e.clientY); if (id !== hov) { hov = id; document.body.classList.toggle('lx-pick', !!id); } }, { passive: true });
   let aFt = 0, aFn = 0;
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();fallBack();},{once:true});
   r.setAnimationLoop(() => {
     const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05);
     // adaptive quality: slow machines drop to a lower render resolution instead of stuttering
@@ -388,7 +399,13 @@ async function sky() {
       else mk.classList.remove('on');
     } else { tgt.classList.remove('on'); mk.classList.remove('on'); }
     first = false;
-    r.render(scene, cam);
+    try {
+      r.render(scene, cam);
+      document.body.classList.remove('lx-no3d');
+    } catch(error) {
+      console.warn('Using the static Solar System illustration.',error);
+      fallBack();
+    }
   });
 }
 
@@ -458,7 +475,11 @@ document.addEventListener('click', e => {
   e.preventDefault(); brief(id);
 });
 
-chapters(); archive(); intro(); sky();
+chapters(); archive(); intro();
+sky().catch(error=>{
+  console.warn('Using the static Solar System illustration.',error);
+  $('#lx-sky').replaceChildren();
+});
 document.querySelectorAll('[data-sheet]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openSheet(a.dataset.sheet); }));
 import('./status.js').then(async ({ mountStatus }) => { const { Music } = await import('./music.js'); mountStatus({ music: new Music() }); });
 $('#lx-replay').onclick = () => intro(true);
