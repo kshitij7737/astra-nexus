@@ -1,0 +1,10 @@
+/* Same-origin page handoff. The destination remains usable in browsers without view transitions. */
+@view-transition { navigation: auto; }
+::view-transition-group(root) { animation-duration: 290ms; }
+::view-transition-old(root) { animation: nexus-exit 190ms ease-in both; }
+::view-transition-new(root) { animation: nexus-enter 290ms cubic-bezier(.16,.66,.28,1) both; }
+@keyframes nexus-exit { to { opacity: 0; } }
+@keyframes nexus-enter { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+}

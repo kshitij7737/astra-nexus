@@ -1,8 +1,8 @@
 /* NEXUS//04 game screens */
 .gx { min-height: 100vh; overflow-x: hidden; background: radial-gradient(120% 90% at 50% 110%, color-mix(in srgb, var(--acc) 18%, #04050a) 0%, #04050a 60%); }
-#gx-stage { position: fixed; inset: 0; z-index: 0; transition: right .5s; }
+#gx-stage { position: fixed; inset: 0; z-index: 0; }
 #gx-stage canvas { display: block; width: 100%; height: 100%; }
-.gx-no3d #gx-stage { display: none; }
+.gx-no3d #gx-stage, .gx[data-screen="pick"] #gx-stage { visibility: hidden; }
 .gx main { position: relative; z-index: 2; }
 .gx-top { justify-content: space-between; }
 .gx-steps { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
@@ -236,7 +236,7 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
 .gx-set select { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px; grid-column: 2 / 4; }
 .gx-set output { font: 12px var(--mono); text-align: right; }
 .gx-check { display: flex; gap: 10px; align-items: center; padding: 8px 0; font-size: 14px; } .gx-check input { accent-color: var(--acc); width: 18px; height: 18px; }
-#gx-setbox, #gx-pollbox, #gx-helpbox { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(2,3,8,.7); backdrop-filter: blur(6px); overflow: auto; }
+#gx-setbox, #gx-pollbox, #gx-helpbox { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(2,3,8,.7); overflow: auto; }
 #gx-setbox .gx-card, #gx-pollbox .gx-card, #gx-helpbox .gx-card { max-height: calc(100vh - 40px); overflow: auto; }
 @media (max-width: 760px) { .gx-diff { grid-template-columns: 1fr; } .gx-set { grid-template-columns: 1fr 54px; } .gx-set span { grid-column: 1 / -1; } .gx-keys { display: none; } }
 @media (prefers-reduced-motion: reduce) { .gx-card--alarm, body.gx-danger::after, .gx-lost b, .gx-hp.low { animation: none; } }
@@ -388,3 +388,8 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
 .gx-coach__row { display: flex; justify-content: flex-end; gap: 8px; } .gx-coach__row .gx-btn { padding: 8px 14px; font-size: 12px; }
 @keyframes gx-coachin { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .gx-coachbox { animation: none; } }
+
+@media (prefers-reduced-motion:reduce) {
+  .gx-launchtext b,.gx-card { animation:none; }
+  .gx-poll li,.gx-poll .gx-gochips span { opacity:1;transform:none;transition:none; }
+}

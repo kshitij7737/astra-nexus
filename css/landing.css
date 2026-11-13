@@ -16,9 +16,9 @@
 /* intro: cinematic orbital sunrise rendered by the 3D sky behind this layer */
 .lx-intro { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; overflow: hidden;
   background: radial-gradient(120% 70% at 50% 18%, rgba(2,3,10,.55), transparent 60%), linear-gradient(180deg, rgba(2,3,10,.65) 0%, rgba(2,3,10,0) 34%, rgba(2,3,10,0) 70%, rgba(2,3,10,.35) 100%);
-  transition: opacity 1.4s ease, transform 1.6s cubic-bezier(.2,.7,.2,1), filter 1.4s; }
+  transition: opacity .5s ease, transform .55s cubic-bezier(.2,.7,.2,1); }
 .lx-intro::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
-.lx-intro.is-out { opacity: 0; transform: scale(1.12); filter: blur(6px); pointer-events: none; }
+.lx-intro.is-out { opacity: 0; transform: scale(1.035); pointer-events: none; }
 .lx-intro__in { position: relative; z-index: 2; text-align: center; padding: 20px; margin-top: -14vh; }
 .lx-intro__k { font: 500 11px var(--mono); letter-spacing: .42em; text-transform: uppercase; color: #c9d6f2; animation: lx-up 1.2s .3s both; margin: 0; }
 .lx-logo { position: relative; margin: 14px 0 8px; font-weight: 800; font-stretch: 125%; font-size: clamp(70px, 15vw, 236px); line-height: .82; letter-spacing: -.03em; white-space: nowrap; filter: drop-shadow(0 10px 40px rgba(0,0,0,.6)); }
@@ -61,7 +61,7 @@
 .lx-flare i:nth-child(4) { width: 160px; height: 160px; background: radial-gradient(circle, rgba(160,120,255,0) 55%, rgba(160,120,255,.18) 66%, rgba(160,120,255,0) 72%); }
 .lx-flare i:nth-child(5) { width: 60px; height: 60px; background: radial-gradient(circle, rgba(110,220,200,.3), rgba(110,220,200,0) 70%); }
 .lx-flare i:nth-child(6) { width: 240px; height: 240px; background: radial-gradient(circle, rgba(255,140,90,0) 60%, rgba(255,140,90,.14) 68%, rgba(255,140,90,0) 76%); }
-@keyframes lx-drop { from { opacity: 0; transform: translateY(-50px) scale(1.25); filter: blur(14px); } }
+@keyframes lx-drop { from { opacity: 0; transform: translateY(-35px) scale(1.12); } }
 @keyframes lx-up { from { opacity: 0; transform: translateY(16px); } }
 @keyframes lx-fade { from { opacity: 0; } }
 @keyframes lx-sheen { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
@@ -251,19 +251,18 @@ body.lx-pick { cursor: pointer; }
 .lx-sheet__meta { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); margin: 0 0 6px; }
 .lx-sheet .lx-row { margin-top: 14px; }
 /* briefing and countdown */
-.lx-brief { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(2,3,8,.72); backdrop-filter: blur(8px); animation: lx-fade .3s both; }
+.lx-brief { position: fixed; inset: 0; z-index: 60; display: grid; place-items: safe center; overflow-y:auto; padding: 16px; background: rgba(2,3,8,.86); animation: lx-fade .23s both; }
 .lx-brief__card { position: relative; width: min(620px, 100%); padding: 28px; border-radius: 20px; background: linear-gradient(170deg, rgba(14,18,30,.97), rgba(6,8,14,.97)); border: 1px solid color-mix(in srgb, var(--acc) 45%, transparent); box-shadow: 0 30px 90px rgba(0,0,0,.6), 0 0 60px color-mix(in srgb, var(--acc) 18%, transparent); animation: lx-up .4s both; overflow: hidden; }
 .lx-brief__card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px); }
 .lx-brief__k { display: flex; align-items: center; gap: 8px; font: 500 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--acc); margin: 0 0 10px; }
 .lx-brief__k i { width: 8px; height: 8px; border-radius: 50%; background: var(--acc); animation: lx-blink 1s infinite; }
 .lx-brief h3 { font-weight: 800; font-stretch: 115%; font-size: clamp(26px, 4vw, 38px); margin: 0 0 12px; } .lx-brief h3 span { color: var(--muted); font-weight: 500; }
 .lx-brief__txt { min-height: 5.2em; font: 15px/1.6 var(--mono); color: #e6e2da; margin: 0 0 16px; }
-.lx-brief__txt::after { content: '▌'; color: var(--acc); animation: lx-blink 1s infinite; }
+
 .lx-brief__kv { display: grid; gap: 8px; margin: 0 0 18px; } .lx-brief__kv div { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
 .lx-brief__kv dt { font: 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); padding-top: 3px; } .lx-brief__kv dd { margin: 0; }
-.lx-count { text-align: center; } .lx-count b { display: block; font-weight: 800; font-stretch: 125%; font-size: clamp(120px, 26vw, 260px); line-height: 1; color: var(--acc); text-shadow: 0 0 60px color-mix(in srgb, var(--acc) 60%, transparent); animation: lx-tick .8s ease both; }
+.lx-count { text-align: center; } .lx-count b { display: block; font-weight: 800; font-stretch: 125%; font-size: clamp(120px, 26vw, 260px); line-height: 1; color: var(--acc); text-shadow: 0 0 60px color-mix(in srgb, var(--acc) 60%, transparent);  }
 .lx-count p { font: 500 13px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #e6e2da; margin: 6px 0 20px; }
-@keyframes lx-tick { from { opacity: 0; transform: scale(1.6); filter: blur(10px); } 60% { opacity: 1; transform: scale(1); filter: none; } }
 .lx-btn:active, .lx-enter:active { transform: translateY(1px) scale(.98); }
 @media (max-width: 640px) { .lx-sheet { top: auto; left: 10px; right: 10px; width: auto; max-height: 76vh; bottom: 10px; transform: translateY(30px); } .lx-brief__kv div { grid-template-columns: 1fr; gap: 2px; } }
 
@@ -278,4 +277,11 @@ body.lx-pick { cursor: pointer; }
   .lx-cosmic { min-height: 420px; align-items: flex-end; padding-bottom: 3.25rem; }
   .lx-cosmic > img { width: 100%; object-position: 55% 30%; }
   .lx-cosmic::before { background: linear-gradient(0deg,#090d18 9%,#090d18e8 33%,#090d1800 83%); }
+}
+
+.lx-brief--handoff { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--acc) 13%, #050713), #02030a 73%); }
+.lx-count { animation: lx-fade .24s ease-out both; }
+@media (prefers-reduced-motion:reduce) {
+  .lx-intro { transition:none; }
+  .lx-brief,.lx-brief__card,.lx-count { animation:none; }
 }

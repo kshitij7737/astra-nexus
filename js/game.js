@@ -9,7 +9,8 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const src = k => k && SOURCES[k] ? `<a class="gx-src" href="${SOURCES[k].url}" target="_blank" rel="noopener">${esc(SOURCES[k].title)}</a>` : '';
-const fmt = (n, d = 0) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
+const formatters = [0, 1, 2].map(d => new Intl.NumberFormat('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }));
+const fmt = (n, d = 0) => (formatters[d] ?? new Intl.NumberFormat('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d })).format(n);
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- saved progress (per browser)
@@ -87,9 +88,12 @@ const VEGA = {
 
 // ---------- state
 const url = new URLSearchParams(location.search);
-let mission = GAME[url.get('mission')] || null;
+let mission = Object.hasOwn(GAME,url.get('mission')) ? GAME[url.get('mission')] : null;
 let cfg = null, d = null, est = null, rd = null, sim = null, stage = null, screen = 'brief';
-let simSpeed = 1, raf = 0, lastFrame = 0, acc = 0, flags = {};
+let simSpeed = 1, raf = 0, lastFrame = 0, lastTelemetry = 0, acc = 0, flags = {};
+let screenAnimation, guideTimer, closeCoach, recoverLaunch;
+let pageSuspended = false;
+const stageElement = $('#gx-stage');
 
 function loadCfg(m) {
   const saved = store.get().cfg?.[m.id];
@@ -99,7 +103,7 @@ function loadCfg(m) {
 function saveCfg() { const s = store.get(); s.cfg = { ...(s.cfg || {}), [mission.id]: cfg }; store.set(s); }
 
 // ---------- boot
-async function boot() {
+function boot() {
   document.body.addEventListener('click', () => audio.init(), { once: true });
   const soundBtn = $('#gx-sound');
   const syncSound = () => { soundBtn.setAttribute('aria-pressed', String(audio.on)); soundBtn.textContent = audio.on ? 'Sound on' : 'Sound off'; };
@@ -107,15 +111,45 @@ async function boot() {
   $('#gx-settings').onclick = openSettings; $('#gx-help').onclick = () => openHelp();
   document.addEventListener('keydown', onKey);
   document.addEventListener('click', e => { if (e.target.closest?.('button, a.gx-btn, a.nx-pill, summary, label')) audio.click(); }, true);
-  try {
-    const g3 = await import('./game3d.js');
-    if (!g3.webglOK()) throw new Error('no WebGL');
-    const raw = new g3.GameStage($('#gx-stage')); raw.setControls(settings);
-    let warned = false;
-    stage = new Proxy(raw, { get(t, k) { const v = t[k]; if (typeof v !== 'function') return v; return (...a) => { try { return v.apply(t, a); } catch (err) { if (!warned) { warned = true; console.warn('NEXUS: 3D step failed, continuing without it', err); } } }; } });
-  } catch (e) { console.warn('NEXUS: 3D disabled', e); document.body.classList.add('gx-no3d'); }
   if (!mission) pickMission(); else start(mission.id);
   if (!store.get().helped) openHelp(true);
+  requestAnimationFrame(() => setTimeout(initStage, 0));
+}
+
+function disableStage(error) {
+  console.warn('NEXUS: continuing with lightweight graphics', error);
+  stage?.dispose();
+  stage = null;
+  stageElement.replaceChildren();
+  document.body.classList.add('gx-no3d');
+  recoverLaunch?.();
+}
+
+async function initStage() {
+  try {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('webgl2', { antialias:true, alpha:true });
+    if (!context) return;
+    const { GameStage } = await import('./game3d.js?v=2');
+    const raw = new GameStage(stageElement, disableStage, context);
+    stage = raw;
+    raw.setControls(settings);
+    raw.r.domElement.addEventListener('webglcontextlost', event => {
+      event.preventDefault();
+      disableStage(new Error('WebGL context lost'));
+    }, { once:true });
+    if (screen === 'brief' || screen === 'debrief') raw.showBuild(mission, cfg, 0, true);
+    raw.setRunning(screen !== 'pick' && !pageSuspended);
+    if (screen === 'build') raw.showBuild(mission, cfg);
+    if (screen === 'ops') {
+      raw.showOps(mission, sim.d);
+      lastTelemetry = 0;
+    }
+    document.body.classList.remove('gx-no3d');
+    stageElement.animate([{opacity:0},{opacity:1}], {duration:reduced ? 0 : 310,easing:'ease-out'});
+  } catch (error) {
+    disableStage(error);
+  }
 }
 
 function pickMission() {
@@ -156,13 +190,24 @@ function start(id) {
 }
 
 function setScreen(name) {
+  closeCoach?.();
+  clearTimeout(guideTimer);
+  screenAnimation?.cancel();
   screen = name; document.body.dataset.screen = name;
+  stage?.setRunning(name !== 'pick' && !pageSuspended);
   $$('[data-screen]').forEach(s => s.hidden = s.dataset.screen !== name);
   const order = ['brief', 'build', 'launch', 'ops', 'debrief'];
   $$('.gx-steps li').forEach((li, i) => { li.dataset.state = i < order.indexOf(name) ? 'done' : i === order.indexOf(name) ? 'now' : ''; });
   if (mission) { const TR = { brief: 'Briefing opened', build: 'Spacecraft design started', launch: 'Launch sequence started', ops: `Orbit reached around ${mission.world}. Science operations started` }; if (TR[name]) trace(mission.id, TR[name], order.indexOf(name)); }
   window.scrollTo(0, 0);
-  setTimeout(() => { if (screen === name) guide(name); }, name === 'ops' ? 1200 : 500);
+  if (!reduced) {
+    const active = $(`main > [data-screen="${name}"]`);
+    screenAnimation = active.animate(
+      [{opacity:.45},{opacity:1}],
+      {duration:290,easing:'cubic-bezier(.16,.65,.26,1)'}
+    );
+  }
+  guideTimer = setTimeout(() => { if (screen === name) guide(name); }, name === 'ops' ? 1200 : 500);
   music.setMood(name === 'launch' ? 'launch' : name === 'ops' ? 'ops' : 'calm');
 }
 
@@ -176,18 +221,20 @@ const COACH = {
 };
 let coachOn = false;
 function guide(name, force) {
+  if (coachOn) return;
   const st = store.get(); if (settings.tips === false && !force) return;
   if (!force && st.tips?.[name]) return;
   const steps = (COACH[name] || []).filter(([sel]) => { const el = document.querySelector(sel); return el && el.offsetParent !== null; });
   if (!steps.length) return;
-  if ([...document.querySelectorAll('.gx-modal')].some(m => !m.hidden)) { setTimeout(() => { if (screen === name) guide(name, force); }, 700); return; }
+  if ([...document.querySelectorAll('.gx-modal')].some(m => !m.hidden)) { guideTimer = setTimeout(() => { if (screen === name) guide(name, force); }, 700); return; }
   coachOn = true; let i = 0;
   const box = document.createElement('div'); box.className = 'gx-coachbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box);
   let cur = null;
   const outside = e => { if (!box.contains(e.target)) end(); };
-  setTimeout(() => document.addEventListener('pointerdown', outside, true), 50);
-  const end = () => { if (!coachOn) return; document.removeEventListener('pointerdown', outside, true); coachOn = false; cur?.classList.remove('gx-coachmark'); box.remove(); removeEventListener('resize', place); const s2 = store.get(); s2.tips = { ...(s2.tips || {}), [name]: 1 }; store.set(s2); };
+  const outsideTimer = setTimeout(() => document.addEventListener('pointerdown', outside, true), 50);
+  const end = () => { if (!coachOn) return; clearTimeout(outsideTimer); document.removeEventListener('pointerdown', outside, true); coachOn = false; closeCoach = null; cur?.classList.remove('gx-coachmark'); box.remove(); removeEventListener('resize', place); const s2 = store.get(); s2.tips = { ...(s2.tips || {}), [name]: 1 }; store.set(s2); };
   function place() {
+    if (!box.isConnected || !steps[i]) return;
     const el = document.querySelector(steps[i][0]); if (!el) return;
     const r = el.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight;
     const below = r.bottom + bh + 18 < innerHeight;
@@ -199,7 +246,7 @@ function guide(name, force) {
   function show() {
     cur?.classList.remove('gx-coachmark');
     const [sel, text] = steps[i]; cur = document.querySelector(sel);
-    cur.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); cur.classList.add('gx-coachmark');
+    cur.scrollIntoView({ block: 'nearest', behavior: reduced ? 'instant' : 'smooth' }); cur.classList.add('gx-coachmark');
     box.innerHTML = `<p class="gx-coach__k">Tip ${i + 1} of ${steps.length}</p><p>${esc(text)}</p><div class="gx-coach__row"><button type="button" class="gx-btn gx-btn--ghost" data-c="skip">Skip tips</button><button type="button" class="gx-btn gx-btn--go" data-c="next">${i < steps.length - 1 ? 'Next' : 'Got it'}</button></div>`;
     box.querySelector('[data-c="next"]').onclick = () => { if (++i < steps.length) show(); else end(); };
     box.querySelector('[data-c="skip"]').onclick = () => { end(); if (confirmSkipAll()) { settings.tips = false; saveSettings(); toast('Tips off. Turn them back on in Settings.'); } };
@@ -207,6 +254,7 @@ function guide(name, force) {
     requestAnimationFrame(place); setTimeout(place, 350);
   }
   const confirmSkipAll = () => true;
+  closeCoach = end;
   addEventListener('resize', place); show();
 }
 window.__nxGuide = n => guide(n || screen, true);
@@ -246,17 +294,11 @@ function renderBrief() {
         <p class="gx-rule">Rule of the game: <b>science only counts when it reaches Earth.</b></p>
       </aside>
     </div>`;
-  typewriter($('#gx-type'), STORY[m.id]); wireDiff(() => { const b = $('#gx-budgetv'); if (b) b.textContent = `${fmt(Math.round((m.budget ?? COMMON.budget) * diff().budgetMul))} credits`; });
+  $('#gx-type').textContent = STORY[m.id]; wireDiff(() => { const b = $('#gx-budgetv'); if (b) b.textContent = `${fmt(Math.round((m.budget ?? COMMON.budget) * diff().budgetMul))} credits`; });
   $('#gx-tobuild').onclick = () => { audio.beep(660); setScreen('build'); renderBuild(); };
   $('#gx-switch').onclick = () => { history.replaceState(null, '', 'play.html'); pickMission(); };
   if (stage) stage.showBuild(m, cfg, 0, true);
 }
-function typewriter(el, text) {
-  if (reduced) { el.textContent = text; return; }
-  el.textContent = ''; let i = 0; clearInterval(typewriter.t);
-  typewriter.t = setInterval(() => { el.textContent = text.slice(0, i += 3); if (i >= text.length) clearInterval(typewriter.t); }, 18);
-}
-
 // ---------- 02 build
 const seg = (key, opts, fmtFn) => `<div class="gx-seg" role="radiogroup" aria-label="${key}">${opts.map(o => `<button type="button" role="radio" data-k="${key}" data-v="${o.id}" aria-checked="${cfg[key] === o.id}">${o.label}${fmtFn ? `<small>${fmtFn(o)}</small>` : ''}</button>`).join('')}</div>`;
 
@@ -375,7 +417,15 @@ function refreshBuild(light) {
     $('#gx-launch').onclick = goLaunch;
     $('#gx-suggest').onclick = () => {
       const b = $('#gx-suggest'); b.textContent = 'VEGA is testing builds…'; b.disabled = true;
-      setTimeout(() => { const before = JSON.stringify(cfg); cfg = suggestBuild(); refreshBuild(); toast(JSON.stringify(cfg) === before ? 'This build is already the best VEGA found' : 'VEGA updated your build'); audio.chime(); }, 30);
+      setTimeout(() => {
+        if (screen !== 'build' || mission !== m || !b.isConnected) return;
+        const before = JSON.stringify(cfg);
+        cfg = suggestBuild();
+        refreshBuild();
+        $('#gx-suggest').focus({preventScroll:true});
+        toast(JSON.stringify(cfg) === before ? 'This build is already the best VEGA found' : 'VEGA updated your build');
+        audio.chime();
+      }, 30);
     };
   };
   if (light) estTimer = setTimeout(paint, 120); else paint();
@@ -399,6 +449,9 @@ function ring(score, max = 100, label) {
 const POLL = { reserve: 'Reserve', mass: 'Booster', budget: 'Finance', dv: 'Propulsion', eclipse: 'Power', power: 'Electrical', science: 'Science', margin: 'Range safety' };
 function goLaunch() {
   if (!d.launchable) return;
+  clearTimeout(estTimer);
+  est = estimate(mission, cfg, settings.diff);
+  rd = readiness(d, est);
   const mo = $('#gx-pollbox'); mo.hidden = false;
   const items = rd.items, warn = items.filter(i => i.level !== 'go');
   const consequence = rd.status === 'nogo' ? 'If you launch anyway: expect battery blackouts that damage the spacecraft, lost points, or a missed orbit. That is your choice, not a game error.'
@@ -409,7 +462,7 @@ function goLaunch() {
     <p class="gx-gochips">${items.filter(c => c.level === 'go').map(c => `<span>✓ ${esc(c.label)}</span>`).join('')}</p>
     <p class="gx-hint">${consequence || `Launch success chance ${fmt((1 - d.launchFail) * 100, 1)}%.`}</p>
     <div class="gx-opts gx-opts--row"><button class="gx-btn ${rd.status === 'nogo' ? 'gx-btn--warn' : 'gx-btn--go'}" id="gx-golaunch">${rd.status === 'go' ? 'Commit to launch' : 'Launch anyway'}</button><button class="gx-btn gx-btn--ghost" id="gx-scrub">Scrub and fix</button></div></div>`;
-  $$('.gx-poll li, .gx-poll .gx-gochips span', mo).forEach((li, i) => setTimeout(() => { li.classList.add('in'); audio.beep(li.tagName === 'SPAN' ? 900 : 300, 0.05); }, 100 + i * 90));
+  $$('.gx-poll li, .gx-poll .gx-gochips span', mo).forEach((li, i) => setTimeout(() => { if (!mo.hidden && li.isConnected) { li.classList.add('in'); audio.beep(li.tagName === 'SPAN' ? 900 : 300, 0.05); } }, 100 + i * 90));
   $('#gx-scrub').onclick = () => { mo.hidden = true; };
   $('#gx-golaunch').onclick = () => { mo.hidden = true; launchOverride = warn.map(w => w.label); runLaunch(); };
   $('#gx-golaunch').focus();
@@ -429,10 +482,19 @@ function runLaunch() {
     if (k === 'lift') { stage?.shake(0.8); }
     if (k === 'sep' || k === 'arrays') audio.beep(660, 0.08);
   };
-  if (!stage) { // no 3D: captions on a timer
-    [[0, 'T-3', 'count'], [0.7, 'T-2', 'count'], [1.4, 'T-1', 'count'], [2.6, 'Liftoff', 'lift'], [4, reachesOrbit ? 'Orbit reached' : 'Propellant exhausted']].forEach(([t, txt, k]) => { if (!(explodeAt && t > explodeAt)) timers.push(setTimeout(() => show(txt, k), t * 1000)); });
-  }
+  let finished = false;
+  const beginFallback = () => {
+    timers.forEach(clearTimeout);
+    if (reduced) { completeFallback(); return; }
+    const sequence = [[0,'T-3','count'],[700,'T-2','count'],[1400,'T-1','count'],[2600,'Liftoff','lift']];
+    for (const [delay,caption,cue] of sequence) timers.push(setTimeout(() => show(caption,cue),delay));
+    timers.push(setTimeout(completeFallback, rocketFails ? explodeAt * 1000 : 4000));
+  };
   const finish = (ok, why) => {
+    if (finished || screen !== 'launch') return;
+    finished = true;
+    recoverLaunch = null;
+    $('#gx-skip').disabled = true;
     audio.hush();
     timers.forEach(clearTimeout);
     if (why === 'launch' || (rocketFails && !stage)) {
@@ -444,9 +506,18 @@ function runLaunch() {
     else { audio.fail(); box.innerHTML = `<b>Missed ${esc(m.world)}</b>`; sim = new Sim(m, cfg, { diff: settings.diff }); setTimeout(() => showDebrief(sim.result()), 1400); }
   };
   const cues = { say: show, boom: () => { audio.hush(); timers.forEach(clearTimeout); box.innerHTML = '<b class="gx-red">Vehicle lost</b>'; audio.boom(); document.body.classList.add('gx-flash'); setTimeout(() => document.body.classList.remove('gx-flash'), 900); } };
-  $('#gx-skip').onclick = () => { stage?.skipLaunch?.(); if (!stage) finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : ''); };
-  if (stage) stage.playLaunch(m, reachesOrbit, finish, cues, { explodeAt });
-  else setTimeout(() => finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : ''), 1500);
+  const completeFallback = () => finish(reachesOrbit && !rocketFails, rocketFails ? 'launch' : '');
+  const skip = $('#gx-skip');
+  skip.disabled = false;
+  skip.onclick = () => {
+    if (stage?.mode === 'launch') stage.skipLaunch();
+    else completeFallback();
+  };
+  recoverLaunch = beginFallback;
+  if (stage && !reduced) {
+    try { stage.playLaunch(m, reachesOrbit, finish, cues, { explodeAt }); }
+    catch (error) { disableStage(error); }
+  } else beginFallback();
 }
 
 // ---------- 04 operations
@@ -494,7 +565,7 @@ function startOps() {
   seg(o.pass, 'p'); seg(o.contact, 'c');
   log(`Orbit achieved around ${m.world}. ${m.contactNote}`, 'ok');
   if (simSpeed === 0) simSpeed = 1;
-  lastFrame = performance.now(); acc = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+  lastFrame = performance.now(); lastTelemetry = 0; acc = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
 }
 function log(text, kind = 'info') {
   const li = document.createElement('li'); li.className = kind;
@@ -503,8 +574,9 @@ function log(text, kind = 'info') {
 }
 function loop(now) {
   const dt = Math.min(0.25, (now - lastFrame) / 1000); lastFrame = now;
-  if (screen !== 'ops') return;
-  const modalOpen = !$('#gx-modal').hidden || coachOn;
+  if (screen !== 'ops' || pageSuspended) return;
+  if (document.hidden) { raf = requestAnimationFrame(loop); return; }
+  const modalOpen = !$('#gx-modal').hidden || !$('#gx-helpbox').hidden || !$('#gx-setbox').hidden || coachOn;
   if (!sim.pending && simSpeed > 0 && !modalOpen) {
     const stepsPerSec = (sim.T / sim.dt) / 9 * (flags.ff ? 22 : simSpeed); // one orbit ≈ 9 s at 1×; skip-ahead runs an orbit in under half a second
     acc += dt * stepsPerSec;
@@ -525,7 +597,15 @@ function loop(now) {
     const sent = sim.sentTotal;
     if (sent - (flags.lastMilestone || 0) >= milestoneStep()) { flags.lastMilestone = Math.floor(sent / milestoneStep()) * milestoneStep(); if (!flags.ff) { toast(`${fmt(flags.lastMilestone, 0)} Gbit home`); audio.beep(1100, 0.08); } }
   }
-  paintOps();
+  const s = sim.state();
+  const used = sim.storageUsed();
+  const observing = !sim.safe && s.inPass && !sim.activeMods().some(x => x.skip) && sim.enabled.size > 0;
+  const transmitting = !sim.safe && s.inContact && used > 1e-6;
+  stage?.setOps({ phase:s.phase, orbitFloat:sim.t/sim.T, observing, transmitting, sunlit:s.sunlit, alert:sim.safe || sim.batt/sim.d.battWh < .15 || sim.health < 30 });
+  if (now - lastTelemetry >= 80 || sim.done || sim.pending && $('#gx-modal').hidden) {
+    paintOps(s, used, observing, transmitting);
+    lastTelemetry = now;
+  }
   if (sim.pending && $('#gx-modal').hidden) showCard(sim.pending);
   if (sim.done && !sim.pending && !modalOpen) {
     cancelAnimationFrame(raf);
@@ -534,13 +614,8 @@ function loop(now) {
   }
   raf = requestAnimationFrame(loop);
 }
-function paintOps() {
-  const s = sim.state(), m = mission, mods = sim.activeMods(), skip = mods.some(x => x.skip);
-  const used = sim.storageUsed();
-  const observing = !sim.safe && s.inPass && !skip && sim.enabled.size > 0;
-  const transmitting = !sim.safe && s.inContact && used > 1e-6;
-  const bf0 = sim.batt / sim.d.battWh;
-  stage?.setOps({ phase: s.phase, orbitFloat: sim.t / sim.T, observing, transmitting, sunlit: s.sunlit, alert: sim.safe || bf0 < 0.15 || sim.health < 30 });
+function paintOps(s, used, observing, transmitting) {
+  const m = mission;
   const ffb = $('#gx-ff'); if (ffb) { ffb.setAttribute('aria-pressed', String(!!flags.ff)); ffb.textContent = flags.ff ? 'Skipping… ⏸' : 'Skip ahead ⏭'; }
   $('#gx-homev').textContent = `${fmt(sim.sentTotal, 1)} Gbit`;
   { // simulated telemetry: game-model values only
@@ -583,7 +658,7 @@ function drawChart() {
   const c = $('#gx-chart'); if (!c) return; const g = c.getContext('2d'), W = c.width, H = c.height;
   g.clearRect(0, 0, W, H);
   const h = sim.history.slice(-300); if (h.length < 2) return;
-  const maxRet = Math.max(1, ...sim.history.map(x => x.ret));
+  const maxRet = Math.max(1, sim.sentTotal);
   const line = (key, col, scale = 1) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); h.forEach((p, i) => { const x = i / (h.length - 1) * W, y = H - 6 - (p[key] / scale) * (H - 12); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); };
   g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1; [6, H / 2, H - 6].forEach(y => { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); });
   line('batt', '#ffd166'); line('store', '#ff7a3d'); line('ret', '#6fffd0', maxRet);
@@ -689,7 +764,8 @@ function onKey(e) {
   if (e.target.matches?.('input, textarea, select')) return;
   const mo = $('#gx-modal');
   if (mo && !mo.hidden && /^[1-4]$/.test(e.key) && mo.onkey && $('[data-opt]', mo)) { mo.onkey(e.key); e.preventDefault(); return; }
-  if (screen !== 'ops') return;
+  if (screen !== 'ops' || !$('#gx-helpbox').hidden || !$('#gx-setbox').hidden || mo && !mo.hidden || coachOn) return;
+  if (e.key === ' ' && e.target.closest?.('button, a, summary')) return;
   const set = v => { simSpeed = v; $$('[data-speed]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.speed === simSpeed))); };
   if (e.key === ' ') { set(simSpeed ? 0 : (settings.speed || 1)); e.preventDefault(); }
   if (e.key === '1') set(1); if (e.key === '2') set(2); if (e.key === '4') set(4);
@@ -916,4 +992,15 @@ function showFatal(e) {
 }
 addEventListener('error', e => showFatal(e.error || e.message));
 addEventListener('unhandledrejection', e => showFatal(e.reason));
-boot().catch(showFatal);
+document.addEventListener('visibilitychange', () => { lastFrame = performance.now(); });
+addEventListener('pagehide', () => { pageSuspended = true; cancelAnimationFrame(raf); stage?.setRunning(false); });
+addEventListener('pageshow', event => {
+  pageSuspended = false;
+  if (!event.persisted) return;
+  stage?.setRunning(screen !== 'pick');
+  if (screen === 'ops' && !sim.done) {
+    lastFrame = performance.now();
+    raf = requestAnimationFrame(loop);
+  }
+});
+try { boot(); } catch (error) { showFatal(error); }

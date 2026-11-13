@@ -121,14 +121,23 @@ function disposeTree(o) { o.traverse(x => { x.geometry?.dispose(); if (x.materia
 const missionWorld = id => MISSIONS.find(m => m.id === id);
 
 export class GameStage {
-  constructor(el) {
+  constructor(el, onError, context) {
     this.el = el;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.r.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    this.r = new THREE.WebGLRenderer({ canvas:context?.canvas, context, antialias:true, alpha:true });
+    this.renderScale = innerWidth < 760 ? 1.1 : 1.5;
+    this.frameInterval = innerWidth < 760 || (navigator.hardwareConcurrency || 8) < 5 ? 1000 / 30 : 1000 / 60;
+    this.lastDraw = -Infinity;
+    this.onError = onError;
     this.r.outputColorSpace = THREE.SRGBColorSpace; this.r.toneMapping = THREE.ACESFilmicToneMapping;
     el.appendChild(this.r.domElement);
-    const pm = new THREE.PMREMGenerator(this.r); this.env = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); setCraftEnv(this.env);
+    const pm = new THREE.PMREMGenerator(this.r);
+    const room = new RoomEnvironment();
+    this.environment = pm.fromScene(room,.04);
+    room.dispose();
+    pm.dispose();
+    this.env = this.environment.texture;
+    setCraftEnv(this.env);
     this.cam = new THREE.PerspectiveCamera(35, 1, 0.01, 500);
     this.clock = new THREE.Clock();
     this.labelLayer = document.createElement('div'); this.labelLayer.className = 'g3-labels'; el.appendChild(this.labelLayer);
@@ -156,12 +165,27 @@ export class GameStage {
     }, { passive: false });
     this.paused = false;
     this.resize();
-    this.r.setAnimationLoop(() => this.tick());
+    this.setRunning(true);
   }
   setControls(c) { Object.assign(this.ctl, c); }
   shake(amount = 0.6) { if (this.ctl.shake && !this.reduced) this.shakeT = Math.max(this.shakeT, amount); }
   resetView() { this.opsView = { yaw: 0, pitch: 0, zoom: 1 }; this.userTurned = false; this.zoom = 1; }
-  resize() { const w = this.el.clientWidth || 1, h = this.el.clientHeight || 1; this.r.setSize(w, h, false); this.cam.aspect = w / h; this.cam.updateProjectionMatrix(); }
+  setRunning(on) {
+    this.lastDraw = -Infinity;
+    this.clock.getDelta();
+    this.r.setAnimationLoop(on ? now => {
+      try { this.tick(now); }
+      catch (error) { this.onError?.(error); }
+    } : null);
+  }
+  resize() {
+    const w = this.el.clientWidth || innerWidth, h = this.el.clientHeight || innerHeight;
+    const ratio = Math.min(devicePixelRatio, this.renderScale, Math.sqrt(1900000 / (w*h)));
+    if (ratio !== this.r.getPixelRatio()) this.r.setPixelRatio(ratio);
+    this.r.setSize(w,h,false);
+    this.cam.aspect = w/h;
+    this.cam.updateProjectionMatrix();
+  }
   clear() {
     if (this.scene) disposeTree(this.scene);
     this.scene = new THREE.Scene(); this.labels = []; this.labelLayer.innerHTML = ''; this.update = null;
@@ -203,13 +227,23 @@ export class GameStage {
       this.craftHolder = new THREE.Group(); this.scene.add(this.craftHolder);
       this.cam.position.set(0, 0.5, 6.2); this.cam.lookAt(0, 0.1, 0); this.zoom = 1;
     }
-    this.craftHolder.children.forEach(c => { this.craftHolder.remove(c); disposeTree(c); });
+    for (const child of [...this.craftHolder.children]) {
+      this.craftHolder.remove(child);
+      disposeTree(child);
+    }
+    if (hideCraft) {
+      this.craft = null;
+      this.craftHolder.visible = false;
+      this.setLabels([]);
+      this.update = dt => { if (!this.reduced) this.planet.rotation.y += dt * .02; };
+      return;
+    }
     const { group, labels } = buildCraft(cfg, mission);
     group.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.9; } });
     group.scale.setScalar(0.78);
     this.craftHolder.add(group); this.craft = group;
-    this.craftHolder.visible = !hideCraft;
-    this.setLabels(hideCraft ? [] : labels);
+    this.craftHolder.visible = true;
+    this.setLabels(labels);
     this.update = dt => {
       if (!this.userTurned && !this.paused && !this.reduced) this.drag.yaw += dt * 0.15;
       this.craft.rotation.set(this.drag.pitch * 0.5, this.drag.yaw, 0);
@@ -504,7 +538,7 @@ export class GameStage {
       }
       if (t > T.end && !ended) { ended = true; this._insertCue = false; onDone?.(success); }
     };
-    this.skipLaunch = () => { if (!ended) { if (boomAt && !boom) { t = boomAt; return; } ended = true; this._insertCue = false; onDone?.(success); } };
+    this.skipLaunch = () => { if (!ended) { if (boomAt && !boom) { t = boomAt; return; } ended = true; this._insertCue = false; onDone?.(success && !boomAt, boomAt ? 'launch' : undefined); } };
   }
 
   // ---------------- operations: orbit view driven by the simulation
@@ -596,11 +630,17 @@ export class GameStage {
   }
   setOps(st) { this.opsState = st; }
 
-  tick() {
+  tick(now) {
+    if (document.hidden || !this.scene) {
+      this.clock.getDelta();
+      return;
+    }
+    if (now - this.lastDraw < this.frameInterval - 1.5) return;
+    this.lastDraw = now;
     const raw = this.clock.getDelta();
     // slow device: drop render resolution a step at a time until frames are smooth
     this._ft = (this._ft ?? 0.016) * 0.95 + Math.min(raw, 0.2) * 0.05; this._fn = (this._fn || 0) + 1;
-    if (this._fn > 90 && this._ft > 0.038 && this.r.getPixelRatio() > 0.75) { this.r.setPixelRatio(Math.max(0.75, this.r.getPixelRatio() - 0.25)); this.resize(); this._fn = 0; this._ft = 0.02; }
+    if (this._fn > 90 && this._ft > this.frameInterval / 1000 * 1.38 && this.renderScale > .75) { this.renderScale = Math.max(.75, this.renderScale - .2); this.resize(); this._fn = 0; this._ft = 0.02; }
     // the launch cinematic follows the wall clock so slow devices still finish on time
     const dt = Math.min(raw, this.mode === 'launch' ? 0.25 : 0.05);
     if (this.update && !(this.paused && this.mode !== 'launch')) this.update(dt);
@@ -624,5 +664,5 @@ export class GameStage {
       for (const l of this.labels) { l.el.style.opacity = l.vis ? 1 : 0; l.el.style.transform = `translate(${l.x}px, ${l.y}px)`; }
     }
   }
-  dispose() { this.r.setAnimationLoop(null); this.ro.disconnect(); if (this.scene) disposeTree(this.scene); this.r.dispose(); }
+  dispose() { this.r.setAnimationLoop(null); this.ro.disconnect(); if (this.scene) disposeTree(this.scene); this.environment.dispose(); this.r.dispose(); }
 }

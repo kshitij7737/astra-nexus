@@ -11,11 +11,29 @@ const autoLite = matchMedia('(max-width: 760px)').matches || (navigator.hardware
 let chapter = chapters[0], beat = 0, state = {...initialSettings};
 let art, visual, free = false, labels = false, still = prefersStill.matches, guided = false, frameId = 0;
 let yaw = 0, pitch = 0, zoom = 1, clock = 0, previous = 0, deadline = 0, viewChanged = true;
-let pointer = null, diagramFrame = 0, pulseTimer = 0, renderGeneration = 0;
+let pointer = null, diagramFrame = 0, pulseTimer = 0, renderGeneration = 0, rendererQueued = false;
 let hubOpen = false, lastScene = '#nebula', frozen = false, visited = new Set();
 const progress=new Map(), branches=new Map();
 const videoDialog=$('media-dialog');
-let displayPreference = 'auto', activeDisplay = 'model', loadedObservation = null;
+let displayPreference = 'auto', activeDisplay = 'model', loadedObservation = null, pendingObservation;
+let sceneBuild = 0, sceneAnimation, lastDraw = 0, viewerVisible = true, fadingObservation;
+const stage = document.querySelector('.cx-stage');
+const sceneVeil = $('scene-veil');
+const clips = {
+  nebula: [{file:'nebula', title:'Nebula evolution', time:'0:34'}],
+  stars: [
+    {file:'sun-like-star', title:'Evolution of a Sun-like star', time:'0:42'},
+    {file:'massive-star', title:'Evolution of a massive star', time:'0:49'},
+  ],
+};
+
+function revealScene() {
+  sceneAnimation?.cancel();
+  if(still || !viewerVisible) return;
+  sceneAnimation = sceneVeil.animate([
+    {opacity:.68}, {opacity:0},
+  ], {duration:380,easing:'cubic-bezier(.17,.74,.31,1)'});
+}
 const missingImages = new Set();
 
 function syncDisplay() {
@@ -24,6 +42,10 @@ function syncDisplay() {
   const show = available && (displayPreference==='telescope' || displayPreference==='auto' && !visual);
   activeDisplay = show ? 'telescope' : 'model';
   $('observation').hidden = !show;
+  if (!show) {
+    pendingObservation = null;
+    $('observation').removeAttribute('aria-busy');
+  }
   $('observation-notes').hidden = !show;
   $('model-controls').hidden = show;
   viewport.hidden = show;
@@ -47,31 +69,61 @@ function syncDisplay() {
   canvas.hidden=Boolean(visual);
   $('retry-renderer').hidden=Boolean(visual);
   if (show && free) setFree(false);
-  if (!show || loadedObservation===id) return;
+  if (!show || pendingObservation?.id === id) return;
+  if (loadedObservation === id) {
+    pendingObservation = null;
+    $('observation').removeAttribute('aria-busy');
+    return;
+  }
   const photo = observations[id];
-  const img = $('observation-image');
-  loadedObservation = id;
+  const img = new Image();
+  const request = {id};
+  pendingObservation = request;
+  $('observation').setAttribute('aria-busy','true');
   img.alt = photo.alt;
+  img.decoding = 'async';
   img.style.setProperty('--photo-focus',photo.focus);
   img.style.setProperty('--photo-zoom',photo.zoom || 1);
   img.classList.toggle('cx-wide',id==='carina');
   img.src = imagePath(id);
-  $('observation-title').textContent = photo.title;
-  $('observation-instrument').textContent = photo.instrument;
-  $('observation-note').textContent = photo.note;
-  $('observation-credit').textContent = photo.credit;
-  $('observation-credit').href = photo.link;
+  img.decode().then(()=>{
+    if(pendingObservation !== request) return;
+    const old = $('observation-image');
+    fadingObservation?.remove();
+    fadingObservation = null;
+    old.removeAttribute('id');
+    img.id = 'observation-image';
+    old.before(img);
+    if (loadedObservation && !still && viewerVisible) {
+      fadingObservation = old;
+      old.setAttribute('aria-hidden','true');
+      const fade = old.animate([{opacity:.88},{opacity:0}],{duration:380,easing:'ease-out',fill:'forwards'});
+      fade.onfinish=()=>{old.remove(); if(fadingObservation===old) fadingObservation=null;};
+    } else {
+      old.remove();
+      revealScene();
+    }
+    loadedObservation = id;
+    pendingObservation = null;
+    $('observation').removeAttribute('aria-busy');
+    $('observation-title').textContent = photo.title;
+    $('observation-instrument').textContent = photo.instrument;
+    $('observation-note').textContent = photo.note;
+    $('observation-credit').textContent = photo.credit;
+    $('observation-credit').href = photo.link;
+  }).catch(()=>{
+    if(pendingObservation !== request) return;
+    pendingObservation = null;
+    $('observation').removeAttribute('aria-busy');
+    missingImages.add(id);
+    rebuild();
+  });
 }
 function switchDisplay(preference) {
   setGuided(false);
   displayPreference=preference;
-  rebuild();
+  rebuild(true);
 }
-$('observation-image').addEventListener('error',()=>{
-  if(!loadedObservation) return;
-  missingImages.add(loadedObservation);
-  rebuild();
-});
 
 function el(tag, content, className) {
   const e = document.createElement(tag);
@@ -106,16 +158,20 @@ function media(asset) {
   pane.replaceChildren();
   $('media-title').textContent=asset.title;
   $('media-caption').textContent=asset.kind+' · '+asset.credit+'. '+asset.note;
-  $('media-links').replaceChildren(link('Official source ↗',asset.source,true),link('Original media ↗',asset.original,true));
+  $('media-links').replaceChildren();
+  if(asset.source) $('media-links').append(link('Official source ↗',asset.source,true));
+  if(asset.original) $('media-links').append(link('Original media ↗',asset.original,true));
   if(asset.video){
     const video=el('video');
-    video.setAttribute('aria-label',asset.title+' · silent video');
+    video.setAttribute('aria-label',asset.title);
     video.controls=true;video.playsInline=true;video.preload='none';
-    video.poster=assetPath(asset.file);video.src=assetPath(asset.video);
+    const path=asset.local ? file=>'textures/cosmic/'+file : assetPath;
+    video.poster=path(asset.file);video.src=path(asset.video);
+    if(asset.local) video.muted=true;
     const status=el('p');status.setAttribute('role','status');
     video.addEventListener('waiting',()=>{status.textContent='Loading video…';});
     video.addEventListener('playing',()=>{status.textContent='';});
-    video.addEventListener('error',()=>{status.textContent='Video unavailable. The poster and source are still available.';});
+    video.addEventListener('error',()=>{status.textContent='Video unavailable. You can continue exploring the scene.';});
     pane.append(video,status);
   }else{
     const image=el('img');image.src=assetPath(asset.file);image.alt=asset.alt;
@@ -135,33 +191,59 @@ function media(asset) {
   setGuided(false);frozen=true;
   videoDialog.showModal();
 }
-videoDialog.addEventListener('close',()=>$('media-content').replaceChildren());
+videoDialog.addEventListener('close',()=>{
+  const pane=$('media-content'), video=pane.querySelector('video');
+  if(video){video.pause();video.removeAttribute('src');video.load();}
+  pane.replaceChildren();
+});
+
+function renderClips() {
+  const items=clips[chapter.id] || [];
+  $('chapter-films').hidden=!items.length;
+  $('film-list').replaceChildren(...items.map(clip=>{
+    const open=button(clip.title,()=>media({
+      title:clip.title, kind:'Illustrative film', credit:'NEXUS//04 team submission',
+      note:'The film compresses time and includes on-screen text.',
+      file:clip.file+'-poster.webp', video:clip.file+'.mp4', local:true,
+    }));
+    open.className='cx-film';
+    open.prepend(el('span','', 'cx-film-play'));
+    open.firstElementChild.setAttribute('aria-hidden','true');
+    open.append(el('span',clip.time,'cx-film-time'));
+    open.setAttribute('aria-label','Watch '+clip.title+' ('+clip.time+')');
+    return open;
+  }));
+}
 function renderEvidence() {
   const keys=evidenceByScene[chapter.id]?.[beat] || [];
   $('evidence').hidden=!keys.length;
   $('evidence-grid').replaceChildren(...keys.map(key=>{
     const asset=assets[key];
     const card=el('article',null,'cx-evidence-card');
-    card.append(el('p',asset.kind,'cx-eyebrow'),el('h3',asset.title),el('p',asset.note));
+    const copy=el('div',null,'cx-evidence-copy');
+    copy.append(el('p',asset.kind,'cx-eyebrow'),el('h3',asset.title),el('p',asset.note));
     if(key==='water'){
       const legend=el('div',null,'cx-evidence-legend');
       legend.append(el('span','Blue · water vapour'),el('span','Red · dust'));
-      card.append(legend);
+      copy.append(legend);
     }
     if(asset.file){
       const image=el('img');image.src=assetPath(asset.file);image.alt=asset.alt;image.loading='lazy';image.decoding='async';
       image.addEventListener('error',()=>{image.hidden=true;},{once:true});
-      card.prepend(image);
-      card.append(button(asset.video?'Watch animation':'Expand image',()=>media(asset)));
+      card.append(image);
+      copy.append(button(asset.video?'Watch animation':'Expand image',()=>media(asset)));
     }
-    card.append(link(asset.credit+' ↗',asset.source,true));
-    if(!asset.file)card.append(link('View official media ↗',asset.original,true));
+    copy.append(link(asset.credit+' ↗',asset.source,true));
+    if(!asset.file)copy.append(link('View official media ↗',asset.original,true));
+    card.append(copy);
     return card;
   }));
 }
 const hubCards=chapters.map((item,i)=>{
   const a=link('',route(item.id));
-  a.append(el('span','Part '+String(i+1).padStart(2,'0'),'cx-eyebrow'),el('strong',item.title),el('span',item.intro));
+  const arrow=el('span','→','cx-hub-arrow');
+  arrow.setAttribute('aria-hidden','true');
+  a.append(el('span',String(i+1).padStart(2,'0'),'cx-eyebrow'),el('strong',item.title),el('span',item.intro,'cx-hub-intro'),arrow);
   return a;
 });
 $('hub-grid').append(...hubCards);
@@ -174,19 +256,30 @@ const menu = chapters.map((item,i)=>{
 });
 function resetCamera() { yaw=0; pitch=0; zoom=1; viewChanged=true; }
 function drawFallback(){
-  if(visual||activeDisplay==='telescope')return;
+  if(visual||activeDisplay==='telescope'||!viewerVisible||hubOpen)return;
   cancelAnimationFrame(diagramFrame);
   diagramFrame=requestAnimationFrame(()=>drawDiagram(canvas,chapter,beat,state,drawFallback));
 }
-function rebuild() {
-  syncDisplay();
-  if(activeDisplay==='telescope') return;
-  if(visual){
-    try{visual.setChapter(chapter,beat,{...state,still});}
-    catch(error){console.warn('Could not build the 3D scene.',error);useFallback();return;}
-  }
-  else drawFallback();
-  viewChanged=true;
+let animateScene=false, firstModelFrame=true;
+function rebuild(transition=false) {
+  animateScene ||= transition;
+  if(sceneBuild) return;
+  sceneBuild=requestAnimationFrame(()=>{
+    sceneBuild=0;
+    const animate=animateScene;
+    animateScene=false;
+    syncDisplay();
+    if(activeDisplay==='telescope') return;
+    if(visual){
+      try{visual.setChapter(chapter,beat,{...state,still});}
+      catch(error){console.warn('Could not build the 3D scene.',error);useFallback();return;}
+    }else{
+      cancelAnimationFrame(diagramFrame);
+      drawDiagram(canvas,chapter,beat,state,drawFallback);
+    }
+    viewChanged=true;
+    if(animate) revealScene();
+  });
 }
 function setFree(on) {
   free=on;
@@ -347,10 +440,25 @@ function update(key,value) {
   if(key==='jets'&&value&&beat<3){go(3);return;}
   if(key==='forces'&&value&&beat!==3){go(3);return;}
   if(key==='cutaway'&&value&&beat!==3){go(3);return;}
+  if (key==='alignment') {
+    scheduleAlignment();
+    return;
+  }
   syncControls();
   if(key==='angle'){resetCamera();drawFallback();}
   else rebuild();
   showReading();
+}
+let alignmentFrame=0;
+function scheduleAlignment() {
+  if(alignmentFrame) return;
+  alignmentFrame=requestAnimationFrame(()=>{
+    alignmentFrame=0;
+    if(chapter.id!=='lensing') return;
+    syncControls();
+    showReading();
+    rebuild();
+  });
 }
 function showReading(){
   let text='';
@@ -473,7 +581,7 @@ function renderRelated() {
       el('p',visited.size+' of '+chapter.beats.length+' scenes visited','cx-subnote'));
   }
 }
-function go(index, fromTour=false, keepFeature=false){
+function go(index, fromTour=false, keepFeature=false, transition=true){
   if(!fromTour)setGuided(false);
   clearTimeout(pulseTimer);
   if(!keepFeature){state.feature='';state.binary=false;}
@@ -507,7 +615,7 @@ function go(index, fromTour=false, keepFeature=false){
   showReading();
   renderRelated();
   renderEvidence();
-  rebuild();
+  rebuild(transition);
   lastScene=route(chapter.id,beat);
 }
 function openChapter(item, start=0){
@@ -551,11 +659,12 @@ function openChapter(item, start=0){
   const next=({nebula:['stars',2,'Continue the forming star'],stars:['black-holes',0,'Black-hole evidence'],planets:['stars',2,'Return to the stellar timeline'],'black-holes':['lensing',0,'Gravitational lensing'],lensing:['universe',0,'Cosmic scales']})[item.id];
   $('next-chapter').href=next?route(next[0],next[1]):'#chapters';
   $('next-chapter').textContent=(next?next[2]:'Chapter hub')+' →';
+  renderClips();
   buildControls();go(start);
 }
 function navigate(){
   const destination=currentRoute();
-  const returning=hubOpen&&!destination.hub&&destination.item===chapter&&destination.index===beat;
+  const returning=progress.has(chapter.id)&&hubOpen&&!destination.hub&&destination.item===chapter&&destination.index===beat;
   hubOpen=destination.hub;
   $('chapter-hub').hidden=!hubOpen;
   $('chapter-view').hidden=hubOpen;
@@ -568,22 +677,32 @@ function navigate(){
     scrollTo(0,0);
     return;
   }
-  if(returning){viewChanged=true;drawFallback();}
+  if(returning){frozen=false;rebuild(true);}
   else openChapter(destination.item||chapters[0],destination.index);
   scrollTo(0,0);
+  if (!renderGeneration && !rendererQueued) {
+    rendererQueued = true;
+    requestAnimationFrame(()=>setTimeout(()=>{
+      rendererQueued = false;
+      if(!renderGeneration && !hubOpen)startRenderer();
+    },0));
+  }
 }
 function loop(now){
   frameId=requestAnimationFrame(loop);
-  if(document.hidden||hubOpen){previous=0;return;}
-  const dt=previous?Math.min(.05,(now-previous)/1000):0;
-  previous=now;
+  if(document.hidden||hubOpen||videoDialog.open){previous=0;return;}
   if(guided&&now>=deadline){
     if(beat<chapter.beats.length-1)go(beat+1,true);
     else {setGuided(false);frozen=true;}
   }
-  if(!visual||activeDisplay==='telescope')return;
-  if(!still&&!frozen)clock+=dt;
+  if(!visual||activeDisplay==='telescope'||!viewerVisible||sceneBuild){previous=0;return;}
   if((still||frozen)&&!viewChanged)return;
+  const quality=$('quality').value;
+  const limit=quality==='lite'||quality==='auto'&&autoLite ? 1000/30 : 1000/60;
+  if(!viewChanged && now-lastDraw<limit-1.5) return;
+  const dt=previous?Math.min(.08,(now-previous)/1000):limit/1000;
+  previous=lastDraw=now;
+  if(!still&&!frozen)clock+=dt;
   const width=viewport.clientWidth,height=viewport.clientHeight;
   if(!width||!height)return;
   const view=art.cameraPreset(chapter.id,beat,state,width<760);
@@ -595,7 +714,9 @@ function loop(now){
     eye.set(r*Math.sin(phi)*Math.sin(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.cos(theta));
   }
   try {
-    visual.frame(clock,view,(still||frozen)?1:1-Math.exp(-dt*4.6),width,height);
+    const smoothing=(still||frozen||firstModelFrame)?1:1-Math.exp(-dt*4.6);
+    visual.frame(clock,view,smoothing,width,height);
+    firstModelFrame=false;
   } catch (error) {
     console.warn('Cosmic Explorer is switching to its diagram view.', error);
     useFallback();
@@ -618,7 +739,7 @@ function useFallback(){
 async function startRenderer(){
   const generation=++renderGeneration;
   $('renderer-status').textContent='Loading 3D…';
-  $('stage-status').textContent='Loading 3D · diagram available';
+  if (!hubOpen) $('stage-status').textContent='Loading 3D · diagram available';
   if(visual)useFallback();
   try{
     const context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
@@ -627,6 +748,7 @@ async function startRenderer(){
     if(generation!==renderGeneration){context.getExtension('WEBGL_lose_context')?.loseContext();return;}
     const quality=$('quality').value;
     visual=art.createRenderer(viewport,quality==='lite'||quality==='auto'&&autoLite,context,()=>{viewChanged=true;});
+    firstModelFrame=true;
     const current=visual;
     current.renderer.domElement.addEventListener('webglcontextlost',event=>{
       event.preventDefault();
@@ -659,7 +781,7 @@ $('inspect-model').onclick=()=>{
   switchDisplay('model');
   $('controls').querySelector('button, input, select')?.focus();
 };
-$('timeline').oninput=e=>go(+e.target.value);
+$('timeline').oninput=e=>go(+e.target.value,false,false,false);
 $('free').onclick=()=>{setFree(!free);if(free)viewport.focus({preventScroll:true});};
 $('labels').onclick=()=>{
   labels=!labels;pressed($('labels'),labels);$('model-labels').hidden=!labels;
@@ -668,7 +790,7 @@ $('labels').onclick=()=>{
 function setStill(on){
   still=on;pressed($('motion'),still);pressed($('help-motion'),still);
   $('stage-status').textContent='';
-  if(still)setGuided(false);
+  if(still){setGuided(false);sceneAnimation?.cancel();fadingObservation?.remove();}
   rebuild();
   viewChanged=true;
 }
@@ -713,6 +835,11 @@ viewport.onkeydown=e=>{
   e.preventDefault();viewChanged=true;
 };
 new ResizeObserver(()=>{viewChanged=true;drawFallback();}).observe(viewport);
+new IntersectionObserver(([entry])=>{
+  viewerVisible=entry.isIntersecting;
+  previous=0;
+  if(viewerVisible){viewChanged=true;drawFallback();}
+}).observe(stage);
 window.addEventListener('hashchange',navigate);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setGuided(false);});
 window.addEventListener('pagehide',()=>cancelAnimationFrame(frameId));
@@ -720,4 +847,3 @@ window.addEventListener('pageshow',event=>{if(event.persisted){previous=0;frameI
 navigate();
 pressed($('motion'),still);pressed($('help-motion'),still);
 frameId=requestAnimationFrame(loop);
-startRenderer();

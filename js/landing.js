@@ -7,6 +7,16 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const src = k => SOURCES[k] ? `<a class="lx-src" href="${SOURCES[k].url}" target="_blank" rel="noopener">${esc(SOURCES[k].title)}</a>` : '';
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let handingOff = false, handoffTimer;
+let preloadedGame = false;
+function preloadGame() {
+  if (preloadedGame || navigator.connection?.saveData) return;
+  preloadedGame = true;
+  const link = document.createElement('link');
+  link.rel = 'modulepreload';
+  link.href = 'js/game.js?v=2';
+  document.head.append(link);
+}
 const store = () => { try { return JSON.parse(localStorage.getItem('nexus04') || '{}'); } catch { return {}; } };
 
 // Stop copy follows the locked design handoff. Facts are reference values from NASA missions, each with its source.
@@ -22,19 +32,22 @@ const CH = {
 };
 
 // ---------- intro
+let introTimer, introExitTimer;
 function intro(force) {
+  clearInterval(introTimer);
+  clearTimeout(introExitTimer);
   const el = $('#lx-intro');
   let seen = false; try { seen = sessionStorage.getItem('nx-intro') === '1'; } catch { /* ignore */ }
   if (seen && !force) { el.hidden = true; return; }
   el.hidden = false; el.classList.remove('is-out'); document.body.classList.add('lx-locked');
   $('#lx-enter').focus();
   const clk = $('#lx-clock'), t0 = performance.now();
-  const tick = setInterval(() => { const sec = Math.floor((performance.now() - t0) / 1000); clk.textContent = `T+ 00:${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`; }, 250);
+  introTimer = setInterval(() => { const sec = Math.floor((performance.now() - t0) / 1000); clk.textContent = `T+ 00:${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`; }, 250);
   $('#lx-enter').onclick = () => {
-    clearInterval(tick);
+    clearInterval(introTimer);
     try { sessionStorage.setItem('nx-intro', '1'); } catch { /* ignore */ }
     el.classList.add('is-out'); document.body.classList.remove('lx-locked');
-    setTimeout(() => { el.hidden = true; }, reduced ? 0 : 1600);
+    introExitTimer = setTimeout(() => { el.hidden = true; }, reduced ? 0 : 550);
   };
 }
 
@@ -100,7 +113,9 @@ async function sky() {
   craftModule.setCraftEnv(null);
   const el = $('#lx-sky');
   const r = new THREE.WebGLRenderer({canvas,context,antialias:true,alpha:true});
-  r.setPixelRatio(Math.min(devicePixelRatio,1.75));
+  let resolution = innerWidth < 760 ? 1.1 : 1.5;
+  const pixelRatio = () => Math.min(devicePixelRatio, resolution, Math.sqrt(2300000 / (innerWidth * innerHeight)));
+  r.setPixelRatio(pixelRatio());
   r.outputColorSpace = THREE.SRGBColorSpace;
   r.toneMapping = THREE.ACESFilmicToneMapping;
   el.appendChild(r.domElement);
@@ -250,7 +265,7 @@ async function sky() {
   const camPos = HERO.clone(), camLook = new THREE.Vector3();
   const goal = { pos: camPos.clone(), look: new THREE.Vector3() };
   const craftPos = new THREE.Vector3(), craftGoal = new THREE.Vector3(), lastCraft = new THREE.Vector3();
-  const resize = () => { r.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
+  const resize = () => { r.setPixelRatio(pixelRatio()); r.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
   addEventListener('resize', resize); resize();
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { focus = e.target.dataset.focus; document.body.dataset.focus = focus; document.body.style.setProperty('--acc', GAME[focus]?.accent || '#ff7a3d'); } }), { rootMargin: '-45% 0px -45% 0px' });
   $$('[data-focus]').forEach(s => io.observe(s));
@@ -270,12 +285,28 @@ async function sky() {
   document.addEventListener('click', e => { if (busy(e.target)) return; const id = pickBody(e.clientX, e.clientY); if (id) window.__nxSheet?.(id); });
   let hov = null;
   document.addEventListener('pointermove', e => { const id = busy(e.target) ? null : pickBody(e.clientX, e.clientY); if (id !== hov) { hov = id; document.body.classList.toggle('lx-pick', !!id); } }, { passive: true });
-  let aFt = 0, aFn = 0;
-  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();fallBack();},{once:true});
-  r.setAnimationLoop(() => {
-    const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05);
-    // adaptive quality: slow machines drop to a lower render resolution instead of stuttering
-    aFt += rawDt; aFn++; if (aFn >= 90) { if (aFt / aFn > 0.03 && r.getPixelRatio() > 1) { r.setPixelRatio(Math.max(1, r.getPixelRatio() - 0.25)); r.setSize(innerWidth, innerHeight, false); } aFt = 0; aFn = 0; }
+  let aFt = 0, aFn = 0, lastFrame = -Infinity;
+  const frameInterval = innerWidth < 760 || (navigator.hardwareConcurrency || 8) < 5 ? 1000 / 30 : 1000 / 60;
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();failed=true;fallBack();},{once:true});
+  let lastFocus = '';
+  const draw = now => {
+    if (document.hidden || handingOff || document.querySelector('.lx-brief')) {
+      clock.getDelta();
+      return;
+    }
+    if (focus === 'dash' && focus === lastFocus && now-lastFrame < 1000/20) return;
+    if (now - lastFrame < frameInterval - 1.5) return;
+    lastFocus = focus;
+    lastFrame = now;
+    const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.06);
+    aFt += Math.min(rawDt, .1); aFn++;
+    if (aFn >= 60) {
+      if (focus !== 'dash' && aFt / aFn > frameInterval / 1000 * 1.35 && resolution > .8) {
+        resolution = Math.max(.8, resolution - .2);
+        resize();
+      }
+      aFt = 0; aFn = 0;
+    }
     if (!reduced) t0 += dt * 0.03;
     sunMat.uniforms.uT.value += dt;
     const key = focus === 'exit' ? 'mars' : focus, stop = !!focusBody[key];
@@ -405,16 +436,29 @@ async function sky() {
     } catch(error) {
       console.warn('Using the static Solar System illustration.',error);
       fallBack();
+      failed = true;
+    }
+  };
+  let failed = false;
+  r.setAnimationLoop(draw);
+  addEventListener('pagehide', () => r.setAnimationLoop(null));
+  addEventListener('pageshow', event => {
+    if (event.persisted && !failed) {
+      lastFrame = -Infinity;
+      clock.getDelta();
+      r.setAnimationLoop(draw);
     }
   });
 }
 
 // ---------- mission preview sheet (hero cards and the planets in the 3D view)
 const DIFF_HINT = { earth: 'Good first mission. Try Cadet.', astra: 'Timing matters: map before and after the flyby.', lunaris: 'Hardest power budget. Long shadows.', mars: 'Data is the bottleneck. Plan your downlink.' };
+let sheetExitTimer;
 function openSheet(id) {
   const m = GAME[id], c = CH[id]; if (!m) return;
   let sh = $('#lx-sheet');
   if (!sh) { sh = document.createElement('aside'); sh.id = 'lx-sheet'; sh.className = 'lx-sheet'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'false'); document.body.appendChild(sh); }
+  clearTimeout(sheetExitTimer);
   sh.style.setProperty('--acc', m.accent);
   sh.innerHTML = `<button class="lx-sheet__x" type="button" aria-label="Close">×</button>
     <p class="lx-sheet__k">${esc(c.label)}</p>
@@ -425,8 +469,14 @@ function openSheet(id) {
     <ul class="lx-sheet__obj">${m.objectives.map(o => `<li>${esc(o.label)}</li>`).join('')}</ul>
     <p class="lx-sheet__meta"><span>Research lead · ${esc(m.owner)}</span><span>${esc(DIFF_HINT[id])}</span></p>
     <div class="lx-row"><button class="lx-btn lx-btn--go" type="button" data-brief="${id}">Start mission</button><a class="lx-btn" href="explore.html?mission=${id}">Explore ${esc(m.world)}</a><a class="lx-btn" href="#ch-${id}" data-close>See the stop</a></div>`;
-  sh.hidden = false; requestAnimationFrame(() => sh.classList.add('on'));
-  const close = () => { sh.classList.remove('on'); setTimeout(() => { sh.hidden = true; }, 300); };
+  sh.hidden = false;
+  const showFrame = requestAnimationFrame(() => sh.classList.add('on'));
+  const close = () => {
+    cancelAnimationFrame(showFrame);
+    sh.classList.remove('on');
+    clearTimeout(sheetExitTimer);
+    sheetExitTimer = setTimeout(() => { sh.hidden = true; }, reduced ? 0 : 250);
+  };
   sh.querySelector('.lx-sheet__x').onclick = close; sh.querySelector('[data-close]').onclick = close;
   sh.querySelector('[data-brief]').onclick = () => { close(); brief(id); };
   sh.querySelector('h3').setAttribute('tabindex', '-1'); sh.querySelector('h3').focus();
@@ -436,23 +486,23 @@ window.__nxSheet = openSheet;
 
 // ---------- briefing (typed), then a skippable 3-2-1 countdown into the game
 function brief(id) {
-  const m = GAME[id], c = CH[id]; if (!m) return;
+  const m = GAME[id], c = CH[id];
+  if (!m || document.querySelector('.lx-brief')) return;
+  preloadGame();
   const prev = document.activeElement;
   const mo = document.createElement('div'); mo.className = 'lx-brief'; mo.style.setProperty('--acc', m.accent);
   mo.innerHTML = `<div class="lx-brief__card" role="dialog" aria-modal="true" aria-labelledby="lx-brief-t">
     <p class="lx-brief__k"><i></i> Incoming briefing · VEGA, mission control</p>
     <h3 id="lx-brief-t">${esc(m.name)} <span>· ${esc(m.world)}</span></h3>
-    <p class="lx-brief__txt" aria-live="polite"></p>
+    <p class="lx-brief__txt"></p>
     <dl class="lx-brief__kv"><div><dt>Objective</dt><dd>${esc(m.objectives[0].label)}${m.objectives.length > 1 ? ` + ${m.objectives.length - 1} more` : ''}</dd></div><div><dt>Your role</dt><dd>Flight director: design, launch and fly the spacecraft</dd></div><div><dt>Research lead</dt><dd>${esc(m.owner)}</dd></div></dl>
-    <div class="lx-row"><button class="lx-btn lx-btn--go" type="button" data-go>Start mission</button><button class="lx-btn" type="button" data-skip>Show full text</button><button class="lx-btn" type="button" data-x>Not now</button></div>
+    <div class="lx-row"><button class="lx-btn lx-btn--go" type="button" data-go>Start mission</button><button class="lx-btn" type="button" data-x>Not now</button></div>
   </div>`;
   document.body.appendChild(mo);
   const full = `${c.h} ${c.sub} ${m.tagline} Only data that reaches Earth counts. Good luck.`;
-  const txt = mo.querySelector('.lx-brief__txt'); let i = 0, typing = true;
-  const tick = () => { if (!typing) return; i += 2; txt.textContent = full.slice(0, i); if (i < full.length) setTimeout(tick, 16); else typing = false; };
-  if (reduced) { txt.textContent = full; typing = false; } else tick();
-  const close = () => { typing = false; mo.remove(); prev?.focus?.(); };
-  mo.querySelector('[data-skip]').onclick = () => { typing = false; txt.textContent = full; };
+  const txt = mo.querySelector('.lx-brief__txt');
+  txt.textContent = full;
+  const close = () => { mo.remove(); prev?.focus?.({preventScroll:true}); };
   mo.querySelector('[data-x]').onclick = close;
   mo.addEventListener('click', e => { if (e.target === mo) close(); });
   mo.addEventListener('keydown', e => { if (e.key === 'Escape') close(); if (e.key === 'Tab') { const f = [...mo.querySelectorAll('button')]; if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); } else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); } } });
@@ -461,20 +511,42 @@ function brief(id) {
 }
 function countdown(mo, id) {
   const url = `play.html?mission=${id}`;
-  if (reduced) { location.href = url; return; }
-  mo.innerHTML = `<div class="lx-count" role="status" aria-live="assertive"><b>3</b><p>Systems go</p><button class="lx-btn" type="button">Skip</button></div>`;
-  const b = mo.querySelector('b'), p = mo.querySelector('p'); let n = 3;
-  const go = () => { location.href = url; };
-  mo.querySelector('button').onclick = go; mo.querySelector('button').focus();
-  const t = setInterval(() => { n--; if (n > 0) { b.textContent = n; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; p.textContent = n === 2 ? 'Arrays stowed' : 'Handing over to you'; } else { clearInterval(t); b.textContent = 'GO'; setTimeout(go, 450); } }, 800);
+  const go = () => {
+    if (handingOff) return;
+    handingOff = true;
+    clearInterval(handoffTimer);
+    location.assign(url);
+  };
+  if (reduced) { go(); return; }
+  mo.classList.add('lx-brief--handoff');
+  mo.innerHTML = `<div class="lx-count"><b aria-hidden="true">3</b><p role="status">Systems go</p><button class="lx-btn" type="button">Skip countdown</button></div>`;
+  const b = mo.querySelector('b'), p = mo.querySelector('p');
+  let n = 3;
+  const pulse = () => b.animate([{opacity:.5,transform:'scale(1.08)'},{opacity:1,transform:'scale(1)'}],{duration:550,easing:'ease-out'});
+  const skip = mo.querySelector('button');
+  skip.onclick = go;
+  skip.focus();
+  pulse();
+  handoffTimer = setInterval(() => {
+    n--;
+    if (n === 0) { go(); return; }
+    b.textContent = n;
+    p.textContent = n === 2 ? 'Arrays stowed' : 'Handing over to you';
+    pulse();
+  }, 620);
 }
 // every "play this mission" link on the home page opens the briefing first
 document.addEventListener('click', e => {
-  const a = e.target.closest?.('a[href^="play.html?mission="]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  const a = e.target.closest?.('a[href^="play.html?mission="]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.defaultPrevented) return;
   const id = new URL(a.href, location.href).searchParams.get('mission'); if (!GAME[id]) return;
   e.preventDefault(); brief(id);
 });
 
+for (const event of ['pointerover','focusin']) {
+  document.addEventListener(event, e => {
+    if(e.target.closest?.('a[href^="play.html"]')) preloadGame();
+  },{passive:true});
+}
 chapters(); archive();
 if (location.hash === '#team') {
   $('#lx-intro').hidden = true;
@@ -489,4 +561,9 @@ sky().catch(error=>{
 document.querySelectorAll('[data-sheet]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openSheet(a.dataset.sheet); }));
 import('./status.js').then(async ({ mountStatus }) => { const { Music } = await import('./music.js'); mountStatus({ music: new Music() }); });
 $('#lx-replay').onclick = () => intro(true);
-addEventListener('pageshow', archive);
+addEventListener('pagehide', () => clearInterval(handoffTimer));
+addEventListener('pageshow', event => {
+  handingOff = false;
+  if (event.persisted) document.querySelector('.lx-brief')?.remove();
+  archive();
+});
