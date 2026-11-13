@@ -393,3 +393,6 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
   .gx-launchtext b,.gx-card { animation:none; }
   .gx-poll li,.gx-poll .gx-gochips span { opacity:1;transform:none;transition:none; }
 }
+
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }

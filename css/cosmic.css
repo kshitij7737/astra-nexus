@@ -186,3 +186,85 @@ button.cx-film:hover:not(:disabled){color:var(--accent);background:transparent;b
 .cx-film-play{width:0;height:0;border-block:5px solid transparent;border-inline-start:8px solid currentColor;margin-inline:3px}
 .cx-film-time{font-variant-numeric:tabular-nums;color:var(--muted)}
 @media(prefers-reduced-motion:reduce){.cx-scene-veil{display:none}}
+
+/* ===== Refined controls: no boxed buttons. Text controls with an accent underline, one clear primary action. ===== */
+button,select{border:0;background:transparent;border-radius:0;padding:.45rem .1rem;min-height:40px;color:#d9e1f2;transition:color .2s,opacity .2s,transform .2s}
+button:hover:not(:disabled),select:hover{background:transparent;color:#fff}
+button[aria-pressed=true]{background:transparent;color:var(--accent)}
+button:active:not(:disabled){transform:translateY(1px)}
+.cx-header-actions button{border:0;padding:.3rem 0;color:var(--accent);font-size:.85rem}
+/* stage toolbar: a quiet line of text controls separated by thin dots */
+.cx-viewbar{gap:0;align-items:center;row-gap:.2rem}
+.cx-viewbar>button,.cx-viewbar>div>button{background:transparent;font-size:.82rem;letter-spacing:.01em;padding:.35rem .7rem;position:relative;color:#cdd6e8}
+.cx-viewbar>button+button::before,.cx-viewbar>div+button::before{content:'';position:absolute;left:-2px;top:50%;width:3px;height:3px;border-radius:50%;background:#55617a;transform:translateY(-50%)}
+.cx-viewbar>button[aria-pressed=true]{color:var(--accent)}
+.cx-viewbar>button:hover:not(:disabled),.cx-viewbar>div>button:hover:not(:disabled){color:#fff}
+.cx-stage-navigation{align-items:center;gap:0;margin-right:.4rem}
+.cx-stage-navigation button:not(.cx-primary){font-size:1.05rem;padding:.3rem .55rem;color:#cdd6e8}
+button.cx-primary{position:relative;display:inline-flex;align-items:center;gap:.55rem;background:transparent!important;color:var(--accent)!important;font-weight:700;padding:.35rem .7rem;border:0}
+button.cx-primary::before{content:'';width:30px;height:30px;border-radius:50%;flex:none;transition:box-shadow .3s,transform .2s;
+  background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='12'%3E%3Cpath d='M1 1l8 5-8 5z' fill='%230d1323'/%3E%3C/svg%3E") 56% 50%/10px 12px no-repeat}
+button.cx-primary[data-playing]::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='12'%3E%3Cpath d='M1 1h3v10H1zM6 1h3v10H6z' fill='%230d1323'/%3E%3C/svg%3E");background-position:50% 50%}
+button.cx-primary:hover:not(:disabled)::before{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 22%,transparent);transform:scale(1.05)}
+button.cx-primary:hover:not(:disabled){color:#fff!important}
+/* the console repeats the stage arrows; keep the timeline and scene numbers, drop the second set of buttons */
+.cx-traverse{display:none}
+/* model / telescope switch: two words, the active one underlined */
+.cx-modes{border:0;background:transparent;padding:0;gap:1rem}
+.cx-modes button{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;padding:.3rem 0;min-height:34px;color:#aab6cc;border-bottom:1px solid transparent!important;background:transparent!important}
+.cx-modes button[aria-pressed=true]{color:#fff;border-bottom-color:var(--accent)!important}
+/* selects: plain text with a fine underline and a chevron */
+select{appearance:none;-webkit-appearance:none;border-bottom:1px solid var(--line);padding:.45rem 1.4rem .45rem 0;color:#e6ecf8;cursor:pointer;
+  background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a99efc' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right .2rem center}
+select:hover,select:focus-visible{border-bottom-color:var(--accent)}
+select option{background:#0d1423;color:#e6ecf8}
+/* evidence actions become links */
+.cx-evidence-copy button{padding:.2rem 0;min-height:30px;color:var(--accent);text-decoration:underline;text-underline-offset:.24em;font-size:.88rem}
+.cx-evidence-copy button::after{content:' →'}
+.cx-evidence-card img{border-radius:.35rem}
+.cx-evidence-legend span{border:0;padding:0 .2rem;border-bottom:2px solid #8bc7f1;border-radius:0}
+.cx-evidence-legend span+span{border-bottom-color:#f2a4a4}
+.cx-arrivals span{border:0;border-bottom:1px solid #49627d;border-radius:0}
+.cx-model-labels span{background:transparent;border:0;padding:.2rem .1rem;text-shadow:0 1px 6px #000,0 0 2px #000;color:#eef2fb;border-bottom:1px solid #ffffff55;border-radius:0}
+.cx-scene-hotspots button{background:radial-gradient(circle,#0b1222cc 55%,transparent 56%);border:1.5px solid var(--accent);border-radius:50%;min-height:34px;min-width:34px;box-shadow:0 0 14px color-mix(in srgb,var(--accent) 45%,transparent)}
+.cx-dialog{border:0;border-radius:14px;background:#0e1626;box-shadow:0 30px 90px #000a}
+.cx-dialog form button,.cx-dialog>button{color:var(--accent)}
+/* caption: the "guided tour" line no longer collides with the toolbar */
+.cx-caption{bottom:4.4rem}
+.cx-caption .cx-duration{opacity:.8}
+/* text change between scenes: a soft rise instead of a hard swap */
+.cx-swap{animation:cx-swap .55s cubic-bezier(.2,.75,.25,1) both}
+@keyframes cx-swap{from{opacity:0;transform:translateY(8px);filter:blur(3px)}}
+/* scene-to-scene dissolve: a snapshot of the previous frame fades and drifts out */
+.cx-ghost{position:absolute;inset:0;z-index:1;pointer-events:none;width:100%;height:100%;will-change:opacity,transform,filter}
+@media(prefers-reduced-motion:reduce){.cx-swap{animation:none}.cx-ghost{display:none}}
+/* films: poster thumbnails instead of list rows */
+.cx-films{border-top:0}
+#film-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.9rem;margin-top:.4rem}
+button.cx-film{display:grid;grid-template-columns:1fr;gap:.4rem;padding:0;border:0!important;text-align:left;min-height:0;color:#e6ecf8}
+.cx-film-thumb{position:relative;display:block;aspect-ratio:16/9;border-radius:.45rem;overflow:hidden;background:#0d1423 center/cover no-repeat;transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s}
+.cx-film-thumb::after{content:'';position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:#0b1222b0;backdrop-filter:blur(4px);box-shadow:inset 0 0 0 1.5px #ffffffcc}
+.cx-film-thumb::before{content:'';position:absolute;z-index:1;left:50%;top:50%;margin:-7px 0 0 -4px;border-block:7px solid transparent;border-inline-start:11px solid #fff}
+button.cx-film:hover .cx-film-thumb,button.cx-film:focus-visible .cx-film-thumb{transform:translateY(-2px) scale(1.015);box-shadow:0 14px 34px #0009}
+.cx-film-meta{display:flex;justify-content:space-between;gap:.5rem;font-size:.86rem}
+.cx-film-meta span{color:var(--muted);font-variant-numeric:tabular-nums}
+/* cinematic film viewer */
+.cx-media-dialog[open]{animation:cx-dlg .45s cubic-bezier(.2,.8,.2,1) both}
+.cx-media-dialog[open]::backdrop{animation:cx-fade .45s ease both;background:#02040af2;backdrop-filter:blur(6px)}
+@keyframes cx-dlg{from{opacity:0;transform:translateY(14px) scale(.985)}}
+@keyframes cx-fade{from{opacity:0}}
+.cx-media-dialog:has(video){width:min(96vw,1200px);padding:0;background:transparent;box-shadow:none;overflow:visible}
+.cx-media-dialog:has(video) video{max-height:78svh;border-radius:12px;box-shadow:0 30px 100px #000}
+.cx-media-dialog:has(video) form{position:absolute;right:0;top:-2.6rem;margin:0}
+.cx-media-dialog:has(video) h2{font-size:1.1rem;margin:.9rem 0 .2rem}
+.cx-media-dialog:has(video) p{color:var(--muted);font-size:.85rem;margin:.2rem 0}
+
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }
+.cx-stage{min-height:clamp(520px,70svh,820px)}
+.cx-caption h1{font-size:clamp(2.2rem,4.3vw,4.4rem);margin:.45rem 0 .8rem}
+.cx-caption{bottom:auto}
+@media(max-height:760px) and (min-width:761px){.cx-caption .cx-duration{display:none}}
+#chapter-view:not([hidden]),#chapter-hub:not([hidden]){animation:cx-fade .5s ease both}
+.cx-observation img{transition:opacity .6s ease}
+@media(prefers-reduced-motion:reduce){#chapter-view,#chapter-hub{animation:none!important}}

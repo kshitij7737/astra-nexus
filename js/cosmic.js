@@ -21,6 +21,10 @@ const stage = document.querySelector('.cx-stage');
 const sceneVeil = $('scene-veil');
 const clips = {
   nebula: [{file:'nebula', title:'Nebula evolution', time:'0:34'}],
+  planets: [
+    {file:'worlds-from-dust', title:'Worlds from dust', time:'0:33'},
+    {file:'nebula-to-system', title:'From nebula to planetary system', time:'0:28'},
+  ],
   stars: [
     {file:'sun-like-star', title:'Evolution of a Sun-like star', time:'0:42'},
     {file:'massive-star', title:'Evolution of a massive star', time:'0:49'},
@@ -97,7 +101,7 @@ function syncDisplay() {
     if (loadedObservation && !still && viewerVisible) {
       fadingObservation = old;
       old.setAttribute('aria-hidden','true');
-      const fade = old.animate([{opacity:.88},{opacity:0}],{duration:380,easing:'ease-out',fill:'forwards'});
+      const fade = old.animate([{opacity:.92,transform:'scale(1)'},{opacity:0,transform:'scale(1.03)'}],{duration:800,easing:'cubic-bezier(.25,.7,.3,1)',fill:'forwards'});
       fade.onfinish=()=>{old.remove(); if(fadingObservation===old) fadingObservation=null;};
     } else {
       old.remove();
@@ -167,7 +171,7 @@ function media(asset) {
     video.controls=true;video.playsInline=true;video.preload='none';
     const path=asset.local ? file=>'textures/cosmic/'+file : assetPath;
     video.poster=path(asset.file);video.src=path(asset.video);
-    if(asset.local) video.muted=true;
+    if(asset.local){video.preload='auto';video.autoplay=true;} // opened by a click, so it may play with its soundtrack
     const status=el('p');status.setAttribute('role','status');
     video.addEventListener('waiting',()=>{status.textContent='Loading video…';});
     video.addEventListener('playing',()=>{status.textContent='';});
@@ -207,9 +211,10 @@ function renderClips() {
       file:clip.file+'-poster.webp', video:clip.file+'.mp4', local:true,
     }));
     open.className='cx-film';
-    open.prepend(el('span','', 'cx-film-play'));
-    open.firstElementChild.setAttribute('aria-hidden','true');
-    open.append(el('span',clip.time,'cx-film-time'));
+    open.replaceChildren();
+    const thumb=el('span','', 'cx-film-thumb'); thumb.style.backgroundImage=`url(textures/cosmic/${clip.file}-poster.webp)`; thumb.setAttribute('aria-hidden','true');
+    const meta=el('span',null,'cx-film-meta'); meta.append(el('b',clip.title),el('span',clip.time));
+    open.append(thumb,meta);
     open.setAttribute('aria-label','Watch '+clip.title+' ('+clip.time+')');
     return open;
   }));
@@ -271,14 +276,14 @@ function rebuild(transition=false) {
     syncDisplay();
     if(activeDisplay==='telescope') return;
     if(visual){
-      try{visual.setChapter(chapter,beat,{...state,still});}
+      try{visual.setChapter(chapter,beat,{...state,still},animate&&!still&&viewerVisible);}
       catch(error){console.warn('Could not build the 3D scene.',error);useFallback();return;}
     }else{
       cancelAnimationFrame(diagramFrame);
       drawDiagram(canvas,chapter,beat,state,drawFallback);
     }
     viewChanged=true;
-    if(animate) revealScene();
+    if(animate && !visual) revealScene();
   });
 }
 function setFree(on) {
@@ -298,6 +303,7 @@ function setGuided(on) {
   if(on && free) setFree(false);
   $('play').textContent=on?'Pause guided tour':beat===5?'Replay chapter':'Play guided tour';
   $('stage-play').textContent=on?'Pause tour':beat===5?'Replay tour':'Play tour';
+  $('stage-play').toggleAttribute('data-playing',on); $('play').toggleAttribute('data-playing',on);
   deadline=performance.now()+(chapter.id==='nebula'?20000:10000);
 }
 function buildControls() {
@@ -602,6 +608,7 @@ function go(index, fromTour=false, keepFeature=false, transition=true){
   $('beat-title').textContent=chapter.beats[beat][0];
   $('beat-copy').textContent=chapter.beats[beat][1];
   $('stage-beat').replaceChildren(el('b',chapter.beats[beat][0]),el('span',chapter.beats[beat][1]));
+  if(!still) for(const id of ['stage-beat','beat-title','beat-copy','beat-number']){const n=$(id);n.classList.remove('cx-swap');void n.offsetWidth;n.classList.add('cx-swap');}
   $('timeline').value=beat;
   $('timeline').setAttribute('aria-valuetext',chapter.beats[beat][0]);
   $('timeline-value').textContent=(beat+1)+' of '+chapter.beats.length;
@@ -635,6 +642,7 @@ function openChapter(item, start=0){
   $('chapter-number').textContent='Chapter '+String(index+1).padStart(2,'0')+' / 06';
   $('chapter-title').textContent=item.title;
   $('chapter-intro').textContent=item.intro;
+  if(!still) for(const id of ['chapter-title','chapter-intro','chapter-number']){const n=$(id);n.classList.remove('cx-swap');void n.offsetWidth;n.classList.add('cx-swap');}
   $('duration').textContent='Guided tour · about '+(item.id==='nebula'?'2 minutes':'1 minute')+(item.id==='stars'?' · Stellar time compressed':'');
   $('chapter-help').textContent='Choose a named feature or change an option in '+item.short+'. Scene controls remain available in the diagram.';
   renderScaleReference();
@@ -663,6 +671,7 @@ function openChapter(item, start=0){
   buildControls();go(start);
 }
 function navigate(){
+  if(videoDialog.open) videoDialog.close();
   const destination=currentRoute();
   const returning=progress.has(chapter.id)&&hubOpen&&!destination.hub&&destination.item===chapter&&destination.index===beat;
   hubOpen=destination.hub;

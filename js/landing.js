@@ -442,6 +442,11 @@ async function sky() {
   let failed = false;
   r.setAnimationLoop(draw);
   addEventListener('pagehide', () => r.setAnimationLoop(null));
+  // leaving for another page: stop drawing at once so the next page gets the whole GPU while it loads
+  addEventListener('nx-leave', () => r.setAnimationLoop(null));
+  document.addEventListener('click', e => { const a = e.target.closest?.('a[href]'); if (!a || a.target === '_blank' || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    const href = a.getAttribute('href'); if (!href || href.startsWith('#') || href.startsWith('http')) return;
+    setTimeout(() => { if (!e.defaultPrevented) r.setAnimationLoop(null); }, 0); });
   addEventListener('pageshow', event => {
     if (event.persisted && !failed) {
       lastFrame = -Infinity;
@@ -515,6 +520,7 @@ function countdown(mo, id) {
     if (handingOff) return;
     handingOff = true;
     clearInterval(handoffTimer);
+    dispatchEvent(new Event('nx-leave'));
     location.assign(url);
   };
   if (reduced) { go(); return; }

@@ -23,7 +23,7 @@ const vertex = `
   varying vec3 local;
   void main(){ local=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }
 `;
-const linearize = '#include <colorspace_fragment>';
+const linearize = '\n#include <colorspace_fragment>\n';
 
 function cloud(colors, { shell = 0, density = 1, lite = false } = {}) {
   const mesh = new T.Mesh(new T.BoxGeometry(2, 2, 2), new T.ShaderMaterial({
@@ -649,7 +649,22 @@ export function createRenderer(host, lite, context, invalidate) {
   let model=new T.Group(), motion, start=0, moved=false;
   const size=new T.Vector2();
   scene.add(model);
-  function setChapter(chapter, beat, state) {
+  // scene change: keep a still of the old frame on top and dissolve it while the new scene eases in
+  function ghost() {
+    const src=renderer.domElement; if(!src.width||!src.height||!model.children.length) return;
+    try{
+      renderer.render(scene,camera);
+      const g=document.createElement('canvas'); g.className='cx-ghost';
+      g.width=Math.max(1,src.width>>1); g.height=Math.max(1,src.height>>1);
+      g.getContext('2d').drawImage(src,0,0,g.width,g.height);
+      host.querySelectorAll('.cx-ghost').forEach(x=>x.remove());
+      host.append(g);
+      const a=g.animate([{opacity:1,transform:'scale(1)',filter:'blur(0px)'},{opacity:0,transform:'scale(1.045)',filter:'blur(5px)'}],{duration:950,easing:'cubic-bezier(.25,.7,.3,1)',fill:'forwards'});
+      a.onfinish=()=>g.remove();
+    }catch{ /* a still frame is optional */ }
+  }
+  function setChapter(chapter, beat, state, dissolve) {
+    if(dissolve) ghost();
     scene.background=new T.Color('#040710').lerp(new T.Color(chapter.bg),.13);
     scene.remove(model);
     const disposed=new Set();

@@ -62,3 +62,6 @@ button:active { transform: translateY(1px) scale(.98); }
 @media (prefers-reduced-motion: reduce) { .nb-lbl i { animation: none; } body.nb-fade .nb-veil { animation-duration: .3s; } }
 @media (max-width: 720px) { .nb-panel { bottom: 58px; } .nb-note { font-size: 9.5px; } }
 .nb-lbl--l { flex-direction: row-reverse; translate: -100% 0; } .nb-lbl--l i { margin-left: 0; margin-right: -7px; }
+
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }
