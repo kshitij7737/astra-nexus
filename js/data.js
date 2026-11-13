@@ -40,7 +40,7 @@ export const MISSIONS = [
     vertical: '99942 APOPHIS · 13 APR 2029',
     hero: {
       kicker: 'The close pass',
-      headline: 'A 340 metre asteroid will pass closer than our satellites.',
+      headline: 'A 340 metre asteroid will pass about 32,000 km from Earth in 2029.',
       lede: '13 April 2029. About 32,000 km from Earth\'s surface.',
     },
     factsHeadline: 'Close enough to see without a telescope.',

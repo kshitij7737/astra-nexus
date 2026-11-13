@@ -25,7 +25,9 @@ Live: https://kshitij7737.github.io/astra-nexus/
 - Score: objective points (weight x share of data returned) + questions (0 to 10) - blackouts (3 each, max 15) - thrown-away data (1 per 20 Gbit, max 5). A lost spacecraft keeps 60%.
 
 ## Look and sound
-- Spacecraft palette is locked: grey-white blanket hull, blue solar cells, blue-white engine light. Mission accents only change the interface and scenes.
+- Spacecraft palette is locked (design handoff): warm gold body, blue arrays, white high-gain antenna. Mission accents never recolour the craft.
+- js/craft.js builds the four concept spacecraft (shapes inspired by OSIRIS-APEX, LRO, Aura, MRO). Always labelled Conceptual, not NASA hardware. Builder parts carry data-part ids; hovering a catalogue row highlights that part via stage.inspect(id). Only instruments in the game config are drawn. Downlink and recorder change readouts only.
+- Landing stops: one target per stop, one orbit ring, the stop's own craft on that ring pointed at the target, world name placed in open space, Jezero and south-pole markers marked approximate. Facts per stop live in CH in js/landing.js with a source link each.
 - Accents: ASTRA ion blue #4aa8ff, LUNARIS silver-cyan #9fe0ea, HALO violet #a78bfa, JEZERO ECHO Mars red #d0674c with pale blue #a9d4ff.
 - Music: js/music.js, generated with Web Audio. Moods: calm, launch, ops, tense.
 

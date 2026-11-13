@@ -3,6 +3,8 @@ import * as THREE from '../vendor/three.module.min.js';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
 import { buildWorld, latLonToVec } from './scene.js';
 import { MISSIONS } from './data.js';
+import { buildCraft, setCraftEnv, fullCfg } from './craft.js';
+export { buildCraft };
 
 export function webglOK() {
   try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
@@ -94,67 +96,6 @@ function glowSprite() {
   r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,.5)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64);
   glowTexC = new THREE.CanvasTexture(c); glowTexC.userData.shared = true; return glowTexC;
 }
-export function buildCraft(cfg, mission) {
-  const g = new THREE.Group(), labels = [];
-  const bus = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.8), M.foil()); g.add(bus);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.05, 0.82), M.grey()); deck.position.y = 0.42; g.add(deck);
-  // solar wings
-  const nPanels = cfg.solar === 'L' ? 3 : 2;
-  for (const side of [-1, 1]) {
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.35), M.grey()); boom.rotation.z = Math.PI / 2; boom.position.set(side * 0.62, 0.05, 0); g.add(boom);
-    for (let i = 0; i < nPanels; i++) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.02, 0.5), [M.panelBack(), M.panelBack(), M.panel(), M.panelBack(), M.panelBack(), M.panelBack()]); p.position.set(side * (0.82 + 0.31 + i * 0.64), 0.05, 0); p.rotation.x = 0.25; g.add(p);
-      const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.62, 0.021, 0.5)), new THREE.LineBasicMaterial({ color: 0xc8ccd2, transparent: true, opacity: 0.6 })); frame.position.copy(p.position); frame.rotation.copy(p.rotation); g.add(frame);
-      if (i === nPanels - 1 && side === 1) labels.push({ obj: p, text: 'Solar arrays' });
-    }
-  }
-  // antenna
-  const dr = cfg.radio === 'L' ? 0.42 : 0.26;
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3), M.grey()); mast.position.set(0.1, 0.58, 0); g.add(mast);
-  const d = dish(dr); d.position.set(0.1, 0.72, 0); d.rotation.z = -0.35; g.add(d); labels.push({ obj: d, text: 'High-gain antenna' });
-  // propellant tank (visible on the anti-sun side) and thrusters
-  const tr = 0.16 + 0.12 * Math.min(1, cfg.propKg / 150);
-  const tank = new THREE.Mesh(new THREE.SphereGeometry(tr, 24, 16), M.grey()); tank.position.set(-0.2, -0.4 - tr * 0.6, -0.15); g.add(tank);
-  labels.push({ obj: tank, text: `Propellant ${cfg.propKg} kg` });
-  for (const [x, z] of [[0.3, 0.3], [-0.3, 0.3], [0.3, -0.3], [-0.3, -0.3]]) {
-    const n = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 12, 1, true), M.dark()); n.position.set(x, -0.46, z); n.rotation.x = Math.PI; g.add(n);
-  }
-  // main engine with a blue-white plume (shown only while it fires)
-  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.15, 0.22, 32, 1, true), M.dark()); bell.position.set(0, -0.55, 0); g.add(bell);
-  const plume = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowSprite(), color: 0xbfe0ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
-  plume.scale.set(0.5, 1.1, 1); plume.position.set(0, -1.05, 0); g.add(plume); g.userData.plume = plume;
-  // star trackers and sun sensor
-  for (const sx of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.1, 16), M.dark()); st.position.set(sx * 0.3, 0.5, -0.32); st.rotation.x = -0.5; g.add(st); }
-  const rad = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.55), new THREE.MeshStandardMaterial({ color: 0xf4f5f6, roughness: 0.3, metalness: 0.1 })); rad.position.set(0.461, 0, 0); g.add(rad);
-  // battery and recorder boxes on the side face, sized by option
-  const bat = new THREE.Mesh(new THREE.BoxGeometry(0.06, cfg.battery === 'L' ? 0.32 : 0.18, 0.22), M.dark()); bat.position.set(-0.48, 0, 0.18); g.add(bat);
-  labels.push({ obj: bat, text: cfg.battery === 'L' ? 'Battery 500 Wh' : 'Battery 100 Wh' });
-  const recb = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, cfg.recorder === 'L' ? 0.3 : 0.16), M.grey()); recb.position.set(-0.48, 0.1, -0.2); g.add(recb);
-  // instruments on the nadir (front, +z) face
-  const insts = mission.instruments.filter(i => cfg.inst.includes(i.id));
-  insts.forEach((ins, k) => {
-    const x = -0.28 + (k % 3) * 0.28, y = k < 3 ? -0.12 : 0.22;
-    let o;
-    if (/camera|Imager/i.test(ins.name)) {
-      const big = /High-res/i.test(ins.name);
-      o = new THREE.Group();
-      const tube = new THREE.Mesh(new THREE.CylinderGeometry(big ? 0.15 : 0.09, big ? 0.15 : 0.09, big ? 0.5 : 0.28, 24), M.white()); tube.rotation.x = Math.PI / 2; o.add(tube);
-      const lens = new THREE.Mesh(new THREE.CircleGeometry(big ? 0.13 : 0.075, 24), M.lens()); lens.position.z = big ? 0.251 : 0.141; o.add(lens);
-    } else if (/Radar/i.test(ins.name)) {
-      o = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.03), M.dark());
-    } else if (/Relay/i.test(ins.name)) {
-      o = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.06, 0.24, 12), M.white()); o.rotation.x = Math.PI / 2;
-    } else {
-      o = new THREE.Group();
-      const box = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.16), M.dark()); o.add(box);
-      const ap = new THREE.Mesh(new THREE.CircleGeometry(0.05, 20), M.lens()); ap.position.z = 0.081; o.add(ap);
-    }
-    o.position.set(x, y, 0.48); g.add(o);
-    labels.push({ obj: o, text: `${ins.name} (${ins.heritage}-type)` });
-  });
-  return { group: g, labels };
-}
-
 const starTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); const r = g.createRadialGradient(16, 16, 0, 16, 16, 16); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(255,255,255,.6)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
 starTex.userData.shared = true;
 // Layered starfield: faint dust, a Milky Way band, and a few bright coloured stars.
@@ -187,12 +128,12 @@ export class GameStage {
     this.r.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.r.outputColorSpace = THREE.SRGBColorSpace; this.r.toneMapping = THREE.ACESFilmicToneMapping;
     el.appendChild(this.r.domElement);
-    const pm = new THREE.PMREMGenerator(this.r); this.env = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose();
+    const pm = new THREE.PMREMGenerator(this.r); this.env = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); setCraftEnv(this.env);
     this.cam = new THREE.PerspectiveCamera(35, 1, 0.01, 500);
     this.clock = new THREE.Clock();
     this.labelLayer = document.createElement('div'); this.labelLayer.className = 'g3-labels'; el.appendChild(this.labelLayer);
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(el);
-    this.drag = { yaw: 0.6, pitch: 0.35, active: false };
+    this.drag = { yaw: 0.45, pitch: 0.32, active: false };
     this.ctl = { rot: 1, zoom: 1, invert: false, shake: true };
     this.opsView = { yaw: 0, pitch: 0, zoom: 1 };
     this.shakeT = 0;
@@ -243,7 +184,13 @@ export class GameStage {
   }
 
   // ---------------- builder: planet below, spacecraft centre stage
+  // builder inspection: glow one part and pick out its label
+  inspect(id) {
+    this.craft?.userData.highlight?.(id);
+    (this.labels || []).forEach(l => { l.el.classList.toggle('on', !!id && l.id === id); l.el.classList.toggle('dim', !!id && l.id !== id); });
+  }
   showBuild(mission, cfg, offsetX = 0, hideCraft = false) {
+    this.lastCfg = cfg;
     const keepView = this.mode === 'build' && this.missionId === mission.id;
     this.offsetX = offsetX;
     this.mode = 'build'; this.missionId = mission.id;
@@ -259,7 +206,7 @@ export class GameStage {
     this.craftHolder.children.forEach(c => { this.craftHolder.remove(c); disposeTree(c); });
     const { group, labels } = buildCraft(cfg, mission);
     group.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.9; } });
-    group.scale.setScalar(1.25);
+    group.scale.setScalar(0.78);
     this.craftHolder.add(group); this.craft = group;
     this.craftHolder.visible = !hideCraft;
     this.setLabels(hideCraft ? [] : labels);
@@ -343,8 +290,8 @@ export class GameStage {
     const fairL = new THREE.Mesh(new THREE.LatheGeometry(prof, 32, 0, Math.PI), body);
     const fairR = new THREE.Mesh(new THREE.LatheGeometry(prof, 32, Math.PI, Math.PI), body);
     const fair = new THREE.Group(); fair.position.y = 2.36; fair.add(fairL, fairR); rocket.add(fair);
-    const { group: sat, labels: _l } = buildCraft({ solar: 'S', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
-    sat.scale.setScalar(0.1); sat.position.y = 2.48; sat.visible = false; rocket.add(sat);
+    const { group: sat, labels: _l } = buildCraft(this.lastCfg || fullCfg(mission), mission);
+    sat.scale.setScalar(0.04); sat.userData.setDeploy(0); sat.position.y = 2.48; sat.visible = false; rocket.add(sat);
     rocket.traverse(o => { if (o.material && !o.material.envMap) { o.material.envMap = this.env; o.material.envMapIntensity = 0.7; } });
     s.add(rocket);
     // ----- exhaust: bright core, outer plume, shock glow
@@ -497,12 +444,12 @@ export class GameStage {
           const ub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 0.8, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.3, metalness: 0.9, side: THREE.DoubleSide })); ub.position.y = -1.15; upper.add(ub);
           upper.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.7; } });
           upper.rotation.z = -0.25; orbitShot.add(upper);
-          const { group: craft } = buildCraft({ solar: 'L', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
+          const { group: craft } = buildCraft(this.lastCfg || fullCfg(mission), mission);
           craft.traverse(o => { if (o.material) { o.material.envMap = this.env; o.material.envMapIntensity = 0.9; } });
           craft.scale.setScalar(0.55); orbitShot.add(craft);
-          const wings = craft.children.filter(c => c.material && (Array.isArray(c.material) || c.material.map === cells()) || (c.isLineSegments));
+          craft.userData.setDeploy(0);
           craft.position.set(0, 1.35, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), -0.25);
-          orbitShot.userData = { upper, craft, wings, c0: craft.position.clone() };
+          orbitShot.userData = { upper, craft, c0: craft.position.clone() };
           this.cam.fov = 40; this.cam.updateProjectionMatrix();
           this.cam.position.set(2.6, 1.3, 3.6); camL.set(0, 0.9, 0); this.cam.lookAt(camL);
         }
@@ -514,7 +461,7 @@ export class GameStage {
         at(T.deploy, 'Spacecraft separation', 'sep');
         u.craft.position.copy(u.c0).add(new THREE.Vector3(0.08, 0.32, 0.05).multiplyScalar(k)); u.craft.rotation.y = k * 0.12; u.craft.rotation.z = -0.25 + k * 0.03;
         const open = Math.min(1, Math.max(0, (t - T.arrays) / 1.2)); const ease = open * open * (3 - 2 * open);
-        u.wings.forEach(w => { if (w.userData.x0 === undefined) w.userData.x0 = w.position.x; w.scale.x = Math.max(0.02, ease); w.position.x = Math.sign(w.userData.x0) * (0.62 + (Math.abs(w.userData.x0) - 0.62) * ease); });
+        u.craft.userData.setDeploy(ease);
         if (t > T.arrays) at(T.arrays, 'Solar arrays deployed', 'arrays');
         u.upper.position.y -= dt * 0.04; u.upper.rotation.x += dt * 0.02;
         if (isEarth && t > T.burn) { at(T.burn, 'Raising to final orbit'); const pl = u.craft.userData.plume; if (pl) pl.material.opacity = 0.85 + Math.random() * 0.15; }
@@ -530,7 +477,7 @@ export class GameStage {
           const pts = curve.getPoints(120);
           const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color: new THREE.Color(mission.accent), dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.8 }));
           line.computeLineDistances(); transfer.add(line);
-          const { group: mini } = buildCraft({ solar: 'L', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission); mini.scale.setScalar(0.14); transfer.add(mini);
+          const { group: mini } = buildCraft(this.lastCfg || fullCfg(mission), mission); mini.scale.setScalar(0.14); transfer.add(mini);
           const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowSprite(), color: 0xd8ecff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 })); halo.scale.setScalar(0.5); mini.add(halo); halo.scale.setScalar(4);
           const ring = new THREE.Mesh(new THREE.TorusGeometry(target === 'astra' ? 0.6 : 0.95, 0.01, 8, 120), new THREE.MeshBasicMaterial({ color: new THREE.Color(mission.accent), transparent: true, opacity: 0 }));
           ring.position.copy(destPos); ring.rotation.x = Math.PI / 2.3; transfer.add(ring);
@@ -585,7 +532,7 @@ export class GameStage {
     tilt.add(arc(derived.orbit.pass, new THREE.Color(mission.accent).getHex(), orbitR * 0.97, 0.9));
     if (derived.eclipseFrac > 0) tilt.add(arc([0.75 - derived.eclipseFrac / 2, 0.75 + derived.eclipseFrac / 2], 0x334466, orbitR, 0.9));
     // craft
-    const { group: craft } = buildCraft(this.lastCfg || { solar: 'S', battery: 'S', radio: 'S', recorder: 'S', propKg: 80, inst: [] }, mission);
+    const { group: craft } = buildCraft(this.lastCfg || fullCfg(mission), mission);
     craft.scale.setScalar(0.15); craft.traverse(o => { if (o.material) { o.material.envMap = this.env; } });
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ color: new THREE.Color(mission.accent), transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, map: (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,.35)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })() }));
     halo.scale.setScalar(4); craft.add(halo);
@@ -627,7 +574,7 @@ export class GameStage {
       }
       craft.position.copy(cp);
       craft.lookAt(0, 0, 0);
-      halo.material.color.set(st.alert ? 0xff3b3b : mission.accent);
+      halo.material.color.set(st.alert ? 0xff3b3b : 0xdfeaff); // neutral glow: the craft itself is never tinted by the mission accent
       halo.scale.setScalar(st.alert ? 4 + Math.sin(this.clock.elapsedTime * 10) * 1.2 : 4);
       beam.visible = st.observing;
       if (st.observing) { // cone from the craft down to the surface

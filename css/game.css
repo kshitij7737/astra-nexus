@@ -353,3 +353,10 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
 .gx-launchbox .gx-hint { font-size: 13px; margin: 10px 0 6px; }
 .gx-est svg { width: 76px; height: 76px; }
 @media (min-width: 1101px) and (max-height: 860px) { .gx-build { padding-top: 78px; } .gx-cat { max-height: calc(100vh - 345px); } .gx-sum { padding: 10px; margin-bottom: 8px; } .gx-stat { padding: 6px 9px; } .gx-stat b { font-size: 16px; } }
+
+/* builder inspection and concept disclosure */
+.g3-label.on { border-color: #4aa8ff; background: rgba(20,40,80,.9); z-index: 2; }
+.g3-label.dim { opacity: .25 !important; }
+.gx-item[data-part]:hover, .gx-item[data-part]:focus-within { background: rgba(74,168,255,.06); border-radius: 10px; }
+.gx-concept { display: inline-block; margin: 6px 0 4px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(224,176,74,.55); font-size: 12px; color: #e8d6ae; background: rgba(224,176,74,.08); }
+.gx-concept b { color: #f0c870; }

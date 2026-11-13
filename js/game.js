@@ -218,21 +218,22 @@ function renderBuild() {
         <p class="gx-kicker">Step 02 · Mission builder</p>
         <h1 class="gx-h2">Build your <span>${esc(m.world)}</span> ${m.id === 'astra' ? 'probe' : m.id === 'earth' ? 'satellite' : 'orbiter'}</h1>
         <p>Pick parts. Each one costs weight, money or power. The checks on the right turn GO when the design works. Stuck? Press <b>Suggest a build</b>.</p>
-        <ul class="gx-hints"><li>Drag to rotate</li><li>Scroll to zoom</li></ul>
+        <p class="gx-concept"><b>Conceptual</b> · Not NASA hardware. Shape inspired by ${esc({ astra: 'OSIRIS-APEX', lunaris: 'LRO', earth: 'Aura', mars: 'MRO' }[m.id])}.</p>
+        <ul class="gx-hints"><li>Drag to rotate</li><li>Scroll to zoom</li><li>Point at a part to find it on the model</li></ul>
       </div>
       <aside class="gx-cat" aria-label="Component catalogue">
         <h2>Component catalogue</h2>
-        <div class="gx-item"><div><b>Solar array</b><span>Makes power in sunlight</span></div>${seg('solar', O.solar, o => `${fmt(o.w * COMMON.derating / au2)} W here`)}</div>
-        <div class="gx-item"><div><b>Battery</b><span>Keeps you running in the planet's shadow</span></div>${seg('battery', O.battery, o => `${o.wh} Wh`)}</div>
-        <div class="gx-item"><div><b>Radio</b><span>Sends your science home</span></div>${seg('radio', O.radio, o => `${fmt(o.mbps * m.radioMul, 1)} Mb/s`)}</div>
-        <div class="gx-item"><div><b>Recorder</b><span>Holds data until the next call home</span></div>${seg('recorder', O.recorder, o => `${o.gbit} Gbit`)}</div>
+        <div class="gx-item" data-part="solar"><div><b>Solar array</b><span>Makes power in sunlight</span></div>${seg('solar', O.solar, o => `${fmt(o.w * COMMON.derating / au2)} W here`)}</div>
+        <div class="gx-item" data-part="bus"><div><b>Battery</b><span>Keeps you running in the planet's shadow</span></div>${seg('battery', O.battery, o => `${o.wh} Wh`)}</div>
+        <div class="gx-item" data-part="radio"><div><b>Radio</b><span>Sends your science home</span></div>${seg('radio', O.radio, o => `${fmt(o.mbps * m.radioMul, 1)} Mb/s`)}</div>
+        <div class="gx-item" data-part="bus"><div><b>Recorder</b><span>Holds data until the next call home</span></div>${seg('recorder', O.recorder, o => `${o.gbit} Gbit`)}</div>
         <div class="gx-item gx-item--col"><div><b>Science payload</b><span>Pick what to fly</span></div>
-          <div class="gx-chips">${m.instruments.map(i => `<button type="button" class="gx-chip" data-inst="${i.id}" aria-pressed="${cfg.inst.includes(i.id)}"><b>${esc(i.name)}</b><small>${esc(i.heritage)}-type · ${i.w} W · ${i.mbps} Mb/s · ${i.kg} kg · ${i.cr} cr</small><em>${esc(m.objectives.filter(o => o.inst.includes(i.id)).map(o => o.label).join(' · ') || 'Bonus')}</em></button>`).join('')}</div></div>
-        <div class="gx-item gx-item--col"><div><b>Propellant</b><span>Fuel for the push into orbit (Δv)</span></div>
+          <div class="gx-chips">${m.instruments.map(i => `<button type="button" class="gx-chip" data-inst="${i.id}" data-part="inst:${i.id}" aria-pressed="${cfg.inst.includes(i.id)}"><b>${esc(i.name)}</b><small>${esc(i.heritage)}-type · ${i.w} W · ${i.mbps} Mb/s · ${i.kg} kg · ${i.cr} cr</small><em>${esc(m.objectives.filter(o => o.inst.includes(i.id)).map(o => o.label).join(' · ') || 'Bonus')}</em></button>`).join('')}</div></div>
+        <div class="gx-item gx-item--col" data-part="engine"><div><b>Propellant</b><span>Fuel for the push into orbit (Δv)</span></div>
           <label class="gx-range"><input type="range" id="gx-prop" min="0" max="150" step="5" value="${cfg.propKg}"><output id="gx-propv"></output></label></div>
         <div class="gx-item"><div><b>Rocket</b><span>How much it can lift</span></div>${seg('launch', O.launch, o => `${o.wetKg} kg · ${o.cr} cr`)}</div>
         <div class="gx-item"><div><b>Orbit</b><span>How high you fly</span></div>${seg('orbit', m.orbitOptions, o => esc(o.note))}</div>
-        <p class="gx-fine">Part sizes follow the team's LUNARIS design document. Values are game values, not NASA hardware specs.</p>
+        <p class="gx-fine">Part values follow the team's LUNARIS design document. They are game values, not NASA hardware specs. The spacecraft model is a team concept.</p>
       </aside>
       <section class="gx-sum" aria-label="Mission summary" aria-live="polite"></section>
     </div>`;
@@ -241,6 +242,10 @@ function renderBuild() {
     const id = b.dataset.inst; cfg.inst = cfg.inst.includes(id) ? cfg.inst.filter(x => x !== id) : [...cfg.inst, id]; audio.beep(600, 0.04); refreshBuild();
   });
   $('#gx-prop').oninput = e => { cfg.propKg = +e.target.value; refreshBuild(true); };
+  $$('#gx-build [data-part]').forEach(el => {
+    const on = () => stage?.inspect(el.dataset.part), off = () => stage?.inspect(null);
+    el.addEventListener('pointerenter', on); el.addEventListener('pointerleave', off); el.addEventListener('focusin', on); el.addEventListener('focusout', off);
+  });
   refreshBuild();
 }
 
