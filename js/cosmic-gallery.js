@@ -40,6 +40,7 @@ export const observations = {
     alt: 'An apparent ring and bright lensed images surrounding a foreground galaxy.',
     note: 'A foreground galaxy stretches the quasar’s host into an arc and produces four images of the quasar. The interactive symmetric model is simpler than this observed system.',
     focus: '50% 50%',
+    zoom: 1.65,
   },
   'deep-field': {
     title: 'Webb’s First Deep Field', instrument: 'JWST · NIRCam · Infrared',
@@ -56,6 +57,7 @@ export const observations = {
     alt: 'An uneven orange ring of radio emission surrounding a dark central shadow.',
     note: 'This reconstruction maps radio emission near the black hole in M87. The bright ring surrounds the shadow.',
     focus: '50% 48%',
+    zoom: 1.23,
   },
 };
 

@@ -1,6 +1,6 @@
 import { chapters, initialSettings, lensNames, lensState } from './cosmic-data.js?v=2';
 import { drawDiagram } from './cosmic-diagram.js?v=2';
-import { imagePath, observationFor, observations } from './cosmic-gallery.js';
+import { imagePath, observationFor, observations } from './cosmic-gallery.js?v=3';
 
 const $ = id => document.getElementById(id);
 const viewport = $('viewport'), canvas = $('diagram');
@@ -42,6 +42,7 @@ function syncDisplay() {
   loadedObservation = id;
   img.alt = photo.alt;
   img.style.setProperty('--photo-focus',photo.focus);
+  img.style.setProperty('--photo-zoom',photo.zoom || 1);
   img.classList.toggle('cx-wide',id==='carina');
   img.src = imagePath(id);
   $('observation-title').textContent = photo.title;
@@ -378,8 +379,8 @@ async function init(){
   try{
     const context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
     if(!context) return useFallback();
-    art=await import('./cosmic-art.js?v=2');
-    visual=art.createRenderer(viewport,lite,context);
+    art=await import('./cosmic-art.js?v=3');
+    visual=art.createRenderer(viewport,lite,context,()=>{viewChanged=true;});
     visual.renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();useFallback();},{once:true});
     canvas.hidden=true;
     rebuild();

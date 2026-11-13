@@ -26,13 +26,13 @@
 <li><a href="https://fonts.google.com/specimen/Archivo" target="_blank" rel="noopener">Archivo</a> and <a href="https://fonts.google.com/specimen/IBM+Plex+Mono" target="_blank" rel="noopener">IBM Plex Mono</a><small>SIL Open Font Licence</small></li>
 <li><a href="https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=99942" target="_blank" rel="noopener">JPL Small-Body Database: 99942 Apophis</a> approximate orbit on the home page<small>NASA/JPL</small></li></ul>
 <h3>Cosmic Explorer observations</h3><ul id="sx-observations"></ul>
-<p class="lx-lede">Images are resized for the web. Infrared and radio data are mapped to visible colors by the original teams. ESA/Webb images are credited under the <a href="https://esawebb.org/copyright/" target="_blank" rel="noopener">ESA/Webb usage terms</a>. The illustrated Earth and Moon globes use the maps linked above.</p>
+<p class="lx-lede">Images are resized and some views are cropped for the web. Infrared and radio data are mapped to visible colors by the original teams. ESA/Webb images are credited under the <a href="https://esawebb.org/copyright/" target="_blank" rel="noopener">ESA/Webb usage terms</a>. The illustrated Earth and Moon globes use the maps linked above.</p>
 <h3>Music</h3><p class="lx-lede">The background music is generated live in the browser by our own code. No recordings are used.</p>
 <h3>Disclaimer</h3><p class="lx-lede">Built for the NASA Space Apps Challenge 2026 by team NEXUS//04. Not affiliated with or endorsed by NASA. No NASA logos are used. Earth, Moon and Mars use real global maps. The shape of Apophis is illustrative, because no close-up map of it exists yet. It is drawn as a rocky rubble pile, like the asteroids Itokawa and Bennu that spacecraft have visited.</p>
 </main>
 <footer class="lx-foot"><p><a href="index.html">Home</a> · <a href="play.html">Play</a> · <a href="explore.html">Explore</a> · <a href="cosmic.html">Cosmic Explorer</a></p></footer>
 <script type="module">import { SOURCES } from './js/data.js';
-import { observations } from './js/cosmic-gallery.js';
+import { observations } from './js/cosmic-gallery.js?v=3';
 const e=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 document.getElementById('sx-list').innerHTML=Object.values(SOURCES).sort((a,b)=>a.title.localeCompare(b.title)).map(s=>`<li><a href="${e(s.url)}" target="_blank" rel="noopener">${e(s.title)}</a><small>${e(new URL(s.url).hostname)}</small></li>`).join('');
 document.getElementById('sx-observations').innerHTML=Object.values(observations).map(o=>`<li><a href="${e(o.link)}" target="_blank" rel="noopener">${e(o.title)}</a><small>${e(o.instrument)} · ${e(o.credit)}</small></li>`).join('');</script>

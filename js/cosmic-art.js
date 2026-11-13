@@ -596,7 +596,7 @@ export function cameraPreset(id, beat, state, narrow) {
   return {eye,target};
 }
 
-export function createRenderer(host, lite, context) {
+export function createRenderer(host, lite, context, invalidate) {
   const renderer=new T.WebGLRenderer({canvas:context.canvas,context});
 
   renderer.outputColorSpace=T.SRGBColorSpace;
@@ -612,7 +612,7 @@ export function createRenderer(host, lite, context) {
   const textures=new Map(), loader=new T.TextureLoader();
   const texture=name=>{
     if(!textures.has(name)){
-      const map=loader.load(new URL('../textures/'+name,import.meta.url).href);
+      const map=loader.load(new URL('../textures/'+name,import.meta.url).href,invalidate);
       if(!name.includes('clouds')&&!name.includes('bump')) map.colorSpace=T.SRGBColorSpace;
       map.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
       textures.set(name,map);
