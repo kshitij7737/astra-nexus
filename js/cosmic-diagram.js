@@ -1,4 +1,4 @@
-import { lensState } from './cosmic-data.js?v=2';
+import { lensState } from './cosmic-data.js?v=4';
 
 const globes = new Map();
 function globe(name, onLoad) {
@@ -86,10 +86,20 @@ export function drawDiagram(canvas, chapter, beat, state, onLoad) {
   }else if(chapter.id==='planets'){
     if(beat===2){
       for(let i=0;i<48;i++)circle((random()-.5)*5,(random()-.5)*3,.02+random()*.11,'#e7ab88a0');
-      circle(-.65,0,.58,'#ae765f');circle(.65,.11,.45,'#89a8b8');
+      if(state.collision==='fragment'){
+        for(let i=0;i<26;i++){
+          const a=random()*Math.PI*2,r=.24+random()*1.9;
+          circle(Math.cos(a)*r,Math.sin(a)*r,.04+random()*.12,i%2?'#ae765f':'#89a8b8');
+        }
+      }else{
+        const together=state.collision==='stick';
+        circle(together?-.42:-1.18,0,.58,'#ae765f');
+        circle(together?.47:1.18,.11,.45,'#89a8b8');
+        if(!together){path([[-1.8,0],[-2.32,0]],'#bdd9e7');path([[1.72,0],[2.24,0]],'#bdd9e7');}
+      }
     }else{
       const flat=state.angle==='top'?1:state.angle==='edge'?.19:.53;
-      for(let i=0;i<22;i++)stroke(0,0,.54+i*.148,beat===5?'#819ab45a':i<10?'#f6b87674':'#9cb5f075',flat);
+      for(let i=0;i<22&&(beat<3||state.paths);i++)stroke(0,0,.54+i*.148,beat===5?'#819ab45a':i<10?'#f6b87674':'#9cb5f075',flat);
       if(state.thermal||beat===1)stroke(0,0,2.02,'#adf9e7',flat);
       light(0,0,1.18,'#ffd39cc4','#ffb16700');circle(0,0,.36,'#ffdf9e');
       if(beat>=3)for(let i=0;i<7;i++){
@@ -99,7 +109,7 @@ export function drawDiagram(canvas, chapter, beat, state, onLoad) {
     }
   }else if(chapter.id==='black-holes'){
     if(beat===1){light(0,0,2.45,'#ff9571b0','#fa775500');circle(0,0,1.2,'#ee8b68');}
-    else if(beat===5){
+    else if(beat===5&&state.binary){
       for(const a of [-1,1]){stroke(a,0,.89,'#ffa670',.4);circle(a,0,.36,'#080c1b');}
       path(Array.from({length:180},(_,i)=>{const t=i/179;return [(t-.5)*7,1.65+Math.sin(11*t+100*t*t)*Math.min(t*t,Math.max(0,(1-t)*3))];}),'#8de9fa');
     }else{
@@ -122,7 +132,15 @@ export function drawDiagram(canvas, chapter, beat, state, onLoad) {
       }
       if(state.jets&&beat>=3)path([[0,-2.7],[0,2.7]],'#88e5fd');
       circle(0,0,r,'#080b16');
-      if(beat===2)stroke(0,0,r*.75,'#c7e5f3');
+      if(beat===2){
+        g.setLineDash([.055,.055]);stroke(0,0,r*.55,'#c7e5f3');g.setLineDash([]);
+        if(state.feature==='shadow')stroke(0,0,r*1.03,'#d9bcff');
+      }
+      if(beat===4&&state.trace){
+        path([[r+.35,.15],[2.95,.57]],'#f5c697');
+        g.strokeStyle='#a6d8fa';g.beginPath();g.moveTo(-2,.38);
+        g.bezierCurveTo(-1.1,-r*1.6,.65,-r*1.52,2.95,-.58);g.stroke();
+      }
     }
   }else if(chapter.id==='lensing'){
     const l=lensState(state.alignment,state.lens);

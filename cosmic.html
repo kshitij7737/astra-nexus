@@ -4,18 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a1021">
-<meta name="description" content="Six interactive astronomy chapters from NEXUS//04, from stellar nurseries to the observable horizon.">
-<title>Cosmic Explorer · NEXUS//04</title>
+<meta name="description" content="Six interactive astronomy chapters from ASTRA NEXUS, from stellar nurseries to the observable horizon.">
+<title>Cosmic Explorer · ASTRA NEXUS</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/cosmic.css?v=3">
+<link rel="stylesheet" href="css/cosmic.css?v=5">
 </head>
 <body>
 <header class="cx-header">
-  <a class="cx-brand" href="./"><span class="cx-mark" aria-hidden="true">✧</span><span>NEXUS<span class="cx-slash">//04</span><small>Cosmic Explorer</small></span></a>
-  <a class="cx-back" href="./#dash">Mission control</a>
+  <a class="cx-brand" href="./"><span class="cx-mark" aria-hidden="true">✧</span><span>ASTRA <span class="cx-slash">NEXUS</span><small>Cosmic Explorer</small></span></a>
+  <div class="cx-header-actions"><a class="cx-back" href="#chapters">Chapter hub</a><button id="help" type="button">Controls</button><a class="cx-back" href="./#dash">Mission control</a></div>
 </header>
 <nav id="chapters" class="cx-chapters" aria-label="Chapters"></nav>
 <main id="explorer">
+  <section id="chapter-hub" class="cx-hub" hidden aria-labelledby="hub-title">
+    <div><h1 id="hub-title">Cosmic Explorer</h1><p>Six guided journeys through the life of stars, the formation of planets and the scale of the universe.</p></div>
+    <a class="cx-cta" id="continue-chapter" href="#nebula">Start exploring →</a>
+    <div class="cx-hub-grid" id="hub-grid"></div>
+  </section>
+  <div id="chapter-view">
   <section class="cx-stage" aria-labelledby="chapter-title">
     <div id="viewport" class="cx-viewport" role="region" aria-label="Cosmic scene. In free look use arrow keys to rotate and plus or minus to zoom." tabindex="0">
       <canvas id="diagram" aria-hidden="true"></canvas>
@@ -32,6 +38,8 @@
       <h1 id="chapter-title">Inside a Nebula</h1>
       <p id="chapter-intro">Explore clouds of gas and dust and find where a star begins.</p>
       <div class="cx-current" id="stage-beat"></div>
+      <p class="cx-duration" id="duration"></p>
+      <p class="cx-duration" id="stage-status" role="status"></p>
     </div>
     <div class="cx-modes" role="group" aria-label="Scene display">
       <button id="show-model" type="button" aria-pressed="true">Model</button>
@@ -40,6 +48,8 @@
     <div class="cx-scene-tag" id="render-mode">Interactive diagram</div>
     <div class="cx-model-labels" id="model-labels" hidden></div>
     <div class="cx-scale" id="scale" hidden></div>
+    <div class="cx-model-labels cx-hotspot" id="feature-marker" hidden></div>
+    <div id="scene-hotspots" class="cx-scene-hotspots" aria-label="Scene feature markers" hidden></div>
     <div class="cx-viewbar">
       <div class="cx-stage-navigation" role="group" aria-label="Scene navigation">
         <button id="stage-previous" type="button" aria-label="Previous scene in viewer">←</button>
@@ -47,9 +57,14 @@
         <button id="stage-next" type="button" aria-label="Next scene in viewer">→</button>
       </div>
       <button id="free" type="button" aria-pressed="false">Free look</button>
+      <div id="zoom-controls" class="cx-stage-navigation" hidden>
+        <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+      </div>
       <button id="labels" type="button" aria-pressed="false">Labels</button>
       <button id="motion" type="button" aria-pressed="false">Still mode</button>
       <button id="reset" type="button">Reset view</button>
+      <button id="replay" type="button">Replay scene</button>
     </div>
   </section>
   <div class="cx-console">
@@ -64,6 +79,8 @@
       </div>
       <label class="cx-timeline" for="timeline"><span>Chapter timeline</span><output id="timeline-value" for="timeline"></output><input id="timeline" type="range" min="0" max="5" step="1" value="0"></label>
       <div id="stops" class="cx-stops" aria-label="Chapter scenes"></div>
+      <div id="chapter-related" class="cx-related"></div>
+      <div id="chapter-summary" class="cx-summary" hidden></div>
     </section>
     <section class="cx-lab" aria-label="Explore this scene">
       <div class="cx-eyebrow">Explore this scene</div>
@@ -75,17 +92,37 @@
       <div id="model-controls">
         <div id="controls"></div>
         <p class="cx-reading" id="reading" aria-live="polite"></p>
+        <div id="locator" class="cx-locator" hidden></div>
+        <div id="lens-demo" class="cx-lens-demo" hidden></div>
       </div>
       <details>
         <summary>Science notes &amp; sources</summary>
         <p id="science"></p>
         <div id="sources"></div>
+        <div id="scale-reference"></div>
       </details>
     </section>
   </div>
+  <section id="evidence" class="cx-evidence" hidden aria-labelledby="evidence-title"><h2 id="evidence-title">Observations and visual references</h2><div id="evidence-grid" class="cx-evidence-grid"></div></section>
   <footer class="cx-footer"><span>Models use illustrative colors, times and distances.</span><a id="next-chapter" href="#stars">Next chapter →</a></footer>
+  </div>
 </main>
+<dialog id="help-dialog" class="cx-dialog" aria-labelledby="help-title">
+  <h2 id="help-title">Explorer controls</h2>
+  <p>Use the scene arrows or timeline to advance. Guided tour plays each scene in order. Use Still mode to step through at your own pace.</p>
+  <p>In Free look, drag or use the arrow keys to rotate. Use the wheel, + and −, or the zoom buttons to zoom. Escape exits Free look.</p>
+  <p id="chapter-help"></p>
+  <label class="cx-field"><span>Graphics quality</span><select id="quality"><option value="auto">Auto</option><option value="lite">Reduced</option><option value="full">Full</option></select></label>
+  <button id="help-motion" type="button" aria-pressed="false">Still mode</button>
+  <button id="retry-renderer" type="button">Try 3D again</button>
+  <p id="renderer-status" role="status"></p>
+  <form method="dialog"><button autofocus>Close controls</button></form>
+</dialog>
+<dialog id="media-dialog" class="cx-dialog cx-media-dialog" aria-labelledby="media-title">
+  <form method="dialog"><button autofocus>Close evidence</button></form>
+  <h2 id="media-title"></h2><div id="media-content"></div><p id="media-caption"></p><div id="media-links"></div>
+</dialog>
 <noscript><p class="cx-noscript">Enable JavaScript to explore the six interactive chapters. <a href="https://science.nasa.gov/universe/">Explore NASA’s universe guide</a>.</p></noscript>
-<script type="module" src="js/cosmic.js?v=3"></script>
+<script type="module" src="js/cosmic.js?v=5"></script>
 </body>
 </html>

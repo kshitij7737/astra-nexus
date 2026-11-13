@@ -1,5 +1,5 @@
 import * as T from '../vendor/three.module.min.js';
-import { lensState } from './cosmic-data.js?v=2';
+import { lensState } from './cosmic-data.js?v=4';
 
 const TAU = Math.PI * 2;
 const V = (x, y, z) => new T.Vector3(x, y, z);
@@ -298,14 +298,19 @@ function planets(group, beat, state, lite) {
     aggregate.add(...joined);
     group.add(...grains,aggregate);
     return t=>{
-      const collision = T.MathUtils.smoothstep(t,0,3.4);
-      grains[0].position.x=-1.7+1.28*collision;
-      grains[1].position.x=1.51-1.12*collision;
-      grains.forEach(grain=>{grain.visible=t<3.4;});
-      aggregate.visible=t>=3.4;
-      aggregate.rotation.y=Math.max(0,t-3.4)*.09;
+      if(state.still)t=5.2;
+      const contact=2.6, approach=T.MathUtils.smoothstep(t,0,contact);
+      const retreat=T.MathUtils.smoothstep(t,contact,5.2);
+      const result=state.collision;
+      const after=t>=contact;
+      grains[0].position.x=-1.7+1.24*approach-1.20*retreat;
+      grains[1].position.x=1.51-1.07*approach+1.20*retreat;
+      grains.forEach(grain=>{grain.visible=!after||result==='bounce';});
+      aggregate.visible=after&&result==='stick';
+      aggregate.rotation.y=Math.max(0,t-contact)*.09;
+      debris.visible=result==='fragment'&&after;
       debris.rotation.y=t*.054;
-      debris.scale.setScalar(1+.23*T.MathUtils.smoothstep(t,3.4,6.6));
+      debris.scale.setScalar(.18+1.04*retreat);
     };
   }
   group.add(star(.72,'#ffd394'));
@@ -366,7 +371,7 @@ function blackHole(group, beat, state) {
     const precursor=star(1.7,'#ff7849');group.add(precursor);
     return t=>precursor.scale.setScalar(1-.49*(1-Math.exp(-t*.4)));
   }
-  if(beat===5){
+  if(beat===5&&state.binary){
     const pair=[.46,.63].map(r=>new T.Mesh(new T.SphereGeometry(r,40,26),new T.MeshBasicMaterial({color:'#080c18'})));
     pair.forEach((body,i)=>{
       body.add(disk(.49,1.4+i*.24,'#ffc182','#79508d'));
@@ -409,14 +414,31 @@ function blackHole(group, beat, state) {
       group.add(image);
       image.userData.faceCamera=true;
     }
+    if(beat===4&&state.trace){
+      const paths=new T.Group();
+      paths.add(line([V(radius*1.2,-.15,.3),V(3,-.55,.3)],'#f5c697',.84),
+        line(new T.CatmullRomCurve3([V(-2,-.34,.36),V(-radius,.45,.36),V(0,radius*1.4,.36),V(2.9,.54,.36)]).getPoints(32),'#a6d8fa',.84));
+      paths.userData.faceCamera=true;
+      group.add(paths);
+    }
     if(state.jets) jets(group,4.3);
   }
   if(beat===2){
-    const boundary=ring(radius*.75,'#b5daed',.64);
-    boundary.material.depthTest=false;
-    boundary.renderOrder=2;
-    boundary.rotation.x=.3;
-    group.add(boundary);
+    const dashed=[];
+    for(let i=0;i<34;i++){
+      const a=i*TAU/34,b=a+.085,r=radius*.55;
+      dashed.push(V(r*Math.cos(a),0,r*Math.sin(a)),V(r*Math.cos(b),0,r*Math.sin(b)));
+    }
+    const guide=new T.LineSegments(new T.BufferGeometry().setFromPoints(dashed),new T.LineBasicMaterial({
+      color:state.feature==='horizon'?'#d6f4ff':'#84bbce',opacity:.74,transparent:true,depthTest:false,depthWrite:false,
+    }));
+    guide.renderOrder=2;
+    guide.rotation.x=.3;
+    group.add(guide);
+    if(state.feature==='shadow'){
+      const outline=arc(radius*1.05,0,TAU,'#d9bcff',.018);
+      outline.userData.faceCamera=true;group.add(outline);
+    }
   }
   if(beat===0 || state.evidence==='orbits'){
     const stars=[];
@@ -590,6 +612,11 @@ export function cameraPreset(id, beat, state, narrow) {
   if(id==='black-holes') eye=V(1.4,beat===4?2.3:4.1,beat===2?8.3:11.7);
   if(id==='lensing') eye=V(0,state.observer?.08:2.1,state.observer?6.7:13.5);
   if(id==='universe') eye=V(2.1,[1.2,6.3,2.1,6,4.7,4.3][beat],[8.7,13.2,11,11.9,13.3,14.2][beat]);
+  if(id==='nebula'&&state.feature==='dust')target.x-=.48;
+  if(id==='nebula'&&state.feature==='cavity')target.y+=.38;
+  if(id==='planets'&&state.feature==='star')eye.multiplyScalar(.84);
+  if(id==='planets'&&state.feature==='dust')target.y-=.48;
+  if(id==='planets'&&state.feature==='protoplanet')eye.multiplyScalar(.88);
   if(state.angle==='top' && id!=='lensing') eye=V(0,eye.length(),.02);
   if(state.angle==='edge' && id!=='lensing') eye=V(0,.16,eye.length());
   if(narrow){eye.multiplyScalar(id==='planets'||id==='lensing'?1.24:1.13);target.y=1.05;}
@@ -659,5 +686,15 @@ export function createRenderer(host, lite, context, invalidate) {
     });
     renderer.render(scene,camera);
   }
-  return {renderer,setChapter,frame};
+  function dispose(){
+    for(const texture of textures.values())texture.dispose();
+    const resources=new Set();
+    scene.traverse(node=>{
+      if(node.geometry)resources.add(node.geometry);
+      for(const material of [].concat(node.material||[]))resources.add(material);
+    });
+    for(const resource of resources)resource.dispose();
+    renderer.dispose();
+  }
+  return {renderer,setChapter,frame,dispose};
 }
