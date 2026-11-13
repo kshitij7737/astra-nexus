@@ -3,6 +3,7 @@ import { Music } from './music.js';
 import { GAME, ORDER, COMMON, ISP, rankFor, gradeFor, DIFFICULTY, RECOMMENDED } from './game-data.js';
 import { SOURCES } from './data.js';
 import { derive, estimate, Sim, defaultConfig } from './sim.js';
+import { trace } from './status.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -157,6 +158,8 @@ function setScreen(name) {
   $$('[data-screen]').forEach(s => s.hidden = s.dataset.screen !== name);
   const order = ['brief', 'build', 'launch', 'ops', 'debrief'];
   $$('.gx-steps li').forEach((li, i) => { li.dataset.state = i < order.indexOf(name) ? 'done' : i === order.indexOf(name) ? 'now' : ''; });
+  const TR = { brief: 'Briefing opened', build: 'Spacecraft design started', launch: 'Launch sequence started', ops: `Orbit reached around ${mission.world}. Science operations started`, debrief: null };
+  if (mission && TR[name] !== undefined) trace(mission.id, TR[name], order.indexOf(name));
   window.scrollTo(0, 0);
   music.setMood(name === 'launch' ? 'launch' : name === 'ops' ? 'ops' : 'calm');
 }
@@ -419,6 +422,13 @@ function startOps() {
         <p class="gx-home"><span>Science home</span><b id="gx-homev">0 Gbit</b><small>Only data that reaches Earth scores</small></p>
         <p class="gx-coach" id="gx-coach" aria-live="polite"></p>
       </div>
+      <h3>Telemetry <small class="gx-sim">simulated</small></h3>
+      <div class="gx-tele" id="gx-tele">
+        <div><span>Power</span><b id="gx-tpow">–</b></div>
+        <div><span>Signal</span><b><i class="gx-bars" id="gx-tsig"><i></i><i></i><i></i><i></i></i> <em id="gx-tsigt">–</em></b></div>
+        <div><span>Orbit</span><b id="gx-torb">–</b></div>
+        <svg class="gx-tx" id="gx-tx" viewBox="0 0 240 34" aria-hidden="true"><circle cx="14" cy="17" r="6" class="sc"/><path d="M22 17 H214" class="ln"/><circle cx="226" cy="17" r="8" class="ea"/><circle r="3" class="pk"><animate attributeName="cx" from="24" to="214" dur="1.1s" repeatCount="indefinite"/><animate attributeName="cy" values="17;17" dur="1.1s" repeatCount="indefinite"/></circle><text x="120" y="31" text-anchor="middle" id="gx-txt">Spacecraft → Earth</text></svg>
+      </div>
       <h3>Objectives · science back on Earth</h3>
       <ul class="gx-prog" id="gx-prog"></ul>
       <h3>Instruments</h3>
@@ -486,6 +496,20 @@ function paintOps() {
   stage?.setOps({ phase: s.phase, orbitFloat: sim.t / sim.T, observing, transmitting, sunlit: s.sunlit, alert: sim.safe || bf0 < 0.15 || sim.health < 30 });
   const ffb = $('#gx-ff'); if (ffb) { ffb.setAttribute('aria-pressed', String(!!flags.ff)); ffb.textContent = flags.ff ? 'Skipping… ⏸' : 'Skip ahead ⏭'; }
   $('#gx-homev').textContent = `${fmt(sim.sentTotal, 1)} Gbit`;
+  { // simulated telemetry: game-model values only
+    const d = sim.d, allW = d.insts.reduce((a, i) => a + i.w, 0), busW = Math.max(0, d.sunLoad - allW - d.radio.w);
+    const onW = d.insts.filter(i => sim.enabled.has(i.id)).reduce((a, i) => a + i.w, 0);
+    const load = busW + (observing ? onW : 0) + (transmitting ? d.radio.w : 0), gen = s.sunlit && !sim.safe ? d.solarW : 0, net = gen - load;
+    $('#gx-tpow').innerHTML = `<span class="${net < 0 ? 'neg' : 'pos'}">${net >= 0 ? '+' : '−'}${fmt(Math.abs(net))} W</span> <small>${fmt(gen)} in · ${fmt(load)} out</small>`;
+    const o = d.orbit, until = ((o.contact[0] - s.phase + 1) % 1) * d.periodMin;
+    const bars = s.inContact && !sim.safe ? 3 + (Math.sin(performance.now() / 700) > 0.3 ? 1 : 0) : 0;
+    $$('#gx-tsig > i').forEach((b, i) => b.classList.toggle('on', i < bars));
+    $('#gx-tsigt').textContent = sim.safe ? 'Safe mode' : s.inContact ? `${fmt(d.rateMbps, 1)} Mb/s link` : `Next window ${Math.max(1, Math.round(until))} min`;
+    $('#gx-torb').textContent = sim.safe ? 'Safe mode, recovering' : !s.sunlit ? 'Eclipse, on battery' : 'Stable, sunlit';
+    $('#gx-tx').classList.toggle('on', transmitting); $('#gx-txt').textContent = transmitting ? 'Sending science to Earth' : s.inContact ? 'Link open, nothing to send' : 'Spacecraft → Earth';
+    if (transmitting && !flags.txFrom) flags.txFrom = sim.sentTotal + 1e-9;
+    if (!transmitting && flags.txFrom) { const got = sim.sentTotal - flags.txFrom; flags.txFrom = 0; if (got > 0.05) { log(`Data received on Earth: +${fmt(got, 1)} Gbit`, 'ok'); trace(m.id, `Data received on Earth: +${fmt(got, 1)} Gbit (total ${fmt(sim.sentTotal, 1)})`); } }
+  }
   const coachTxt = coach(s); if (coachTxt !== flags.coach) { flags.coach = coachTxt; $('#gx-coach').innerHTML = coachTxt; }
   const danger = sim.health < 30 || sim.safe; document.body.classList.toggle('gx-danger', danger); music.setMood(danger ? 'tense' : 'ops');
   if (sim.health < lastHealth) { lastHealth = sim.health; }
@@ -696,6 +720,7 @@ function showDebrief(r) {
   s.disc = [...new Set([...(s.disc || []), ...unlocked.map(x => x.id)])];
   const prevAch = new Set(s.ach || []); s.ach = [...new Set([...(s.ach || []), ...earned.map(a => a.id)])];
   s.flights = (s.flights || 0) + 1; if (!failed) s.wins = (s.wins || 0) + 1; store.set(s);
+  trace(m.id, `Debrief filed: ${r.outcome === 'success' ? 'mission success' : r.outcome === 'partial' ? 'partial success' : 'mission failed'}, score ${r.score}`);
   const newAch = earned.filter(a => !prevAch.has(a.id));
   // one outcome drives the badge, headline and summary
   const OUT = { success: 'Mission success', partial: 'Partial success', failure: 'Mission failed' };
@@ -767,6 +792,13 @@ function showDebrief(r) {
         <section><h2>Your mission vs NASA</h2>
           <table class="gx-table"><thead><tr><th></th><th>Real mission</th></tr></thead><tbody>${m.compare.map(([k, v, s]) => `<tr><th>${esc(k)}</th><td>${esc(v)} ${src(s)}</td></tr>`).join('')}
             <tr><th>Your solar power</th><td>${fmt(d.solarW)} W at ${esc(m.world)} (game value)</td></tr></tbody></table>
+          <h2>Resources used <small class="gx-sim">game values</small></h2>
+          <table class="gx-table"><tbody>
+            <tr><th>Budget</th><td>${d.cost} of ${d.budget} credits (${Math.round(d.cost / d.budget * 100)}%)</td></tr>
+            <tr><th>Launch mass</th><td>${Math.round(d.wet)} of ${d.launch.wetKg} kg on ${esc(d.launch.label || d.launch.name || 'the rocket')}</td></tr>
+            <tr><th>Propellant reserve</th><td>${Math.round(d.dvAvail - d.dvNeed)} m/s spare after reaching orbit</td></tr>
+            <tr><th>Recorder</th><td>${d.storage} Gbit, ${fmt(r.lost || 0, 1)} Gbit lost when full</td></tr>
+          </tbody></table>
           <h2>Discoveries unlocked</h2>
           <div class="gx-disc">${m.discoveries.map(x => { const on = unlocked.includes(x); return `<article class="${on ? 'on' : ''}"><b>${on ? esc(x.title) : 'Locked'}</b><p>${on ? esc(x.text) : 'Complete the matching objective to unlock.'}</p>${on ? src(x.src) : ''}</article>`; }).join('')}</div>
           <h2>Achievements</h2>

@@ -1,0 +1,43 @@
+/* Mission status panel (js/status.js) and shared polish: page transitions, pressed states */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }
+.nx-status { --st-acc: #62c9be; position: fixed; left: 16px; bottom: 16px; z-index: 40; font: 13px/1.4 'NX Display', 'ASTRA Display', 'Helvetica Neue', Arial, sans-serif; color: #f2efe9; }
+.nx-status__pill { display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-radius: 999px; border: 1px solid rgba(98,201,190,.35); background: rgba(6,10,18,.78); backdrop-filter: blur(10px); color: inherit; cursor: pointer;
+  font: 500 10.5px 'NX Mono', 'ASTRA Mono', ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; transition: border-color .25s, transform .25s, background .25s; }
+.nx-status__pill:hover, .nx-status__pill:focus-visible { border-color: var(--st-acc); transform: translateY(-1px); outline: none; }
+.nx-status__pill:active { transform: translateY(1px) scale(.98); }
+.nx-status__sys { color: var(--st-acc); } .nx-status__sum { color: #c9d3e6; }
+.nx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--st-acc); box-shadow: 0 0 0 0 rgba(98,201,190,.6); animation: nx-pulse 2.2s infinite; }
+@keyframes nx-pulse { 0% { box-shadow: 0 0 0 0 rgba(98,201,190,.55); } 70% { box-shadow: 0 0 0 8px rgba(98,201,190,0); } 100% { box-shadow: 0 0 0 0 rgba(98,201,190,0); } }
+.nx-status__panel { position: absolute; left: 0; bottom: calc(100% + 10px); width: min(360px, calc(100vw - 32px)); max-height: min(70vh, 560px); overflow: auto; padding: 14px; border-radius: 16px;
+  background: rgba(8,12,22,.92); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(14px); box-shadow: 0 24px 60px rgba(0,0,0,.55); animation: nx-in .25s ease both; }
+@keyframes nx-in { from { opacity: 0; transform: translateY(8px); } }
+.nx-status__tabs { display: flex; gap: 4px; margin-bottom: 12px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.05); }
+.nx-status__tabs button { flex: 1; padding: 7px 8px; border: 0; border-radius: 999px; background: none; color: #aab4c8; cursor: pointer; font: 500 10.5px 'NX Mono', 'ASTRA Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
+.nx-status__tabs button[aria-selected="true"] { background: rgba(98,201,190,.16); color: #fff; }
+.nx-kv { margin: 0 0 12px; display: grid; gap: 8px; } .nx-kv div { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; }
+.nx-kv dt { font: 10.5px 'NX Mono', 'ASTRA Mono', monospace; letter-spacing: .1em; text-transform: uppercase; color: #8f9ab0; } .nx-kv dd { margin: 0; }
+.nx-bar { display: inline-block; width: 90px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; vertical-align: middle; }
+.nx-bar i { display: block; height: 100%; background: linear-gradient(90deg, #62c9be, #9fe0ea); border-radius: inherit; transition: width .6s; }
+.nx-stages { list-style: none; margin: 0 0 12px; padding: 0; display: flex; gap: 4px; }
+.nx-stages li { flex: 1; text-align: center; padding: 6px 2px; border-radius: 8px; font: 9.5px 'NX Mono', 'ASTRA Mono', monospace; letter-spacing: .06em; text-transform: uppercase; color: #6f7a8e; background: rgba(255,255,255,.04); border: 1px solid transparent; }
+.nx-stages li.done { color: #0a1a18; background: #62c9be; } .nx-stages li.done::before { content: '✓ '; }
+.nx-stages li.now { color: #fff; border-color: #62c9be; }
+.nx-missions { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.nx-missions li { display: grid; grid-template-columns: 1fr 90px 52px; align-items: center; gap: 8px; font-size: 12px; } .nx-missions b { color: var(--c); font-weight: 600; letter-spacing: .04em; }
+.nx-missions .nx-bar i { background: var(--c); } .nx-missions small { color: #8f9ab0; font-size: 11px; text-align: right; }
+.nx-last { margin: 0 0 10px; font-size: 12.5px; color: #c9d3e6; }
+.nx-go { display: block; text-align: center; padding: 10px; border-radius: 999px; background: #62c9be; color: #061210; text-decoration: none; font: 600 11px 'NX Mono', 'ASTRA Mono', monospace; letter-spacing: .14em; text-transform: uppercase; transition: transform .2s, filter .2s; }
+.nx-go:hover { filter: brightness(1.1); transform: translateY(-1px); } .nx-go:active { transform: translateY(1px); }
+.nx-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; font-size: 12.5px; }
+.nx-log time { font: 10.5px 'NX Mono', 'ASTRA Mono', monospace; color: #8f9ab0; margin-right: 6px; } .nx-log span { font-weight: 600; margin-right: 4px; }
+.nx-empty, .nx-vega { color: #aab4c8; font-size: 12.5px; margin: 0 0 8px; }
+.nx-faq { border-top: 1px solid rgba(255,255,255,.08); padding: 8px 0; } .nx-faq summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.nx-faq p { margin: 6px 0 0; color: #c9d3e6; font-size: 12.5px; }
+.nx-status__foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); font-size: 12px; }
+.nx-status__foot input[type=range] { flex: 1; accent-color: #62c9be; }
+.nx-sound { display: flex; gap: 6px; align-items: center; cursor: pointer; } .nx-sound input { accent-color: #62c9be; }
+.nx-status__note { margin: 8px 0 0; font-size: 10.5px; color: #7d889c; }
+.lx-locked .nx-status { opacity: 0; pointer-events: none; }
+@media (max-width: 640px) { .nx-status { left: 10px; bottom: 10px; } .nx-status__sum { display: none; } }
+@media (prefers-reduced-motion: reduce) { .nx-dot, .nx-status__panel { animation: none; } }

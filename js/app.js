@@ -2,6 +2,7 @@
 // Integration entry point: mountMissionModule(containerEl, { mission: 'mars' })
 // Returns { setMission(id), destroy() }.
 import { MISSIONS, SOURCES, BUILDER, BODIES } from './data.js';
+import { GAME } from './game-data.js';
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const srcLink = key => {
@@ -116,6 +117,7 @@ export async function mountMissionModule(root, opts = {}) {
             </button>`).join('')}</div>
           <div class="mm-tdetail" aria-live="polite"></div>
         </div>
+        ${m.id === 'mars' ? jezeroMap() : ''}
       </section>
 
       <section class="mm-ch mm-inst" id="mm-ch-4" data-ch="4" aria-labelledby="mm-h4">
@@ -124,8 +126,9 @@ export async function mountMissionModule(root, opts = {}) {
           <p class="mm-kicker">Chapter 04 / The instruments</p>
           <h2 id="mm-h4">The instruments.</h2>
         </div>
+        <p class="mm-body mm-inst__hint">Pick an instrument to see what it does and how it behaves in the game.</p>
         <div class="mm-irow" tabindex="0" aria-label="Instrument cards, scroll sideways">${m.instruments.map((ins, i) => `
-          <article class="mm-icard mm-reveal">
+          <article class="mm-icard mm-reveal" data-ins="${i}" tabindex="0" role="button" aria-pressed="false">
             <span class="mm-icard__n">${pad(i + 1)}</span>
             <h3>${esc(ins.name)}</h3>
             <p class="mm-icard__full">${esc(ins.full)}</p>
@@ -133,6 +136,7 @@ export async function mountMissionModule(root, opts = {}) {
             ${ins.specs.length ? `<ul>${ins.specs.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
             ${srcLink(ins.src)}
           </article>`).join('')}</div>
+        <div class="mm-idetail" aria-live="polite" hidden></div>
       </section>
 
       <section class="mm-ch mm-hangar" id="mm-ch-5" data-ch="5" aria-labelledby="mm-h5">
@@ -165,6 +169,8 @@ export async function mountMissionModule(root, opts = {}) {
 
     root.querySelectorAll('.mm-main [data-goto]').forEach(b => b.onclick = () => goto(b.dataset.goto));
     root.querySelectorAll('[data-t]').forEach(b => b.onclick = () => selectTarget(+b.dataset.t));
+    root.querySelectorAll('[data-ins]').forEach(c => { const go = () => selectInstrument(+c.dataset.ins); c.onclick = e => { if (!e.target.closest('a')) go(); }; c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+    root.querySelectorAll('[data-hs]').forEach(b => { b.onclick = () => selectHotspot(b.dataset.hs); b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectHotspot(b.dataset.hs); } }; });
     root.querySelector('.mm-next').onclick = () => setMission(next.id);
     root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { hangarTab = b.dataset.tab; renderHangar(); });
     if (stage) {
@@ -240,6 +246,57 @@ export async function mountMissionModule(root, opts = {}) {
       <div><dt>Coordinate frame</dt><dd>${esc(t.frame)}</dd></div><div><dt>Units</dt><dd>${esc(t.units)}</dd></div>
       <div><dt>Source</dt><dd>${srcLink(t.src)}</dd></div></dl>`;
     if (stage && !silent && active === 3) stage.focusTarget(i);
+  }
+
+  // ---------- instruments: pick one to see its game parameters (simplified game values)
+  function selectInstrument(i) {
+    const ins = mission.instruments[i], box = root.querySelector('.mm-idetail'); if (!ins || !box) return;
+    root.querySelectorAll('[data-ins]').forEach(c => c.setAttribute('aria-pressed', String(+c.dataset.ins === i)));
+    const g = GAME[mission.id]?.instruments.find(x => x.heritage.toLowerCase() === ins.name.toLowerCase());
+    box.hidden = false;
+    box.innerHTML = `<h3>${esc(ins.name)} <small>${esc(ins.full)}</small></h3><p>${esc(ins.purpose)}</p>
+      ${g ? `<p class="mm-kicker">In the game · ${esc(g.name)} ${TAG.conceptual}</p>
+        <dl class="mm-gstats"><div><dt>Power</dt><dd>${g.w} W</dd></div><div><dt>Data rate</dt><dd>${g.mbps} Mb/s</dd></div><div><dt>Mass</dt><dd>${g.kg} kg</dd></div><div><dt>Cost</dt><dd>${g.cr} credits</dd></div></dl>
+        <p class="mm-muted">Simplified game values, not instrument specifications. <a href="play.html?mission=${mission.id}">Fly it in ${esc(GAME[mission.id].name)} →</a></p>`
+      : `<p class="mm-muted">Not flown in the game. Shown for reference.</p>`}`;
+  }
+  // ---------- Jezero from orbit: schematic map with hotspots (positions approximate)
+  const HOT = {
+    delta: { n: 'Western delta', x: 165, y: 175, t: 'A fan of sediment laid down where a river met the lake. One remnant, nicknamed Kodiak, sits about 2.3 km west of the rover landing site.', i: 'HiRISE', src: 'jplKodiak' },
+    inlet: { n: 'Neretva Vallis inlet', x: 62, y: 120, t: 'The river channel that fed Jezero with water billions of years ago. It enters from the west and runs into the delta.', i: 'CTX', src: 'm2020' },
+    landing: { n: 'Octavia E. Butler Landing', x: 262, y: 196, t: 'Where Perseverance touched down on 18 February 2021. An orbiter like JEZERO ECHO relays the rover’s data home.', i: 'Electra', src: 'm2020' },
+    margin: { n: 'Margin unit', x: 132, y: 92, t: 'A band of magnesium-carbonate rock near the inlet. Rover radar found an older buried delta beneath it, so water was here even earlier.', i: 'CRISM', src: 'marginUnit' },
+    outlet: { n: 'Outlet breach', x: 398, y: 210, t: 'A gap in the eastern rim where an outlet valley carried water out of the crater when the lake was high.', i: 'CTX', src: 'jezeroMap' },
+  };
+  function jezeroMap() {
+    return `<div class="mm-jz mm-reveal">
+      <div class="mm-jz__head"><p class="mm-kicker">Zoom in / Jezero from orbit</p><h3>Five places JEZERO ECHO images from orbit.</h3><p class="mm-body">An orbiter reads the crater from above. The rover explores the ground. Pick a marker.</p></div>
+      <div class="mm-jz__grid">
+        <svg class="mm-jz__map" viewBox="0 0 460 300" role="img" aria-label="Schematic map of Jezero crater with five marked features">
+          <defs><radialGradient id="jzf" cx="50%" cy="55%" r="60%"><stop offset="0" stop-color="#5a2f22"/><stop offset="1" stop-color="#2a1610"/></radialGradient>
+            <linearGradient id="jzd" x1="0" x2="1"><stop offset="0" stop-color="#b9774f"/><stop offset="1" stop-color="#8a5038"/></linearGradient></defs>
+          <rect width="460" height="300" fill="#1a0e0a"/>
+          <path d="M0 118 C 40 112, 70 128, 108 140 S 150 160, 160 168" fill="none" stroke="#6f3c2a" stroke-width="9" stroke-linecap="round"/>
+          <path d="M0 118 C 40 112, 70 128, 108 140 S 150 160, 160 168" fill="none" stroke="#3a6f8f" stroke-width="2.5" stroke-dasharray="5 4" opacity=".8"/>
+          <path d="M180 20 C 185 40, 196 52, 210 62" fill="none" stroke="#6f3c2a" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="245" cy="160" r="128" fill="url(#jzf)" stroke="#c98a62" stroke-width="10" stroke-opacity=".55"/>
+          <path d="M392 196 C 420 204, 440 214, 460 230" fill="none" stroke="#6f3c2a" stroke-width="8" stroke-linecap="round"/>
+          <path d="M392 196 C 420 204, 440 214, 460 230" fill="none" stroke="#3a6f8f" stroke-width="2.5" stroke-dasharray="5 4" opacity=".8"/>
+          <path d="M150 150 C 165 135, 200 140, 215 160 C 225 178, 210 205, 188 212 C 168 216, 140 200, 132 182 Z" fill="url(#jzd)" opacity=".95"/>
+          <path d="M120 96 C 140 70, 170 58, 205 54" fill="none" stroke="#d8c08a" stroke-width="7" stroke-linecap="round" opacity=".55"/>
+          <text x="245" y="292" text-anchor="middle" class="mm-jz__cap">Schematic, not to scale · crater about 45 km across · positions approximate</text>
+          ${Object.entries(HOT).map(([k, h]) => `<g class="mm-jz__hs" data-hs="${k}" tabindex="0" role="button" aria-label="${esc(h.n)}"><circle cx="${h.x}" cy="${h.y}" r="13" class="ring"/><circle cx="${h.x}" cy="${h.y}" r="5" class="dot"/></g>`).join('')}
+        </svg>
+        <div class="mm-jz__list">${Object.entries(HOT).map(([k, h], i) => `<button type="button" class="mm-jz__b" data-hs="${k}" aria-pressed="false"><span>${pad(i + 1)}</span>${esc(h.n)}</button>`).join('')}
+          <div class="mm-jz__detail" aria-live="polite"><p class="mm-muted">Pick a marker to read about it.</p></div>
+        </div>
+      </div>
+    </div>`;
+  }
+  function selectHotspot(k) {
+    const h = HOT[k]; if (!h) return;
+    root.querySelectorAll('[data-hs]').forEach(b => { const on = b.dataset.hs === k; b.classList.toggle('on', on); if (b.tagName === 'BUTTON') b.setAttribute('aria-pressed', String(on)); });
+    root.querySelector('.mm-jz__detail').innerHTML = `<h4>${esc(h.n)}</h4><p>${esc(h.t)}</p><p class="mm-muted">Best orbital instrument in the game: <b>${esc(h.i)}</b></p>${srcLink(h.src)}`;
   }
 
   // ---------- hangar

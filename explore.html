@@ -12,6 +12,7 @@
 <meta property="og:image" content="https://kshitij7737.github.io/astra-nexus/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="NEXUS//04 mission environments: Apophis, the Moon, Earth's atmosphere and Mars, built on NASA sources.">
+<link rel="stylesheet" href="css/status.css">
 <link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/missions.css">
 <style>html,body{margin:0;background:#030304}</style>
@@ -23,6 +24,7 @@
   import { mountMissionModule } from './js/app.js';
   const id = new URLSearchParams(location.search).get('mission') || 'astra';
   mountMissionModule(document.getElementById('missions'), { mission: id });
+  import('./js/status.js').then(async ({ mountStatus }) => { const { Music } = await import('./js/music.js'); mountStatus({ music: new Music() }); });
 </script>
 </body>
 </html>

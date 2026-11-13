@@ -249,3 +249,34 @@
 .mm-hangar-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: inherit; background: #000; }
 .mm-hangar-how { margin: 0 0 14px; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--muted); }
 .mm-hangar-how b { color: var(--fg, #eee); font-weight: 600; }
+
+/* selectable instrument cards + game parameters */
+.astra-mm .mm-inst__hint { margin: 0 0 14px; }
+.astra-mm .mm-icard { cursor: pointer; transition: transform .25s, border-color .25s, box-shadow .25s; }
+.astra-mm .mm-icard:hover, .astra-mm .mm-icard:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(0,0,0,.45); outline: none; }
+.astra-mm .mm-icard[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 14px 40px rgba(0,0,0,.45); }
+.astra-mm .mm-idetail { margin-top: 16px; padding: 20px 22px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 12px; background: var(--card); backdrop-filter: blur(6px); animation: mm-fadein .3s both; }
+.astra-mm .mm-idetail h3 { margin: 0 0 6px; font-weight: 800; font-stretch: 115%; font-size: 22px; text-transform: uppercase; } .astra-mm .mm-idetail h3 small { font: 11px var(--mono); color: var(--muted); text-transform: none; margin-left: 8px; }
+.astra-mm .mm-gstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
+.astra-mm .mm-gstats div { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.astra-mm .mm-gstats dt { font: 10px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); } .astra-mm .mm-gstats dd { margin: 2px 0 0; font-weight: 700; font-size: 18px; }
+@keyframes mm-fadein { from { opacity: 0; transform: translateY(6px); } }
+/* Jezero hotspot map */
+.astra-mm .mm-jz { margin-top: 48px; }
+.astra-mm .mm-jz__head h3 { margin: 0 0 8px; font-weight: 800; font-stretch: 112%; font-size: clamp(22px, 2.6vw, 34px); }
+.astra-mm .mm-jz__grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr); gap: 18px; margin-top: 16px; }
+.astra-mm .mm-jz__map { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); background: #1a0e0a; }
+.astra-mm .mm-jz__cap { font: 8px var(--mono); fill: #c8b7a6; }
+.astra-mm .mm-jz__hs { cursor: pointer; outline: none; }
+.astra-mm .mm-jz__hs .ring { fill: rgba(169,212,255,.12); stroke: #a9d4ff; stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: mm-ping 2.4s infinite; }
+.astra-mm .mm-jz__hs .dot { fill: #a9d4ff; }
+.astra-mm .mm-jz__hs:hover .ring, .astra-mm .mm-jz__hs:focus-visible .ring, .astra-mm .mm-jz__hs.on .ring { fill: rgba(208,103,76,.35); stroke: #fff; animation: none; }
+.astra-mm .mm-jz__hs.on .dot { fill: #fff; }
+@keyframes mm-ping { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: .6; } }
+.astra-mm .mm-jz__list { display: grid; gap: 6px; align-content: start; }
+.astra-mm .mm-jz__b { display: flex; gap: 10px; align-items: baseline; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: inherit; font: inherit; font-size: 14px; cursor: pointer; transition: border-color .2s; }
+.astra-mm .mm-jz__b span { font: 10px var(--mono); color: var(--muted); } .astra-mm .mm-jz__b:hover, .astra-mm .mm-jz__b[aria-pressed="true"] { border-color: var(--accent); }
+.astra-mm .mm-jz__detail { margin-top: 6px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.astra-mm .mm-jz__detail h4 { margin: 0 0 6px; font-size: 17px; } .astra-mm .mm-jz__detail p { margin: 0 0 8px; color: #d8d4cc; font-size: 14.5px; }
+@media (max-width: 860px) { .astra-mm .mm-jz__grid { grid-template-columns: 1fr; } .astra-mm .mm-gstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .astra-mm .mm-jz__hs .ring { animation: none; } }

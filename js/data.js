@@ -6,6 +6,10 @@
 //   conceptual   ASTRA team design choice, not NASA flight hardware
 
 export const SOURCES = {
+  m2020: { title: 'NASA Science: Mars 2020 Perseverance mission', url: 'https://science.nasa.gov/mission/mars-2020-perseverance/' },
+  jplKodiak: { title: 'NASA JPL: Perseverance view of the delta in Jezero Crater', url: 'https://www.jpl.nasa.gov/images/perseverance-view-of-the-delta-in-jezero-crater' },
+  jezeroMap: { title: 'Stack et al. 2020, Photogeologic map of the Perseverance landing site, Space Science Reviews', url: 'https://link.springer.com/article/10.1007/s11214-020-00739-x' },
+  marginUnit: { title: 'Physics World: Perseverance finds evidence for an ancient river delta (RIMFAX)', url: 'https://physicsworld.com/a/perseverance-finds-evidence-for-an-ancient-river-delta-on-mars/' },
   apophis: { title: 'NASA Science: Apophis', url: 'https://science.nasa.gov/solar-system/asteroids/apophis/' },
   apophisFacts: { title: 'NASA Science: Apophis Facts', url: 'https://science.nasa.gov/solar-system/asteroids/apophis-facts/' },
   apexSvs: { title: 'NASA SVS: Apophis 2029 Earth Flyby', url: 'https://svs.gsfc.nasa.gov/20414' },
@@ -195,6 +199,7 @@ export const MISSIONS = [
       { name: 'SHARAD', full: 'Shallow Radar', purpose: 'Radar for buried ice.', specs: [], src: 'mroInst' },
       { name: 'MCS', full: 'Mars Climate Sounder', purpose: 'Temperature and dust.', specs: [], src: 'mroInst' },
       { name: 'MARCI', full: 'Mars Color Imager', purpose: 'Daily weather camera.', specs: [], src: 'mroUsgs' },
+      { name: 'Electra', full: 'Electra UHF relay radio', purpose: 'Relays rover data and helps with navigation.', specs: [], src: 'mroInst' },
     ],
     spacecraft: {
       ref: 'Mars Reconnaissance Orbiter', model: 'mro',

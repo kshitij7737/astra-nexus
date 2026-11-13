@@ -360,3 +360,21 @@ body.gx-flash::before { content: ''; position: fixed; inset: 0; z-index: 31; bac
 .gx-item[data-part]:hover, .gx-item[data-part]:focus-within { background: rgba(74,168,255,.06); border-radius: 10px; }
 .gx-concept { display: inline-block; margin: 6px 0 4px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(224,176,74,.55); font-size: 12px; color: #e8d6ae; background: rgba(224,176,74,.08); }
 .gx-concept b { color: #f0c870; }
+
+/* simulated telemetry + transmission animation */
+.gx-sim { font: 9.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; font-weight: 400; }
+.gx-tele { display: grid; gap: 6px; }
+.gx-tele > div { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 8px; font-size: 12.5px; }
+.gx-tele > div span { font: 10px var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.gx-tele b { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .gx-tele small { color: var(--muted); font-weight: 400; } .gx-tele em { font-style: normal; font-weight: 500; }
+.gx-tele .pos { color: var(--ok); } .gx-tele .neg { color: var(--warn); }
+.gx-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+.gx-bars i { width: 4px; background: rgba(255,255,255,.15); border-radius: 1px; transition: background .2s; } .gx-bars i:nth-child(1) { height: 4px; } .gx-bars i:nth-child(2) { height: 7px; } .gx-bars i:nth-child(3) { height: 10px; } .gx-bars i:nth-child(4) { height: 12px; }
+.gx-bars i.on { background: var(--ok); }
+.gx-tx { width: 100%; height: 34px; margin-top: 2px; }
+.gx-tx .sc { fill: var(--acc); } .gx-tx .ea { fill: #3b82c4; stroke: #a9d4ff; stroke-width: 1; }
+.gx-tx .ln { stroke: rgba(255,255,255,.18); stroke-width: 1.5; stroke-dasharray: 3 5; }
+.gx-tx .pk { fill: var(--ok); opacity: 0; } .gx-tx text { font: 9px var(--mono); fill: var(--muted); letter-spacing: .08em; }
+.gx-tx.on .ln { stroke: var(--ok); animation: gx-flow .6s linear infinite; } .gx-tx.on .pk { opacity: 1; } .gx-tx.on text { fill: var(--ok); }
+@keyframes gx-flow { to { stroke-dashoffset: -16; } }
+@media (prefers-reduced-motion: reduce) { .gx-tx.on .ln { animation: none; } }

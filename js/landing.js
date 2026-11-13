@@ -68,7 +68,7 @@ function chapters() {
       <div class="lx-row"><a class="lx-btn lx-btn--go" href="play.html?mission=${id}">Start mission</a><a class="lx-btn" href="explore.html?mission=${id}">Explore</a></div></article>`; }).join('')}</div>
   </section>`;
   const ORB = { astra: 'moon', earth: 'earth-day', lunaris: 'moon', mars: 'mars' };
-  $('.lx-bodies').innerHTML = STORY.map((id, i) => `<li><a href="#ch-${id}" style="--acc:${GAME[id].accent}">
+  $('.lx-bodies').innerHTML = STORY.map((id, i) => `<li><a href="#ch-${id}" data-sheet="${id}" style="--acc:${GAME[id].accent}">
     <i class="lx-orb lx-orb--${id}" style="background-image:url(textures/sm/${ORB[id]}.jpg)" aria-hidden="true"></i>
     <span class="lx-card__n">0${i + 1}</span><b>${esc(GAME[id].name)}</b><em>${esc(GAME[id].world)}</em><small>${esc(CH[id].h)}</small></a></li>`).join('');
 }
@@ -249,6 +249,17 @@ async function sky() {
   let introT = 0, outT = 99, introWas = false, introRise = 0.1, introAlt = 0, sunS = 1;
   let first = true, frameN = 0, copyBox = null, cardBox = null, spin = {};
   const project = p => { v4.copy(p).project(cam); return { x: (v4.x * 0.5 + 0.5) * innerWidth, y: (-v4.y * 0.5 + 0.5) * innerHeight, z: v4.z }; };
+  // click a mission world in the overview to preview its mission
+  const pickBody = (x, y) => {
+    if (focus !== 'sun' || document.body.classList.contains('lx-locked') || scrollY > innerHeight * 0.6) return null;
+    let best = null, bd = 1e9;
+    for (const [id, bb] of Object.entries(focusBody)) { if (!bb.visible) continue; const q = project(bb.position); if (q.z > 1) continue; const d = Math.hypot(q.x - x, q.y - y); if (d < 38 && d < bd) { bd = d; best = id; } }
+    return best;
+  };
+  const busy = t => t.closest?.('a,button,input,label,summary,select,.nx-status,.lx-sheet,.lx-brief,.lx-hero__copy');
+  document.addEventListener('click', e => { if (busy(e.target)) return; const id = pickBody(e.clientX, e.clientY); if (id) window.__nxSheet?.(id); });
+  let hov = null;
+  document.addEventListener('pointermove', e => { const id = busy(e.target) ? null : pickBody(e.clientX, e.clientY); if (id !== hov) { hov = id; document.body.classList.toggle('lx-pick', !!id); } }, { passive: true });
   let aFt = 0, aFn = 0;
   r.setAnimationLoop(() => {
     const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05);
@@ -381,6 +392,74 @@ async function sky() {
   });
 }
 
+// ---------- mission preview sheet (hero cards and the planets in the 3D view)
+const DIFF_HINT = { earth: 'Good first mission. Try Cadet.', astra: 'Timing matters: map before and after the flyby.', lunaris: 'Hardest power budget. Long shadows.', mars: 'Data is the bottleneck. Plan your downlink.' };
+function openSheet(id) {
+  const m = GAME[id], c = CH[id]; if (!m) return;
+  let sh = $('#lx-sheet');
+  if (!sh) { sh = document.createElement('aside'); sh.id = 'lx-sheet'; sh.className = 'lx-sheet'; sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'false'); document.body.appendChild(sh); }
+  sh.style.setProperty('--acc', m.accent);
+  sh.innerHTML = `<button class="lx-sheet__x" type="button" aria-label="Close">×</button>
+    <p class="lx-sheet__k">${esc(c.label)}</p>
+    <h3>${esc(m.name)}</h3>
+    <p class="lx-sheet__q">${esc(c.h)}</p>
+    <p class="lx-sheet__sub">${esc(c.sub)}</p>
+    <h4>Objectives</h4>
+    <ul class="lx-sheet__obj">${m.objectives.map(o => `<li>${esc(o.label)}</li>`).join('')}</ul>
+    <p class="lx-sheet__meta"><span>Research lead · ${esc(m.owner)}</span><span>${esc(DIFF_HINT[id])}</span></p>
+    <div class="lx-row"><button class="lx-btn lx-btn--go" type="button" data-brief="${id}">Start mission</button><a class="lx-btn" href="explore.html?mission=${id}">Explore ${esc(m.world)}</a><a class="lx-btn" href="#ch-${id}" data-close>See the stop</a></div>`;
+  sh.hidden = false; requestAnimationFrame(() => sh.classList.add('on'));
+  const close = () => { sh.classList.remove('on'); setTimeout(() => { sh.hidden = true; }, 300); };
+  sh.querySelector('.lx-sheet__x').onclick = close; sh.querySelector('[data-close]').onclick = close;
+  sh.querySelector('[data-brief]').onclick = () => { close(); brief(id); };
+  sh.querySelector('h3').setAttribute('tabindex', '-1'); sh.querySelector('h3').focus();
+  sh.onkeydown = e => { if (e.key === 'Escape') close(); };
+}
+window.__nxSheet = openSheet;
+
+// ---------- briefing (typed), then a skippable 3-2-1 countdown into the game
+function brief(id) {
+  const m = GAME[id], c = CH[id]; if (!m) return;
+  const prev = document.activeElement;
+  const mo = document.createElement('div'); mo.className = 'lx-brief'; mo.style.setProperty('--acc', m.accent);
+  mo.innerHTML = `<div class="lx-brief__card" role="dialog" aria-modal="true" aria-labelledby="lx-brief-t">
+    <p class="lx-brief__k"><i></i> Incoming briefing · VEGA, mission control</p>
+    <h3 id="lx-brief-t">${esc(m.name)} <span>· ${esc(m.world)}</span></h3>
+    <p class="lx-brief__txt" aria-live="polite"></p>
+    <dl class="lx-brief__kv"><div><dt>Objective</dt><dd>${esc(m.objectives[0].label)}${m.objectives.length > 1 ? ` + ${m.objectives.length - 1} more` : ''}</dd></div><div><dt>Your role</dt><dd>Flight director: design, launch and fly the spacecraft</dd></div><div><dt>Research lead</dt><dd>${esc(m.owner)}</dd></div></dl>
+    <div class="lx-row"><button class="lx-btn lx-btn--go" type="button" data-go>Start mission</button><button class="lx-btn" type="button" data-skip>Show full text</button><button class="lx-btn" type="button" data-x>Not now</button></div>
+  </div>`;
+  document.body.appendChild(mo);
+  const full = `${c.h} ${c.sub} ${m.tagline} Only data that reaches Earth counts. Good luck.`;
+  const txt = mo.querySelector('.lx-brief__txt'); let i = 0, typing = true;
+  const tick = () => { if (!typing) return; i += 2; txt.textContent = full.slice(0, i); if (i < full.length) setTimeout(tick, 16); else typing = false; };
+  if (reduced) { txt.textContent = full; typing = false; } else tick();
+  const close = () => { typing = false; mo.remove(); prev?.focus?.(); };
+  mo.querySelector('[data-skip]').onclick = () => { typing = false; txt.textContent = full; };
+  mo.querySelector('[data-x]').onclick = close;
+  mo.addEventListener('click', e => { if (e.target === mo) close(); });
+  mo.addEventListener('keydown', e => { if (e.key === 'Escape') close(); if (e.key === 'Tab') { const f = [...mo.querySelectorAll('button')]; if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); } else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); } } });
+  mo.querySelector('[data-go]').onclick = () => countdown(mo, id);
+  mo.querySelector('[data-go]').focus();
+}
+function countdown(mo, id) {
+  const url = `play.html?mission=${id}`;
+  if (reduced) { location.href = url; return; }
+  mo.innerHTML = `<div class="lx-count" role="status" aria-live="assertive"><b>3</b><p>Systems go</p><button class="lx-btn" type="button">Skip</button></div>`;
+  const b = mo.querySelector('b'), p = mo.querySelector('p'); let n = 3;
+  const go = () => { location.href = url; };
+  mo.querySelector('button').onclick = go; mo.querySelector('button').focus();
+  const t = setInterval(() => { n--; if (n > 0) { b.textContent = n; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; p.textContent = n === 2 ? 'Arrays stowed' : 'Handing over to you'; } else { clearInterval(t); b.textContent = 'GO'; setTimeout(go, 450); } }, 800);
+}
+// every "play this mission" link on the home page opens the briefing first
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('a[href^="play.html?mission="]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  const id = new URL(a.href, location.href).searchParams.get('mission'); if (!GAME[id]) return;
+  e.preventDefault(); brief(id);
+});
+
 chapters(); archive(); intro(); sky();
+document.querySelectorAll('[data-sheet]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openSheet(a.dataset.sheet); }));
+import('./status.js').then(async ({ mountStatus }) => { const { Music } = await import('./music.js'); mountStatus({ music: new Music() }); });
 $('#lx-replay').onclick = () => intro(true);
 addEventListener('pageshow', archive);
