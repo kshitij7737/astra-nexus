@@ -186,8 +186,8 @@ async function sky() {
   const cue = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 160 }, (_, i) => new THREE.Vector3(Math.cos(i / 160 * Math.PI * 2), 0, Math.sin(i / 160 * Math.PI * 2)))), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
   scene.add(cue);
   // large target name, placed in open space beside the body (never behind it, never cropped)
-  const tgt = document.createElement('p'); tgt.className = 'lx-target'; tgt.setAttribute('aria-hidden', 'true'); document.body.appendChild(tgt);
-  const mk = document.createElement('p'); mk.className = 'lx-marklbl'; mk.setAttribute('aria-hidden', 'true'); document.body.appendChild(mk);
+  const tgt = document.createElement('p'); tgt.className = 'lx-target'; tgt.setAttribute('aria-hidden', 'true'); document.body.appendChild(tgt); let tgtW = 0, tgtH = 0; addEventListener('resize', () => { tgt.dataset.k = ''; mk.dataset.k = ''; }); document.fonts?.ready.then(() => { tgt.dataset.k = ''; mk.dataset.k = ''; });
+  const mk = document.createElement('p'); mk.className = 'lx-marklbl'; mk.setAttribute('aria-hidden', 'true'); document.body.appendChild(mk); let mkW = 0;
   let t0 = 0.9, focus = 'sun', shown = 'earth';
   const HERO = new THREE.Vector3(0, 62, 96);
   const camPos = HERO.clone(), camLook = new THREE.Vector3();
@@ -200,8 +200,11 @@ async function sky() {
   const clock = new THREE.Clock(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
   let first = true, frameN = 0, copyBox = null, cardBox = null, spin = {};
   const project = p => { v4.copy(p).project(cam); return { x: (v4.x * 0.5 + 0.5) * innerWidth, y: (-v4.y * 0.5 + 0.5) * innerHeight, z: v4.z }; };
+  let aFt = 0, aFn = 0;
   r.setAnimationLoop(() => {
-    const dt = Math.min(clock.getDelta(), 0.05);
+    const rawDt = clock.getDelta(), dt = Math.min(rawDt, 0.05);
+    // adaptive quality: slow machines drop to a lower render resolution instead of stuttering
+    aFt += rawDt; aFn++; if (aFn >= 90) { if (aFt / aFn > 0.03 && r.getPixelRatio() > 1) { r.setPixelRatio(Math.max(1, r.getPixelRatio() - 0.25)); r.setSize(innerWidth, innerHeight, false); } aFt = 0; aFn = 0; }
     if (!reduced) t0 += dt * 0.03;
     sunMat.uniforms.uT.value += dt;
     const key = focus === 'exit' ? 'mars' : focus, stop = !!focusBody[key];
@@ -273,8 +276,8 @@ async function sky() {
       const c = project(b.position); v3.copy(cam.up).applyQuaternion(cam.quaternion).normalize();
       const top = project(b.position.clone().add(new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1).multiplyScalar(size)));
       const rad = Math.abs(c.y - top.y);
-      tgt.textContent = CH[key].world; tgt.style.setProperty('--acc', GAME[key].accent);
-      const w = tgt.offsetWidth, h = tgt.offsetHeight, pad = 14;
+      if (tgt.dataset.k !== key) { tgt.dataset.k = key; tgt.textContent = CH[key].world; tgt.style.setProperty('--acc', GAME[key].accent); tgtW = tgt.offsetWidth; tgtH = tgt.offsetHeight; }
+      const w = tgtW, h = tgtH, pad = 14;
       let x = c.x - w / 2, y = c.y - rad - h - 18;
       if (y < 84) { y = Math.max(84, c.y - h / 2); x = c.x + rad + 24; if (x + w > innerWidth - pad) x = c.x - rad - 24 - w; }
       x = Math.max(pad, Math.min(innerWidth - w - pad, x)); y = Math.max(84, Math.min(innerHeight - h - pad, y));
@@ -284,7 +287,7 @@ async function sky() {
       tgt.style.transform = `translate(${x}px, ${y}px)`; tgt.classList.toggle('on', y >= 70);
       const m = marks[key];
       if (m) { const mp = new THREE.Vector3(); m.getWorldPosition(mp); const q = project(mp); const facing = mp.clone().sub(b.position).normalize().dot(cam.position.clone().sub(mp).normalize()) > 0.15;
-        mk.textContent = markLbl[key]; const mw = mk.offsetWidth; mk.style.transform = `translate(${q.x + 14 + mw > innerWidth - 10 ? q.x - 14 - mw : q.x + 14}px, ${Math.min(innerHeight - 34, q.y - 10)}px)`; const qx = q.x + 14 + mw > innerWidth - 10 ? q.x - 14 - mw : q.x + 14, overCard = cardBox && qx < cardBox.right && qx + mw > cardBox.left && q.y < cardBox.bottom && q.y > cardBox.top - 20;
+        if (mk.dataset.k !== key) { mk.dataset.k = key; mk.textContent = markLbl[key]; mkW = mk.offsetWidth; } const mw = mkW; mk.style.transform = `translate(${q.x + 14 + mw > innerWidth - 10 ? q.x - 14 - mw : q.x + 14}px, ${Math.min(innerHeight - 34, q.y - 10)}px)`; const qx = q.x + 14 + mw > innerWidth - 10 ? q.x - 14 - mw : q.x + 14, overCard = cardBox && qx < cardBox.right && qx + mw > cardBox.left && q.y < cardBox.bottom && q.y > cardBox.top - 20;
         mk.classList.toggle('on', facing && !overCard && qx > 4); }
       else mk.classList.remove('on');
     } else { tgt.classList.remove('on'); mk.classList.remove('on'); }

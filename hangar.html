@@ -67,7 +67,7 @@ html.embed .bar{gap:6px}html.embed .bar button{padding:6px 11px;font-size:11px}
 (function(){
 const $=id=>document.getElementById(id),T=THREE,PI=Math.PI;
 const R=new T.WebGLRenderer({canvas:$('c'),antialias:true});
-R.setPixelRatio(Math.min(devicePixelRatio,2));R.outputEncoding=T.sRGBEncoding;R.toneMapping=T.ACESFilmicToneMapping;
+const EMBED=/[?&]embed/.test(location.search);let DPR=Math.min(devicePixelRatio,EMBED?1.5:2);R.setPixelRatio(DPR);R.outputEncoding=T.sRGBEncoding;R.toneMapping=T.ACESFilmicToneMapping;
 R.shadowMap.enabled=true;R.toneMappingExposure=1.15;R.shadowMap.type=T.PCFSoftShadowMap;
 const S=new T.Scene(),cam=new T.PerspectiveCamera(40,1,.1,3000);
 
@@ -78,7 +78,7 @@ const env=tex(1024,512,(x,w,h)=>{const g=x.createLinearGradient(0,0,0,h);g.addCo
  x.fillStyle='rgba(255,255,255,.55)';x.fillRect(120,80,150,40);x.fillRect(430,60,90,26);x.fillStyle='rgba(160,190,255,.35)';x.fillRect(250,300,260,60);});
 env.mapping=T.EquirectangularReflectionMapping;
 S.environment=new T.PMREMGenerator(R).fromEquirectangular(env).texture;
-const sun=new T.DirectionalLight(0xfff1d6,2.4);sun.position.set(30,24,26);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+const sun=new T.DirectionalLight(0xfff1d6,2.4);sun.position.set(30,24,26);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
 Object.assign(sun.shadow.camera,{left:-22,right:22,top:22,bottom:-22,near:1,far:120});sun.shadow.bias=-.0006;S.add(sun);
 S.add(new T.HemisphereLight(0x6f8fff,0x1a1020,.35));const rimL=new T.DirectionalLight(0x7da2ff,1.1);rimL.position.set(-25,-8,-30);S.add(rimL);
 
@@ -327,7 +327,13 @@ cv.addEventListener('wheel',e=>{e.preventDefault();zoom=clamp(zoom*(1+e.deltaY*.
 function resize(){R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();ui();
 
-function loop(){requestAnimationFrame(loop);t+=.016;
+let run=!EMBED,ft=0,fn=0,lastT=performance.now();
+addEventListener('message',e=>{if(e.data&&typeof e.data.nxRun==='boolean'){run=e.data.nxRun;lastT=performance.now();}});
+function loop(){requestAnimationFrame(loop);if(!run||document.hidden)return;
+ const now=performance.now(),dt=Math.min(.1,(now-lastT)/1000);lastT=now;
+ // adaptive quality: if frames are slow, lower resolution, then drop soft shadows
+ ft+=dt;fn++;if(fn>=60){if(ft/fn>.028){if(DPR>1){DPR=Math.max(1,DPR-.25);R.setPixelRatio(DPR);resize();}else if(R.shadowMap.enabled){R.shadowMap.enabled=false;sat.traverse(o=>{if(o.material)[].concat(o.material).forEach(m=>m.needsUpdate=true);});}}ft=0;fn=0;}
+ t+=.016;
  if(auto&&!reduce&&!drag)yaw+=.003;
  expl+=(explG-expl)*.06;dep+=(depG-dep)*.05;
  P.forEach(p=>{const u=p.g.userData;p.g.position.copy(u.base).addScaledVector(u.ex,expl);p.g.visible=!(brief&&p.add);});
@@ -339,7 +345,7 @@ function loop(){requestAnimationFrame(loop);t+=.016;
  cam.position.set(tgt.x+Math.sin(yaw)*Math.cos(pitch)*dist,tgt.y+Math.sin(pitch)*dist,tgt.z+Math.cos(yaw)*Math.cos(pitch)*dist);
  cam.lookAt(tgt);R.render(S,cam);
  const w=innerWidth,h=innerHeight;P.forEach(p=>{v.copy(p.g.userData.lab);p.g.localToWorld(v);v.project(cam);
-  p.el.style.display=(showL&&v.z<1&&!(brief&&p.add))?'block':'none';p.el.style.transform='translate('+((v.x*.5+.5)*w)+'px,'+((-v.y*.5+.5)*h)+'px) translate(-50%,-50%)';});}
+  const sh=(showL&&v.z<1&&!(brief&&p.add));if(p.el._sh!==sh){p.el.style.display=sh?'block':'none';p.el._sh=sh;}if(sh)p.el.style.transform='translate('+((v.x*.5+.5)*w)+'px,'+((-v.y*.5+.5)*h)+'px) translate(-50%,-50%)';});}
 document.querySelectorAll('#tabs button').forEach(x=>x.onclick=()=>load(x.dataset.m));
 addEventListener('keydown',e=>{const k={ArrowLeft:[.12,0],ArrowRight:[-.12,0],ArrowUp:[0,-.1],ArrowDown:[0,.1]}[e.key];
  if(k){e.preventDefault();yaw+=k[0];pitch=clamp(pitch+k[1],-1.45,1.45);auto=false;ui();}

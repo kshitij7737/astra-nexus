@@ -20,6 +20,7 @@ const CHAPTERS = ['Overview', 'What we know', 'Where to look', 'Instruments', 'H
 
 export async function mountMissionModule(root, opts = {}) {
   let mission = MISSIONS.find(m => m.id === opts.mission) || MISSIONS[0];
+  let hangarIO = null;
   let stage = null, active = 1, selected = 0, hangarTab = 'craft', renderToken = 0;
   const cfg = { area: BUILDER.arrayArea.def, eff: 0, angle: 0, vol: BUILDER.dataVolume.def, rate: 0, alt: null, instruments: ['Camera'] };
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -250,11 +251,15 @@ export async function mountMissionModule(root, opts = {}) {
     if (hangarTab === 'craft') {
       const sc = mission.spacecraft;
       // the team's concept spacecraft viewer, with its own controls (labels, explode, arrays, engine, blueprint)
-      stage?.setCraft(sc.model); if (stage?.craftRoot) stage.craftRoot.visible = false;
+      stage?.hideCraft(true);
       const fr = document.createElement('iframe');
       fr.className = 'mm-hangar-frame'; fr.title = `${mission.name} concept spacecraft, interactive 3D`;
       fr.src = `hangar.html?m=${encodeURIComponent(mission.id)}&embed=1`; fr.loading = 'lazy';
       stEl.appendChild(fr); stEl.classList.add('has-hangar');
+      // the viewer only draws while it is on screen, so it never competes with the page's own 3D scene
+      let onScreen = false; const tell = () => fr.contentWindow?.postMessage({ nxRun: onScreen }, '*');
+      fr.addEventListener('load', tell);
+      hangarIO?.disconnect(); hangarIO = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; tell(); }, { rootMargin: '80px' }); hangarIO.observe(stEl);
       note.innerHTML = '';
       root.querySelector('.mm-tabpanel').innerHTML = `
         <p class="mm-body"><b>The ${esc(mission.name)} concept spacecraft.</b> Tap a label on the model to read about that part.</p>
@@ -267,6 +272,7 @@ export async function mountMissionModule(root, opts = {}) {
         </ul>
         <p class="mm-muted">${TAG.conceptual} Shape inspired by ${esc(sc.ref.split('(')[0].trim())}. Not NASA hardware.</p>`;
     } else {
+      hangarIO?.disconnect(); stage?.hideCraft(false);
       note.innerHTML = `${TAG.conceptual} Not NASA hardware.`;
       renderBuilder();
     }
@@ -354,5 +360,5 @@ export async function mountMissionModule(root, opts = {}) {
   }
 
   render();
-  return { setMission, destroy() { window.removeEventListener('resize', onResize); io?.disconnect(); revealIO?.disconnect(); stage?.dispose(); root.innerHTML = ''; } };
+  return { setMission, destroy() { window.removeEventListener('resize', onResize); io?.disconnect(); hangarIO?.disconnect(); revealIO?.disconnect(); stage?.dispose(); root.innerHTML = ''; } };
 }

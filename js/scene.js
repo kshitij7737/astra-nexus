@@ -400,6 +400,7 @@ export class Stage {
     this.hemi.color.copy(col);
     this.focusQ = null; this.selected = -1; this.first = true;
   }
+  hideCraft(v) { this.craftHidden = !!v; if (this.craftRoot && v) this.craftRoot.visible = false; }
   setCraft(model, cfg) {
     dispose(this.craftRoot); this.scene.remove(this.craftRoot);
     this.craftRoot = new THREE.Group(); this.scene.add(this.craftRoot);
@@ -445,7 +446,10 @@ export class Stage {
     this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
   }
   tick() {
-    const dt = Math.min(this.clock.getDelta(), 0.05), k = this.reduced || this.first ? 1 : 1 - Math.pow(0.002, dt);
+    const raw = this.clock.getDelta();
+    this._ft = (this._ft || 0) + raw; this._fn = (this._fn || 0) + 1;
+    if (this._fn >= 90) { if (this._ft / this._fn > 0.03 && this.renderer.getPixelRatio() > 1) { this.renderer.setPixelRatio(Math.max(1, this.renderer.getPixelRatio() - 0.25)); this.resize(); } this._ft = 0; this._fn = 0; }
+    const dt = Math.min(raw, 0.05), k = this.reduced || this.first ? 1 : 1 - Math.pow(0.002, dt);
     this.first = false;
     const lerp = (s, key, v) => { s[key] += (v - s[key]) * k; };
     // world placement
@@ -470,6 +474,7 @@ export class Stage {
     lerp(this.cState, 'fade', this.craftFade);
     this.craftRoot.position.set(this.cState.x, this.cState.y, 0); this.craftRoot.scale.setScalar(this.cState.s);
     setOpacity(this.craftRoot, this.cState.fade);
+    if (this.craftHidden) this.craftRoot.visible = false; // the hangar shows its own viewer instead
     // motion
     const moving = !this.paused;
     if (moving) this.spin += dt * 0.06;
