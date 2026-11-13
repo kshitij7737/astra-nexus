@@ -22,8 +22,9 @@ const sceneVeil = $('scene-veil');
 const clips = {
   nebula: [{file:'nebula', title:'Nebula evolution', time:'0:34'}],
   planets: [
+    {file:'planet-formation', title:'From nebula to solar system', time:'0:31'},
     {file:'worlds-from-dust', title:'Worlds from dust', time:'0:33'},
-    {file:'nebula-to-system', title:'From nebula to planetary system', time:'0:28'},
+    {file:'nebula-to-system', title:'Dust to planets: artwork sequence', time:'0:28'},
   ],
   stars: [
     {file:'sun-like-star', title:'Evolution of a Sun-like star', time:'0:42'},
