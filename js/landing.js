@@ -28,10 +28,13 @@ function intro(force) {
   if (seen && !force) { el.hidden = true; return; }
   el.hidden = false; el.classList.remove('is-out'); document.body.classList.add('lx-locked');
   $('#lx-enter').focus();
+  const clk = $('#lx-clock'), t0 = performance.now();
+  const tick = setInterval(() => { const sec = Math.floor((performance.now() - t0) / 1000); clk.textContent = `T+ 00:${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`; }, 250);
   $('#lx-enter').onclick = () => {
+    clearInterval(tick);
     try { sessionStorage.setItem('nx-intro', '1'); } catch { /* ignore */ }
     el.classList.add('is-out'); document.body.classList.remove('lx-locked');
-    setTimeout(() => { el.hidden = true; }, reduced ? 0 : 900);
+    setTimeout(() => { el.hidden = true; }, reduced ? 0 : 1600);
   };
 }
 
@@ -64,7 +67,10 @@ function chapters() {
       <p class="lx-card__meta"><span>Challenge ${'●'.repeat(CHAL[id])}${'○'.repeat(3 - CHAL[id])}</span><span>${best != null ? `Best score ${best}` : 'Not flown yet'}</span></p>
       <div class="lx-row"><a class="lx-btn lx-btn--go" href="play.html?mission=${id}">Start mission</a><a class="lx-btn" href="explore.html?mission=${id}">Explore</a></div></article>`; }).join('')}</div>
   </section>`;
-  $('.lx-bodies').innerHTML = STORY.map((id, i) => `<li><a href="#ch-${id}" style="--acc:${GAME[id].accent}"><span>0${i + 1}</span><b>${esc(GAME[id].name)}</b><em>${esc(GAME[id].world)}</em></a></li>`).join('');
+  const ORB = { astra: 'moon', earth: 'earth-day', lunaris: 'moon', mars: 'mars' };
+  $('.lx-bodies').innerHTML = STORY.map((id, i) => `<li><a href="#ch-${id}" style="--acc:${GAME[id].accent}">
+    <i class="lx-orb lx-orb--${id}" style="background-image:url(textures/sm/${ORB[id]}.jpg)" aria-hidden="true"></i>
+    <span class="lx-card__n">0${i + 1}</span><b>${esc(GAME[id].name)}</b><em>${esc(GAME[id].world)}</em><small>${esc(CH[id].h)}</small></a></li>`).join('');
 }
 
 // ---------- archive
@@ -106,12 +112,31 @@ async function sky() {
   for (let i = 0; i < n; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(600 + Math.random() * 600); p.set([v.x, v.y, v.z], i * 3); }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(p, 3));
   scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.3, sizeAttenuation: true, transparent: true, opacity: 0.75 })));
+  // Milky Way: a soft band of dense, slightly tinted stars plus faint glow clouds along one great circle (illustrative)
+  {
+    const m = 9000, mp = new Float32Array(m * 3), mc = new Float32Array(m * 3), axis = new THREE.Vector3(0.35, 1, -0.25).normalize();
+    const bA = new THREE.Vector3(1, 0, 0).cross(axis).normalize(), bB = axis.clone().cross(bA), tint = [[1, .92, .85], [.8, .87, 1], [1, 1, 1], [.95, .8, 1]];
+    for (let i = 0; i < m; i++) {
+      const a = Math.random() * Math.PI * 2, h = (Math.random() + Math.random() + Math.random() - 1.5) * 0.16, R = 900 + Math.random() * 200;
+      const v = bA.clone().multiplyScalar(Math.cos(a)).addScaledVector(bB, Math.sin(a)).addScaledVector(axis, h).normalize().multiplyScalar(R);
+      mp.set([v.x, v.y, v.z], i * 3); const c = tint[i % 4], k = 0.45 + Math.random() * 0.55; mc.set([c[0] * k, c[1] * k, c[2] * k], i * 3);
+    }
+    const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(mp, 3)); mg.setAttribute('color', new THREE.BufferAttribute(mc, 3));
+    scene.add(new THREE.Points(mg, new THREE.PointsMaterial({ size: 0.9, vertexColors: true, transparent: true, opacity: 0.8, depthWrite: false })));
+    const cloud = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+    const hues = [0x6a5acd, 0x3a6ea5, 0xb07a5a, 0x7a4a9a, 0x2f5f8a];
+    for (let i = 0; i < 26; i++) {
+      const a = i / 26 * Math.PI * 2 + Math.random() * 0.2, v = bA.clone().multiplyScalar(Math.cos(a)).addScaledVector(bB, Math.sin(a)).addScaledVector(axis, (Math.random() - 0.5) * 0.12).normalize().multiplyScalar(1150);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloud, color: hues[i % hues.length], transparent: true, opacity: 0.16 + Math.random() * 0.12, blending: THREE.AdditiveBlending, depthWrite: false }));
+      sp.position.copy(v); sp.scale.setScalar(260 + Math.random() * 260); scene.add(sp);
+    }
+  }
   // sun
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,240,210,1)'); gr.addColorStop(0.2, 'rgba(255,190,110,.6)'); gr.addColorStop(1, 'rgba(255,140,60,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
   const sunMat = new THREE.ShaderMaterial({
-    uniforms: { uT: { value: 0 } },
+    uniforms: { uT: { value: 0 }, uB: { value: 1 } },
     vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix*mv; }',
-    fragmentShader: `uniform float uT; varying vec3 vN; varying vec3 vV; varying vec3 vP;
+    fragmentShader: `uniform float uT; uniform float uB; varying vec3 vN; varying vec3 vV; varying vec3 vP;
       float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719)))*43758.5453); }
       float n(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z); }
@@ -119,7 +144,7 @@ async function sky() {
         float g = n(vP*4.0+uT*0.15)*0.6 + n(vP*10.0-uT*0.25)*0.4;
         vec3 core = vec3(1.0,0.96,0.86), limb = vec3(1.0,0.42,0.08);
         vec3 c = mix(limb, core, pow(mu, 0.45)) * (0.82 + 0.3*g);
-        gl_FragColor = vec4(c*1.15, 1.0); }`,
+        gl_FragColor = vec4(c*1.15*uB, 1.0); }`,
   });
   const sun = new THREE.Mesh(new THREE.SphereGeometry(3.2, 64, 48), sunMat); scene.add(sun);
   const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a50, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.5 })); corona.scale.setScalar(44); scene.add(corona);
@@ -135,7 +160,7 @@ async function sky() {
   const loader = new THREE.TextureLoader();
   const planet = (name, size, extra) => {
     const mat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
-    loader.load(`textures/planets/${name}.jpg`, t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true; });
+    loader.load(`textures/planets/${name}.jpg`, t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; mat.map = t; mat.color.set(name === 'mercury' ? 0x5a5a5a : name === 'venus' ? 0x6a6458 : 0xffffff); mat.needsUpdate = true; });
     const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(size, 64, 48), mat)); extra?.(g, size); scene.add(g); return g;
   };
   const ringTex = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 8; const g = c.getContext('2d');
@@ -157,6 +182,11 @@ async function sky() {
     bodies[name] = b;
     const lb = document.createElement('span'); lb.textContent = name; lbBox.appendChild(lb); labels.push({ b, lb, size });
   });
+  // main asteroid belt between Mars and Jupiter (illustrative density)
+  const belt = (() => { const m = 2600, bp = new Float32Array(m * 3);
+    for (let i = 0; i < m; i++) { const a = Math.random() * Math.PI * 2, rr = dist(2.1 + Math.random() * 1.2) + (Math.random() - 0.5) * 1.2; bp.set([Math.cos(a) * rr, (Math.random() - 0.5) * 0.9, Math.sin(a) * rr], i * 3); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(bp, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xb8a58c, size: 0.16, transparent: true, opacity: 0.7, depthWrite: false })); scene.add(pts); return pts; })();
   orbitLine(0.922 * 20, 0.191, 0x4aa8ff, 0.5, 0.06); // Apophis orbit, approximate (JPL Small-Body Database)
   const moon = W('lunaris'); moon.scale.setScalar(0.32); scene.add(moon);
   const apo = W('astra'); apo.scale.setScalar(0.32); scene.add(apo);
@@ -164,7 +194,24 @@ async function sky() {
   const focusBody = { astra: apo, earth, lunaris: moon, mars };
   const sizeOf = { astra: 0.32, earth: 1.1, lunaris: 0.32, mars: 0.8 };
   // Earth: thin, natural blue edge and less glare, so the surface reads (violet stays in the interface)
-  earth.traverse(o => { const u = o.material?.uniforms; if (u?.uStrength) { u.uStrength.value = 0.6; u.uPower.value = 3.6; } });
+  const atmos = [];
+  earth.traverse(o => { const u = o.material?.uniforms; if (u?.uStrength) { u.uStrength.value = 0.6; u.uPower.value = 3.6; atmos.push(u); } });
+  const clouds = earth.children.find(c => c.userData.layer === 'clouds');
+  // intro only: a thin sunrise limb, orange where the Sun is about to break through, fading to blue along the horizon
+  const limb = new THREE.Mesh(new THREE.SphereGeometry(1.03, 128, 96), new THREE.ShaderMaterial({
+    uniforms: { uSun: { value: new THREE.Vector3(0, 0, 1) }, uI: { value: 1 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+    fragmentShader: `uniform vec3 uSun; uniform float uI; varying vec3 vN; varying vec3 vV;
+      void main(){ float d = dot(vN, vV); float g = pow(clamp(1.0 + d, 0.0, 1.0), 14.0);
+        float sf = clamp(dot(vN, uSun) * 0.5 + 0.5, 0.0, 1.0);
+        vec3 col = mix(vec3(0.18, 0.42, 1.0), vec3(1.0, 0.62, 0.28), pow(sf, 6.0));
+        gl_FragColor = vec4(col * g * (0.35 + 3.2 * pow(sf, 5.0)) * uI, 1.0); }`,
+    side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  limb.visible = false; earth.add(limb);
+  const india = latLonToVec(23, 79, 1);
+  const surf = earth.children.find(c => c.geometry?.parameters?.radius === 1), _ws = new THREE.Vector3();
+  const earthR = () => (surf || earth).getWorldScale(_ws).x;
   // Targets marked on the surface: Jezero crater and the lunar south polar region (approximate positions, labelled as such)
   const marker = (body, lat, lon, color) => {
     const g = new THREE.Group(); g.position.copy(latLonToVec(lat, lon, 1.004));
@@ -198,6 +245,8 @@ async function sky() {
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { focus = e.target.dataset.focus; document.body.dataset.focus = focus; document.body.style.setProperty('--acc', GAME[focus]?.accent || '#ff7a3d'); } }), { rootMargin: '-45% 0px -45% 0px' });
   $$('[data-focus]').forEach(s => io.observe(s));
   const clock = new THREE.Clock(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3();
+  const Y = new THREE.Vector3(0, 1, 0), camUp = Y.clone(), flare = $('#lx-flare'), flareEls = flare ? [...flare.children] : [];
+  let introT = 0, outT = 99, introWas = false, introRise = 0.1, introAlt = 0, sunS = 1;
   let first = true, frameN = 0, copyBox = null, cardBox = null, spin = {};
   const project = p => { v4.copy(p).project(cam); return { x: (v4.x * 0.5 + 0.5) * innerWidth, y: (-v4.y * 0.5 + 0.5) * innerHeight, z: v4.z }; };
   let aFt = 0, aFn = 0;
@@ -211,16 +260,17 @@ async function sky() {
     PL.forEach(([name, au, , period, phase]) => { const a = t0 / period + phase, d = dist(au); bodies[name].position.set(Math.cos(a) * d, 0, Math.sin(a) * d); });
     { const t = t0 / 0.886 + 0.25, a = 0.922 * 20, e = 0.191, rr = a * (1 - e * e) / (1 + e * Math.cos(t)); apo.position.set(Math.cos(t) * rr, Math.sin(t) * rr * Math.sin(0.06), Math.sin(t) * rr * Math.cos(0.06)); }
     moon.position.copy(earth.position).add(v3.set(Math.cos(t0 * 12) * 2.6, 0, Math.sin(t0 * 12) * 2.6));
-    const narrow = innerWidth < 760;
+    const narrow = innerWidth < 760, introOn = document.body.classList.contains('lx-locked');
     // at a stop only the target is drawn: no other planets, no heliocentric orbit lines
     Object.values(bodies).forEach(b => { b.visible = !stop || b === focusBody[key]; });
     moon.visible = !stop || key === 'lunaris'; apo.visible = !stop || key === 'astra';
-    orbitLines.forEach(l => { l.visible = !stop; });
+    orbitLines.forEach(l => { l.visible = !stop && !introOn; }); belt.visible = !stop && !introOn;
+    if (introOn) Object.entries(bodies).forEach(([nm, bd]) => { bd.visible = nm === 'Earth'; });
     [corona, sunGlow].forEach(o => { o.visible = !stop; });
-    if (!stop) { if (focus !== 'dash') [earth, mars, moon, apo, ...['Mercury', 'Venus', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'].map(n => bodies[n])].forEach(b => { b.rotation.y += dt * 0.15; }); }
+    if (!stop && !introOn) { if (focus !== 'dash') [earth, mars, moon, apo, ...['Mercury', 'Venus', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'].map(n => bodies[n])].forEach(b => { b.rotation.y += dt * 0.15; }); }
     let b = null, size = 1, side = new THREE.Vector3(), off = new THREE.Vector3();
     if (!stop) {
-      goal.pos.copy(HERO).multiplyScalar(narrow ? 1.5 : 1); goal.look.set(narrow ? 0 : -14, 0, 0);
+      goal.pos.copy(HERO).multiplyScalar(narrow ? 1.5 : 1); goal.look.set(narrow ? 0 : -19, narrow ? 0 : 3, 0);
       craftGoal.copy(earth.position).add(v3.set(0, 2.5, 0));
     } else {
       b = focusBody[key]; size = sizeOf[key];
@@ -248,13 +298,48 @@ async function sky() {
     }
     cue.visible = stop && focus !== 'exit'; cue.material.color.set(GAME[key]?.accent || '#ffffff'); cue.material.opacity = 0.35;
     Object.entries(marks).forEach(([k, m]) => { m.visible = stop && k === key; });
-    const k = reduced || first ? 1 : 1 - Math.pow(0.04, dt);
-    camPos.lerp(goal.pos, k); camLook.lerp(goal.look, k);
-    cam.position.copy(camPos); cam.lookAt(camLook);
+    if (introOn) {
+      // orbital sunrise: low over Earth's night side, the Sun climbing over the limb (illustrative view)
+      introT += Math.min(rawDt, 0.5); outT = 0; introWas = true;
+      const R = earthR(), D = R * 1.12, dip = Math.acos(R / D), sDir = v3.copy(earth.position).negate().normalize();
+      // the Sun's height above the limb eases from hidden to half its disc showing (measured each frame, so it works at any screen size)
+      const wantAlt = reduced ? 0.01 : -0.07 + 0.08 * (1 - Math.exp(-introT / 2.4));
+      introRise += (wantAlt - introAlt) * (first ? 1 : 0.7); const rise = introRise;
+      const q = new THREE.Vector3().crossVectors(sDir, Y).normalize().multiplyScalar(narrow ? 0.9 : 0.9).addScaledVector(Y, 0.42).normalize();
+      const el = -dip + rise, nUp = sDir.clone().multiplyScalar(Math.sin(el)).addScaledVector(q, Math.cos(el)).normalize();
+      camPos.copy(earth.position).addScaledVector(nUp, D);
+      const sC = sun.position.clone().sub(camPos).normalize(), f0 = sC.addScaledVector(nUp, -sC.dot(nUp)).normalize();
+      const pitch = dip - (narrow ? 0.26 : 0.2), f = f0.multiplyScalar(Math.cos(pitch)).addScaledVector(nUp, -Math.sin(pitch));
+      camLook.copy(camPos).add(f); camUp.copy(nUp);
+      // turn Earth so the subcontinent's city lights sit under the camera, drifting slowly eastward
+      earth.rotation.y = Math.atan2(india.z, india.x) - Math.atan2(nUp.z, nUp.x) - 0.32 + introT * 0.006;
+    } else {
+      outT += Math.min(rawDt, 0.5);
+      const k = reduced || first ? 1 : 1 - Math.pow(outT < 3.2 && introWas ? 0.3 : 0.04, dt);
+      camPos.lerp(goal.pos, k); camLook.lerp(goal.look, k); camUp.lerp(Y, k).normalize();
+    }
+    cam.position.copy(camPos); cam.up.copy(camUp); cam.lookAt(camLook); cam.updateMatrixWorld();
+    { const sd = v3.copy(sun.position).sub(earth.position).normalize().transformDirection(cam.matrixWorldInverse); atmos.forEach(u => { u.uSun.value.copy(sd); u.uSunOn.value = 1; }); limb.material.uniforms.uSun.value.copy(sd); }
+    limb.visible = introOn; if (clouds) clouds.visible = !introOn;
+    if (surf) { const m = surf.material; // sunrise shot: no grazing glints or bump ridges flickering along the horizon
+      m.roughness = introOn ? 4 : 2; if (m.bumpMap) m.bumpScale = introOn ? 0 : 1.6; if (m.map) m.color.setScalar(introOn ? 0.3 : 1); }
+    atmos.forEach(u => { u.uStrength.value = introOn ? 0.22 : 0.6; });
+    corona.material.opacity = introOn ? 0.3 : 0.5; sunS += ((introOn ? 0.28 : 1) - sunS) * (introOn ? 1 : Math.min(1, dt * 1.5)); sun.scale.setScalar(sunS); sunMat.uniforms.uB.value = introOn ? 4 : 1; sunGlow.scale.setScalar(24 * (0.5 + sunS * 0.5)); moon.visible = moon.visible && !introOn;
+    // lens flare over the intro, strongest as the Sun clears the limb
+    if (introOn && flare) {
+      const sq = project(sun.position), toE = earth.position.clone().sub(cam.position), dE = toE.length(), angR = Math.asin(Math.min(1, earthR() / dE));
+      const sep = toE.normalize().angleTo(sun.position.clone().sub(cam.position).normalize()); introAlt = sep - angR; const vis = Math.max(0, Math.min(1, (introAlt + 0.045) / 0.05));
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      // while the Sun's centre is still below the limb, anchor the flare at the horizon point beneath it
+      let q = sq;
+      if (introAlt < 0) { const vdir = earth.position.clone().sub(cam.position).normalize(), sdir = sun.position.clone().sub(cam.position).normalize(), ax = vdir.clone().cross(sdir).normalize(); q = project(cam.position.clone().addScaledVector(vdir.applyAxisAngle(ax, angR + 0.004), 5)); }
+      flare.style.setProperty('--fl', (q.z < 1 ? vis : 0).toFixed(3));
+      flareEls.forEach((e, i) => { const t = +e.dataset.k; e.style.transform = `translate(${q.x + (cx - q.x) * t}px, ${q.y + (cy - q.y) * t}px) translate(-50%, -50%)`; });
+    }
     // craft: the current mission's own spacecraft; travels between stops, points along its motion, fires its engine while moving fast
     const want = stop ? key : 'earth';
     if (want !== shown) { crafts[shown].visible = false; shown = want; }
-    const craft = crafts[shown]; craft.visible = true;
+    const craft = crafts[shown]; craft.visible = !introOn;
     lastCraft.copy(craftPos);
     craftPos.lerp(craftGoal, reduced || first ? 1 : 1 - Math.pow(focus === 'exit' ? 0.3 : 0.15, dt));
     craft.position.copy(craftPos);
@@ -266,7 +351,7 @@ async function sky() {
     const plume = craft.userData.plume; if (plume) plume.material.opacity = sp > sc * 8 ? Math.min(0.9, sp / (sc * 40)) : 0;
     craft.scale.setScalar(sc);
     // planet labels only on the overview
-    const showLabels = focus === 'sun';
+    const showLabels = focus === 'sun' && !introOn && !(introWas && outT < 3.4);
     if (showLabels && (frameN++ % 20 === 0)) { const a = $('.lx-hero__copy h2')?.getBoundingClientRect(), bb = $('.lx-hero .lx-row')?.getBoundingClientRect() || a, rg = document.createRange(); rg.selectNodeContents($('.lx-hero__copy .lx-lede')); const c = rg.getBoundingClientRect(); copyBox = a && { left: a.left, right: Math.max(c.right, a.left + 380), top: a.top - 30, bottom: Math.max(bb.bottom, c.bottom) }; }
     lbBox.classList.toggle('on', showLabels);
     if (showLabels) labels.forEach(({ b: pb, lb, size: ps }) => { v3.copy(pb.position); v3.y += ps + 0.8; const q = project(v3); lb.style.transform = `translate(${q.x}px, ${q.y}px) translate(-50%, -100%)`; lb.style.opacity = q.z < 1 && !(copyBox && q.x > copyBox.left - 30 && q.x < copyBox.right + 30 && q.y > copyBox.top && q.y < copyBox.bottom + 16) ? 1 : 0; });

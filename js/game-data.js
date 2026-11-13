@@ -221,7 +221,7 @@ export const GAME = {
   },
 
   mars: {
-    id: 'mars', budget: 1400, name: 'JEZERO ECHO', world: 'Mars', owner: 'Anthariksha', accent: '#d0674c', accent2: '#a9d4ff',
+    id: 'mars', budget: 1400, name: 'JEZERO ECHO', world: 'Mars', owner: 'Anttariksha', accent: '#d0674c', accent2: '#a9d4ff',
     tagline: 'Read an ancient lake from orbit.',
     body: { name: 'Mars', radiusKm: 3389.5, mu: 42828, kind: 'mars' },
     solarAU: 1.524,

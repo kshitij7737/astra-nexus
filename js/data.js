@@ -167,7 +167,7 @@ export const MISSIONS = [
   {
     id: 'mars', name: 'JEZERO ECHO', display: 'MARS', subtitle: 'Jezero-focused reconnaissance orbiter',
     reference: 'Science reference: NASA Mars Reconnaissance Orbiter (MRO)',
-    owner: 'Research: Anthariksha', color: 0xc1440e, accent: '#d0674c', glow: 0xd0674c,
+    owner: 'Research: Anttariksha', color: 0xc1440e, accent: '#d0674c', glow: 0xd0674c,
     vertical: 'JEZERO · 18.38° N 77.58° E',
     hero: {
       kicker: 'The dry lake',
