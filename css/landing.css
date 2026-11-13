@@ -131,6 +131,9 @@
 .lx-teamh { margin-top: 30px; }
 .lx-team { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .lx-team li { display: grid; padding: 16px; border-radius: 12px; border: 1px solid var(--line); } .lx-team b { font-weight: 800; font-size: 18px; } .lx-team span { font-size: 13px; color: #cfcbc3; }
+.lx-team li { grid-template-rows: auto 1fr auto; }
+.lx-team-web { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: #e6e2da; font-size: 13px; line-height: 1.45; }
+.lx-team-web strong { display: block; margin-bottom: 2px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .lx-foot { padding: 30px var(--pad); font: 11px var(--mono); color: var(--muted); border-top: 1px solid var(--line); background: #02030a; }
 .lx-linkbtn { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; font: inherit; }
 
