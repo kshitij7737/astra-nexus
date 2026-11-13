@@ -245,15 +245,27 @@ export async function mountMissionModule(root, opts = {}) {
   function renderHangar() {
     root.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === hangarTab)));
     const note = root.querySelector('.mm-stage__note');
+    const stEl = root.querySelector('.mm-stage');
+    stEl.querySelector('.mm-hangar-frame')?.remove(); stEl.classList.remove('has-hangar');
     if (hangarTab === 'craft') {
       const sc = mission.spacecraft;
-      stage?.setCraft(sc.model);
-      note.innerHTML = `${TAG.illustrative} Simplified, not to scale.`;
+      // the team's concept spacecraft viewer, with its own controls (labels, explode, arrays, engine, blueprint)
+      stage?.setCraft(sc.model); if (stage?.craftRoot) stage.craftRoot.visible = false;
+      const fr = document.createElement('iframe');
+      fr.className = 'mm-hangar-frame'; fr.title = `${mission.name} concept spacecraft, interactive 3D`;
+      fr.src = `hangar.html?m=${encodeURIComponent(mission.id)}&embed=1`; fr.loading = 'lazy';
+      stEl.appendChild(fr); stEl.classList.add('has-hangar');
+      note.innerHTML = '';
       root.querySelector('.mm-tabpanel').innerHTML = `
-        <p class="mm-body"><b>${esc(sc.ref)}</b></p>
-        <div class="mm-parts">${sc.parts.map((p, i) => `<button type="button" data-p="${i}" aria-pressed="false"><span>${pad(i + 1)}</span>${esc(p.name)} ${TAG[p.kind]}</button>`).join('')}</div>
-        <div class="mm-pdetail" aria-live="polite"><p class="mm-muted">Pick a part.</p></div>`;
-      root.querySelectorAll('[data-p]').forEach(b => b.onclick = () => selectPart(+b.dataset.p));
+        <p class="mm-body"><b>The ${esc(mission.name)} concept spacecraft.</b> Tap a label on the model to read about that part.</p>
+        <ul class="mm-hangar-how">
+          <li><b>Explode</b> pulls the parts apart so you can see how it fits together.</li>
+          <li><b>Stow arrays</b> folds the solar wings the way they ride inside the rocket.</li>
+          <li><b>Fire engine</b> lights the main engine.</li>
+          <li><b>Blueprint</b> shows the model as a wireframe.</li>
+          <li><b>Core parts only</b> hides the extra concept details.</li>
+        </ul>
+        <p class="mm-muted">${TAG.conceptual} Shape inspired by ${esc(sc.ref.split('(')[0].trim())}. Not NASA hardware.</p>`;
     } else {
       note.innerHTML = `${TAG.conceptual} Not NASA hardware.`;
       renderBuilder();

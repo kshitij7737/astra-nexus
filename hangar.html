@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEXUS//04 hangar, concept spacecraft</title>
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{box-sizing:border-box;--bg:#000;--fg:#e8ecff;--muted:#9aa5d4;--panel:rgba(10,14,36,.78);--accent:#ffb347;--line:rgba(160,175,255,.3);color-scheme:dark;
+padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--fg:#e8ecff}}
+:root[data-theme="dark"]{--bg:#000;--fg:#e8ecff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:Georgia,"Times New Roman",serif;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.hud{position:fixed;left:16px;top:calc(env(safe-area-inset-top,0px) + 14px);pointer-events:none}
+h1{margin:0;font-size:clamp(20px,4vw,30px);font-weight:400}
+.sub{color:var(--muted);font-size:14px;margin-top:4px}
+#card{position:fixed;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 66px);width:min(330px,calc(100% - 24px));background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;backdrop-filter:blur(8px)}
+#card{max-height:34vh;overflow:auto}
+@media(max-width:700px){#card{bottom:calc(env(safe-area-inset-bottom,0px) + 112px)}}
+#card h2{margin:0 0 4px;font-size:17px;font-weight:400;color:var(--accent)}
+#card p{margin:0 0 6px;font-size:14px;line-height:1.45}
+#card ul{margin:0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.5}
+.bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:calc(100% - 24px)}
+button{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:999px;padding:8px 15px;font:inherit;font-size:14px;cursor:pointer;backdrop-filter:blur(6px)}
+button[aria-pressed="true"],button.on{border-color:var(--accent);color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tag{position:fixed;left:0;top:0;padding:3px 9px;font-size:12px;border-radius:999px;white-space:nowrap}
+#tabs{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 66px);display:flex;gap:6px;flex-wrap:wrap}#tabs button{font-size:13px;padding:6px 12px}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(0,0,0,.5) 100%)}
+.hud,#tabs,#card,.bar,.tag{z-index:2}
+@font-face{font-family:'NX Display';src:url('fonts/archivo.woff2') format('woff2');font-weight:100 900;font-display:swap}
+@font-face{font-family:'NX Mono';src:url('fonts/plex-mono-400.woff2') format('woff2');font-weight:400;font-display:swap}
+body{font-family:'NX Display','Helvetica Neue',Arial,sans-serif}
+button{font-family:'NX Mono',ui-monospace,monospace;font-size:12px;letter-spacing:.04em}
+.tag{font-size:11px}
+#card h2{font-weight:600}
+#c:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cpill{position:fixed;right:12px;top:calc(env(safe-area-inset-top,0px) + 14px);z-index:2;font:11px 'NX Mono',monospace;letter-spacing:.04em;color:#f3d9a6;background:rgba(10,14,36,.78);border:1px solid rgba(255,179,71,.45);border-radius:999px;padding:5px 11px;pointer-events:none}
+html.embed .hud,html.embed #tabs{display:none}
+html.embed #card{top:12px;bottom:auto;max-height:42%;box-sizing:border-box}
+html.embed .cpill{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 112px);right:12px}
+html.embed .bar{gap:6px}html.embed .bar button{padding:6px 11px;font-size:11px}
+@media(max-width:700px){html.embed #card{max-height:24%;width:calc(100% - 24px);padding:9px 11px}html.embed #card h2{font-size:15px}html.embed #card p{font-size:12.5px}html.embed .tag{font-size:9.5px;padding:2px 7px}html.embed .cpill{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="Concept spacecraft in 3D. Drag or use arrow keys to rotate, plus and minus to zoom."></canvas>
+<p class="cpill">Conceptual · Not NASA hardware</p>
+<div class="hud"><h1 id="h">Satellite</h1><div class="sub">Drag or use arrow keys to rotate, scroll or pinch to zoom, tap a label for details</div></div>
+<nav id="tabs"><button data-m="astra">Apophis · ASTRA</button><button data-m="luna">Moon · LUNARIS</button><button data-m="halo">Earth · HALO</button><button data-m="mars">Mars · JEZERO ECHO</button></nav>
+<aside id="card"><h2 id="ct">Overview</h2><p id="cd">An illustrative science spacecraft with deployable solar wings, a steerable dish, a telescope payload and a main engine. Values are conceptual.</p><ul id="cs"></ul></aside>
+<div class="bar">
+<button id="bL" aria-pressed="true">Labels</button>
+<button id="bE" aria-pressed="false">Explode</button>
+<button id="bD" aria-pressed="false">Stow arrays</button>
+<button id="bF" aria-pressed="false">Fire engine</button>
+<button id="bB" aria-pressed="false">Blueprint</button>
+<button id="bS" aria-pressed="false">Core parts only</button>
+<button id="bA" aria-pressed="true">Auto-rotate</button>
+<button id="bR">Reset</button>
+</div>
+<script src="vendor/three.r128.min.js"></script>
+<script>
+(function(){
+const $=id=>document.getElementById(id),T=THREE,PI=Math.PI;
+const R=new T.WebGLRenderer({canvas:$('c'),antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.outputEncoding=T.sRGBEncoding;R.toneMapping=T.ACESFilmicToneMapping;
+R.shadowMap.enabled=true;R.toneMappingExposure=1.15;R.shadowMap.type=T.PCFSoftShadowMap;
+const S=new T.Scene(),cam=new T.PerspectiveCamera(40,1,.1,3000);
+
+function tex(w,h,fn){const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=8;return t;}
+// environment for metal reflections
+const env=tex(1024,512,(x,w,h)=>{const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,'#05081c');g.addColorStop(.5,'#16224d');g.addColorStop(.58,'#4f86d6');g.addColorStop(.75,'#1b4a96');g.addColorStop(1,'#0b2250');x.fillStyle=g;x.fillRect(0,0,w,h);
+ const q=x.createRadialGradient(760,170,0,760,170,120);q.addColorStop(0,'#fff');q.addColorStop(.25,'rgba(255,244,214,.95)');q.addColorStop(1,'rgba(255,240,200,0)');x.fillStyle=q;x.fillRect(0,0,w,h);
+ x.fillStyle='rgba(255,255,255,.55)';x.fillRect(120,80,150,40);x.fillRect(430,60,90,26);x.fillStyle='rgba(160,190,255,.35)';x.fillRect(250,300,260,60);});
+env.mapping=T.EquirectangularReflectionMapping;
+S.environment=new T.PMREMGenerator(R).fromEquirectangular(env).texture;
+const sun=new T.DirectionalLight(0xfff1d6,2.4);sun.position.set(30,24,26);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-22,right:22,top:22,bottom:-22,near:1,far:120});sun.shadow.bias=-.0006;S.add(sun);
+S.add(new T.HemisphereLight(0x6f8fff,0x1a1020,.35));const rimL=new T.DirectionalLight(0x7da2ff,1.1);rimL.position.set(-25,-8,-30);S.add(rimL);
+
+// textures
+const foilT=tex(512,512,(x,w,h)=>{x.fillStyle='#b98a2e';x.fillRect(0,0,w,h);for(let i=0;i<900;i++){x.fillStyle='hsl('+(36+Math.random()*8)+',70%,'+(38+Math.random()*34)+'%)';const px=Math.random()*w,py=Math.random()*h;x.beginPath();x.moveTo(px,py);x.lineTo(px+Math.random()*60-30,py+Math.random()*60-30);x.lineTo(px+Math.random()*60-30,py+Math.random()*60-30);x.fill();}});
+const cellT=tex(360,500,(x,w,h)=>{x.fillStyle='#050b24';x.fillRect(0,0,w,h);const cw=w/4,ch=h/10;for(let i=0;i<4;i++)for(let j=0;j<10;j++){const g=x.createLinearGradient(i*cw,j*ch,(i+1)*cw,(j+1)*ch);g.addColorStop(0,'#2447b0');g.addColorStop(1,'#0e2266');x.fillStyle=g;x.fillRect(i*cw+3,j*ch+3,cw-6,ch-6);x.strokeStyle='rgba(215,200,150,.55)';for(let k=1;k<4;k++){const px=i*cw+3+(cw-6)*k/4;x.beginPath();x.moveTo(px,j*ch+3);x.lineTo(px,(j+1)*ch-3);x.stroke();}}});
+
+const foilB=tex(512,512,(x,w,h)=>{x.fillStyle='#808080';x.fillRect(0,0,w,h);for(let i=0;i<1400;i++){const v=40+Math.random()*180|0;x.fillStyle='rgb('+v+','+v+','+v+')';const px=Math.random()*w,py=Math.random()*h;x.beginPath();x.moveTo(px,py);x.lineTo(px+Math.random()*50-25,py+Math.random()*50-25);x.lineTo(px+Math.random()*50-25,py+Math.random()*50-25);x.fill();}});
+const cellB=tex(360,500,(x,w,h)=>{x.fillStyle='#000';x.fillRect(0,0,w,h);const cw=w/4,ch=h/10;for(let i=0;i<4;i++)for(let j=0;j<10;j++){x.fillStyle='#ddd';x.fillRect(i*cw+3,j*ch+3,cw-6,ch-6);x.fillStyle='#888';for(let k=1;k<4;k++)x.fillRect(i*cw+3+(cw-6)*k/4-1,j*ch+3,2,ch-6);}});
+const brushT=tex(256,256,(x,w,h)=>{x.fillStyle='rgb(95,95,95)';x.fillRect(0,0,w,h);for(let i=0;i<1800;i++){const v=60+Math.random()*70|0;x.strokeStyle='rgba('+v+','+v+','+v+',.5)';x.beginPath();const y=Math.random()*h;x.moveTo(0,y);x.lineTo(w,y+Math.random()*2-1);x.stroke();}});
+// materials
+const std=(c,m,r,o)=>new T.MeshStandardMaterial(Object.assign({color:c,metalness:m,roughness:r},o));
+const mli=std(0xffffff,.85,.32,{map:foilT,bumpMap:foilB,bumpScale:2.4}),silver=std(0xd2d8e4,1,1,{roughnessMap:brushT,bumpMap:brushT,bumpScale:.5}),black=std(0x14161c,.4,.55),
+ white=std(0xf0f0f0,.15,.5,{side:T.DoubleSide}),gold=std(0xe0b04a,1,.2),cell=new T.MeshPhysicalMaterial({map:cellT,bumpMap:cellB,bumpScale:1.2,metalness:.55,roughness:.2,clearcoat:1,clearcoatRoughness:.06}),back=std(0xcfd3da,.3,.6),
+ glass=std(0x2a4a80,1,.05,{emissive:0x0a2a55}),panelMats=[black,black,cell,back,black,black];
+const V=(x,y,z)=>new T.Vector3(x,y,z),Y=V(0,1,0);
+const Box=(w,h,d)=>new T.BoxGeometry(w,h,d),Cyl=(a,b,h,s,o)=>new T.CylinderGeometry(a,b,h,s||32,1,!!o);
+function M(g,m,x,y,z,p){const o=new T.Mesh(g,m);o.position.set(x||0,y||0,z||0);if(p)p.add(o);return o;}
+const CX=(r,l,m,x,y,z,p)=>{const o=M(Cyl(r,r,l),m,x,y,z,p);o.rotation.z=PI/2;return o;};
+const CZ=(r,l,m,x,y,z,p)=>{const o=M(Cyl(r,r,l),m,x,y,z,p);o.rotation.x=PI/2;return o;};
+function link(a,b,r,m,p){const d=b.clone().sub(a),o=M(Cyl(r,r,d.length(),8),m,0,0,0,p);o.position.copy(a).addScaledVector(d,.5);o.quaternion.setFromUnitVectors(Y,d.normalize());return o;}
+
+const sat=new T.Group();S.add(sat);const P=[];
+function part(id,name,desc,spec,ex,lab,g){g.userData={base:g.position.clone(),ex:V(...ex),lab:V(...lab)};P.push({id,name,desc,spec,g});sat.add(g);return g;}
+
+// ---- shared mission helpers
+const stow=[-PI/2,3.1,-3.1],wingPivots=[];let leds=[],cur;
+function rivets(g,w,h,d){const pos=[],run=(len,f)=>{for(let u=-len/2+.25;u<len/2-.1;u+=.35)f(u);};
+ for(const a of[-1,1])for(const b of[-1,1]){run(d,u=>{pos.push([a*(w/2+.11),b*h/2,u],[a*w/2,b*(h/2+.11),u]);});run(h,u=>{pos.push([a*(w/2+.11),u,b*d/2],[a*w/2,u,b*(d/2+.11)]);});run(w,u=>{pos.push([u,a*(h/2+.11),b*d/2],[u,a*h/2,b*(d/2+.11)]);});}
+ const im=new T.InstancedMesh(new T.SphereGeometry(.045,6,4),silver,pos.length),o=new T.Object3D();pos.forEach((p,i)=>{o.position.set(p[0],p[1],p[2]);o.updateMatrix();im.setMatrixAt(i,o.matrix);});g.add(im);}
+function shell(g,w,h,d){rivets(g,w,h,d);M(Box(w,h,d),mli,0,0,0,g);for(const a of[-1,1])for(const b of[-1,1]){M(Box(.2,.2,d+.1),silver,a*w/2,b*h/2,0,g);M(Box(.2,h+.1,.2),silver,a*w/2,0,b*d/2,g);M(Box(w+.1,.2,.2),silver,0,a*h/2,b*d/2,g);}}
+function wingG(side,n,L,W,at){const w=new T.Group(),pv=[];CX(.4,.7,silver,.35,0,0,w);CX(.13,1.2,silver,1.2,0,0,w);let par=w,px=1.9;
+ for(let k=0;k<n;k++){const g=new T.Group();g.position.x=px;par.add(g);M(Box(L,.09,W),panelMats,L/2,0,0,g);
+  for(const z of[-W/2,W/2])M(Box(L+.1,.14,.12),silver,L/2,0,z,g);for(const x of[0,L])M(Box(.12,.14,W),silver,x,0,0,g);
+  for(const z of[-W/4,W/4])M(Box(L-.2,.08,.08),silver,L/2,-.1,z,g);CZ(.09,W-.2,gold,0,0,0,g);pv.push(g);par=g;px=L+.1;}
+ w.position.set(side*at,0,0);if(side<0)w.rotation.y=PI;wingPivots.push(pv);return w;}
+function dishG(r){const g=new T.Group(),f=r*.75,h=r*r/(4*f),pts=[];for(let i=0;i<=12;i++){const q=r*i/12;pts.push(new T.Vector2(q,q*q/(4*f)));}
+ M(new T.LatheGeometry(pts,40),white,0,0,0,g);M(new T.TorusGeometry(r,.04,8,48),gold,0,h,0,g).rotation.x=PI/2;M(Cyl(.05,.18,.35),gold,0,f,0,g);
+ for(let i=0;i<3;i++){const a=i*2.094+.5;link(V(r*Math.cos(a),h,r*Math.sin(a)),V(0,f,0),.03,silver,g);}return g;}
+function dishAt(g,x,y,z,r,tx){M(Cyl(.5,.6,.25),silver,x,y+.12,z,g);M(Cyl(.2,.2,.8),silver,x,y+.6,z,g);const d=dishG(r);d.position.set(x,y+1.1,z);d.rotation.x=tx;g.add(d);}
+function pods(g,w,h,z){for(const a of[-1,1])for(const b of[-1,1]){const x=a*w,y=b*h;M(Box(.45,.45,.45),black,x,y,z,g);
+ for(const d of[V(a,0,0),V(0,b,0),V(0,0,-1)]){const c=M(Cyl(.03,.12,.26,12),silver,x+d.x*.34,y+d.y*.34,z+d.z*.34,g);c.quaternion.setFromUnitVectors(Y,d);c.rotateX(PI);}}}
+function bell(g,x,y,z,s,rx){const bp=[];for(let i=0;i<=14;i++){const t=i/14;bp.push(new T.Vector2((.2+.95*Math.pow(t,.65))*s,t*1.8*s));}
+ const m=M(new T.LatheGeometry(bp,36),silver.clone(),x,y,z,g);m.material.side=T.DoubleSide;m.rotation.x=rx;return m;}
+function tube(g,r1,r2,l,x,y,z){const m=M(Cyl(r1,r2,l,32,true),white,x,y,z,g);m.rotation.x=PI/2;return m;}
+function G(){return new T.Group();}
+
+// ---- ASTRA: Apophis encounter, OSIRIS-APEX heritage
+function buildAstra(){
+ const b=G();shell(b,3,3,3.6);
+ part('bus','Spacecraft bus','Main body with computer, battery, recorder and radio. Inspired by NASA’s OSIRIS-APEX (formerly OSIRIS-REx). ASTRA is a fictional student mission, not an official NASA spacecraft.',['Game bus: 160 kg, 180 W, 250 credits (game value)','Not a real spacecraft specification'],[0,0,0],[1.5,1.2,1.8],b);
+ for(const s of[1,-1])part(s>0?'wR':'wL',s>0?'Solar array, starboard':'Solar array, port','Two solar arrays, as on the reference spacecraft. Power falls with distance from the Sun: P = rating × 0.8 ÷ d².',['Game arrays: 1,200 W / 20 kg / 80 credits or 1,800 W / 30 kg / 140 credits (game values)'],[s*7,0,0],[5,0,0],wingG(s,2,3.2,3.6,1.5));
+ let g=G();dishAt(g,0,1.5,-.3,1.6,.7);
+ part('dish','High-gain antenna','Sends maps and measurements home. Data returned = rate × 0.8 × contact time.',['Game radios: 2 Mb/s, 80 W, 15 kg, 60 credits or 20 Mb/s, 100 W, 20 kg, 120 credits (game values)'],[0,4,0],[0,3.3,.3],g);
+ g=G();for(const x of[-.9,0]){M(Box(.7,.7,.7),black,x,.8,2.1,g);CZ(.22,.1,glass,x,.8,2.5,g);}
+ part('ocams','OCAMS camera suite','Maps Apophis and helps navigate close to its surface. Heritage: OSIRIS-REx OCAMS.',['Mapping and navigation'],[0,3,3],[-.45,.8,2.6],g);
+ g=G();CZ(.3,.9,black,.9,-.6,2.3,g);CZ(.2,.1,glass,.9,-.6,2.8,g);
+ part('ola','OLA laser altimeter','Fires a laser to measure the 3D shape of the surface. Heritage: OSIRIS-REx OLA.',['3D surface shape'],[3,0,3],[.9,-.6,2.9],g);
+ g=G();CZ(.35,1.3,silver,.9,.8,2.5,g);CZ(.25,.1,glass,.9,.8,3.2,g);
+ part('ovirs','OVIRS spectrometer','A visible and infrared spectrometer that reads the surface minerals. Heritage: OSIRIS-REx OVIRS.',['Surface composition'],[3,3,3],[.9,.8,3.3],g);
+ g=G();M(Box(.9,.7,.9),silver,-.9,-.6,2.2,g);CZ(.28,.1,gold,-.9,-.6,2.7,g);
+ part('otes','OTES thermal spectrometer','Measures the heat the surface gives off. Heritage: OSIRIS-REx OTES.',['Surface heat'],[-3,-1,3],[-.9,-.6,2.8],g);
+ g=G();const a1=V(0,-1.5,1.8),a2=V(0,-1.4,4.2),a3=V(0,-.5,5.5);link(a1,a2,.09,silver,g);link(a2,a3,.09,silver,g);
+ for(const p of[a1,a2,a3])M(new T.SphereGeometry(.2,16,16),gold,p.x,p.y,p.z,g);
+ M(Cyl(.7,.55,.6,28,true),white,0,-.5,5.8,g).rotation.x=PI/2;M(Cyl(.5,.5,.05),black,0,-.5,5.5,g).rotation.x=PI/2;
+ part('arm','Sampling arm','Based on OSIRIS-REx sample collection hardware (NASA fact). OSIRIS-REx returned its Bennu sample in 2023. In the game you decide whether to fire thrusters near the surface to expose material.',['Fictional use at Apophis'],[0,-3,4],[0,-.5,5.8],g);
+ g=G();bell(g,0,0,-1.8,.8,-PI/2);M(Cyl(1.3,1.45,.4,40,true),silver.clone(),0,0,-1.95,g).rotation.x=PI/2;M(new T.TorusGeometry(1.4,.06,8,40),silver,0,0,-2.15,g);
+ part('eng','Propulsion','Δv = Isp × g0 × ln(wet mass ÷ dry mass). Too little propellant and you fly past the target.',['Game launch: 550 kg wet / 180 credits or 750 kg / 240 credits','Propellant hardware: 40 kg, 60 credits (game values)'],[0,0,-5],[0,0,-3.3],g);
+ g=G();pods(g,1.6,1.6,-1.5);part('rcs','Thruster pods','Small thrusters for fine corrections and for reaction wheel faults in the game.',['Game fault: reaction-wheel problem'],[0,0,-3],[1.6,1.6,-1.8],g);
+ g=G();for(const s of[-1,1]){M(Box(.5,.4,.5),black,s,1.75,1.2,g);M(Cyl(.3,.18,.45,16,true),white,s,2.15,1.2,g);}
+ part('sen','Star trackers','Find which way the spacecraft points from star patterns.',['Illustrative'],[0,3,2],[1,2.1,1.2],g);
+}
+
+// ---- LUNARIS: lunar polar orbiter, LRO heritage
+function buildLuna(){
+ const b=G();shell(b,3,2.6,3.6);M(Box(2.8,.15,3.2),silver,0,-1.7,0,b);
+ part('bus','Spacecraft bus','Main body with computer, battery, recorder and radio. Inspired by NASA’s Lunar Reconnaissance Orbiter (LRO, launched June 2009). LUNARIS is a fictional student mission.',['Game bus: 160 kg, 180 W, 250 credits (game value)','Not a real spacecraft specification'],[0,0,0],[1.5,1,1.8],b);
+ part('wR','Solar array','A solar array. In the shadow the battery takes over.',['Game arrays: 1,200 W or 1,800 W','Game batteries: 100 Wh or 500 Wh (game values)'],[7,0,0],[5,0,0],wingG(1,2,3.2,3.2,1.5));
+ let g=G();dishAt(g,0,1.3,-1,1.6,.6);
+ part('dish','High-gain antenna','Sends data to Earth. The game can reduce ground-antenna availability.',['Game radios: 2 or 20 Mb/s (game values)'],[0,4,0],[0,3.2,-.6],g);
+ g=G();for(const x of[-1,-.5]){M(Cyl(.2,.22,1.5),black,x,-2.55,.9,g);M(Cyl(.3,.2,.3,20,true),white,x,-3.4,.9,g);}M(Box(.4,.4,.4),black,-.75,-2.2,1.5,g);
+ part('lroc','Camera (LROC heritage)','Images craters and rims in high detail. Heritage: LRO’s LROC camera.',['Objective: image a crater and its rim'],[-2,-3,3],[-.75,-3.4,.9],g);
+ g=G();M(Cyl(.35,.4,1.1),silver,.9,-2.3,1,g);M(Cyl(.3,.3,.05),glass,.9,-2.88,1,g);
+ part('lola','Laser altimeter (LOLA)','Measures the height of the terrain with laser pulses to build 3D maps.',['Heritage: LRO LOLA'],[3,-3,3],[.9,-2.9,1],g);
+ g=G();M(Box(.8,.8,.8),silver,-.9,-2.2,-1.1,g);M(Cyl(.25,.25,.05),gold,-.9,-2.63,-1.1,g);
+ part('div','Radiometer (Diviner)','Maps surface temperature. Diviner measured about 35 K in some shadowed craters.',['Heritage: LRO Diviner'],[-3,-3,-2],[-.9,-2.65,-1.1],g);
+ g=G();M(Box(1,1.1,1),white,.9,-2.25,-1.1,g);
+ part('lend','Neutron detector (LEND)','Neutron detector for the ice search. Ice is being searched for, not confirmed at every target.',['Heritage: LRO LEND'],[3,-3,-2],[.9,-2.25,-1.1],g);
+ g=G();M(Cyl(.1,.1,.3),silver,0,-1.8,-.1,g);const d=dishG(.55);d.position.set(0,-1.9,-.1);d.rotation.x=PI;g.add(d);
+ part('rf','Radar (Mini-RF)','Mini-RF radar. The antenna shape here is illustrative.',['Heritage: LRO Mini-RF'],[0,-4,0],[0,-2.7,-.1],g);
+ g=G();bell(g,0,0,-1.8,.7,-PI/2);M(Cyl(1.3,1.45,.4,40,true),silver.clone(),0,0,-1.95,g).rotation.x=PI/2;M(new T.TorusGeometry(1.4,.06,8,40),silver,0,0,-2.15,g);
+ part('eng','Propulsion','Holds the mapping orbit. The game compares 50 km and 100 km orbits.',['Game launch: 550 kg or 750 kg wet (game values)'],[0,0,-5],[0,0,-3.2],g);
+ g=G();pods(g,1.5,1.3,-1.5);part('rcs','Thruster pods','Small thrusters for pointing and orbit trim.',['Illustrative'],[0,0,-3],[1.5,1.3,-1.8],g);
+ g=G();for(const s of[-1,1]){M(Box(.5,.4,.5),black,s,1.55,1.2,g);M(Cyl(.3,.18,.45,16,true),white,s,1.95,1.2,g);}
+ part('sen','Star trackers','Find orientation from star patterns.',['Illustrative'],[0,3,2],[1,1.9,1.2],g);
+}
+
+// ---- HALO: Earth atmosphere, Aura-like illustrative model
+function buildHalo(){
+ const b=G();shell(b,2.6,2.6,3.8);
+ part('bus','Spacecraft bus','An Aura-like bus. HALO is a conceptual student spacecraft; its science draws on Terra, Aqua, Aura and NASA POWER data, so no single real satellite carries all of it.',['Game bus: 160 kg, 180 W, 250 credits (game value)','Reference orbit: Aura, about 705 km sun-synchronous'],[0,0,0],[1.3,0,1.9],b);
+ part('wR','Solar array','A solar array. Eclipses cut power, so the battery matters.',['Game arrays: 1,200 W or 1,800 W','Game batteries: 100 Wh or 500 Wh (game values)'],[7,0,0],[5,0,0],wingG(1,2,3,3.2,1.3));
+ let g=G();M(Box(1.7,.9,1.5),silver,0,-1.8,.5,g);M(Box(1.2,.05,.6),glass,0,-2.28,.5,g);M(Box(1.9,.1,.1),black,0,-2.3,-.4,g);
+ part('omi','Nadir instrument (OMI-like)','Looks straight down to map ozone and pollutant gases such as NO2. Real OMI on Aura has 13 × 24 km pixels.',['Heritage: OMI on Aura (illustrative model)'],[0,-4,0],[0,-2.3,.5],g);
+ g=G();M(Box(1.2,1.2,1.4),silver,0,.2,2.3,g);const d=dishG(1.1);d.position.set(0,.2,3.1);d.rotation.x=PI/2;g.add(d);
+ part('mls','Limb sounder (MLS-like)','Looks sideways through the edge of the atmosphere to measure gases by altitude. Heritage: MLS on Aura.',['Illustrative model'],[0,0,4],[0,.2,4.1],g);
+ g=G();dishAt(g,0,1.3,-.8,.9,.4);
+ part('com','Communications antenna','Sends data to ground stations. Data returned = rate × 0.8 × contact time.',['Game radios: 2 or 20 Mb/s (game values)'],[0,3.5,0],[0,2.3,-.5],g);
+ g=G();M(Box(2.4,2.4,.08),white,0,0,-1.95,g);for(let i=0;i<9;i++)M(Box(2.2,.05,.5),white,0,-1+i*.25,-2.25,g);bell(g,.8,-.8,-1.95,.3,-PI/2);bell(g,-.8,-.8,-1.95,.3,-PI/2);
+ part('rad','Radiator and thrusters','Fins shed heat. Small thrusters keep the orbit at 500 km or 705 km. Game fault: heater stuck on.',['Illustrative'],[0,0,-4],[0,0,-2.4],g);
+ g=G();for(const s of[-1,1]){M(Box(.5,.4,.5),black,s*.6,1.5,-1.4,g);M(Cyl(.3,.18,.45,16,true),white,s*.6,1.9,-1.4,g);}
+ part('sen','Star trackers','Find orientation from star patterns.',['Illustrative'],[0,3,-3],[.6,1.9,-1.4],g);
+}
+
+const MIS={
+ astra:{title:'ASTRA, Apophis encounter',ov:'A fictional student mission inspired by NASA’s OSIRIS-APEX. Target: asteroid 99942 Apophis, which passes Earth on 13 April 2029 at about 32,000 km. The real OSIRIS-APEX arrives after the pass; ASTRA’s earlier arrival is a “what if”. Not an official NASA spacecraft.',span:11,added:['sen','rcs'],fl:{p:[0,0,-4.44],rx:-PI/2,rt:.02,rb:.5,len:2.4},fn:buildAstra},
+ luna:{title:'LUNARIS, lunar polar orbiter',ov:'A student mission inspired by NASA’s Lunar Reconnaissance Orbiter (LRO). It maps terrain and searches for ice in shadowed polar craters. Game orbits: 50 km or 100 km. Not an official NASA spacecraft.',span:13,added:['sen','rcs'],fl:{p:[0,0,-4.26],rx:-PI/2,rt:.02,rb:.45,len:2.2},fn:buildLuna},
+ halo:{title:'HALO, Earth atmosphere observer',ov:'A conceptual student spacecraft. Its science draws on Terra, Aqua, Aura and NASA POWER, so no single real satellite carries all of it. This is an illustrative Aura-like model. Not an official NASA spacecraft.',span:12,added:['sen','rad','com'],fn:buildHalo},
+ mars:{title:'JEZERO ECHO, Mars reconnaissance orbiter',ov:'A student mission inspired by NASA’s Mars Reconnaissance Orbiter (MRO, launched 2005). It studies Jezero crater (18.38° N, 77.58° E). Game orbits: 300 km or 400 km. Not an official NASA spacecraft.',span:16.5,added:['sen','rcs','rad'],fl:{p:[0,0,-5.5],rx:-PI/2,rt:.02,rb:.6,len:2.4},fn:buildMars}};
+
+function buildMars(){
+// ---- bus
+const bus=new T.Group();M(Box(4,4,5),mli,0,0,0,bus);rivets(bus,4,4,5);
+for(const a of[-1,1])for(const b of[-1,1]){M(Box(.22,.22,5.1),silver,a*2,b*2,0,bus);M(Box(.22,4.1,.22),silver,a*2,0,b*2.5,bus);M(Box(4.1,.22,.22),silver,0,a*2,b*2.5,bus);}
+for(const s of[-1,1])for(const z of[-1.1,1.1]){M(Box(4.02,.03,.1),black,0,s*2.01,z,bus);M(Box(.1,4.02,.03),black,0,0,0,bus).visible=false;}
+M(Box(2.4,.05,2.6),silver,0,2.03,.2,bus);
+for(let i=0;i<4;i++)M(Cyl(.07,.07,.06,10),black,(i%2?1:-1)*1.1,2.08,.2+(i<2?-1:1)*1.1,bus);
+const led1=M(new T.SphereGeometry(.08,12,12),new T.MeshBasicMaterial({color:0x44ff88}),-1.9,1.7,2.52,bus),led2=M(new T.SphereGeometry(.08,12,12),new T.MeshBasicMaterial({color:0xff4444}),-1.6,1.7,2.52,bus);
+leds=[led1,led2];part('bus','Spacecraft bus','Main body with computer, battery, recorder and radio. Inspired by NASA’s Mars Reconnaissance Orbiter (MRO, launched 2005). JEZERO ECHO is a fictional student mission.',['Game bus: 160 kg, 180 W, 250 credits (game value)','Not a real spacecraft specification'],[0,0,0],[2,1,2.4],bus);
+
+// ---- radiator
+const rad=new T.Group();M(Box(3.6,.08,4.4),white,0,-2.12,0,rad);
+for(let i=0;i<9;i++)M(Box(3.4,.55,.05),white,0,-2.42,-1.8+i*.45,rad);
+part('rad','Thermal radiator','Aluminium fins on the underside shed waste heat into space so the electronics do not overheat.',['9 fins, white thermal coating','Heat leaves only by radiation'],[0,-5,0],[0,-2.6,0],rad);
+
+// ---- solar wings
+
+function wing(side){
+ const w=new T.Group(),pv=[];CX(.45,.8,silver,.4,0,0,w);CX(.14,1.5,silver,1.4,0,0,w);M(new T.SphereGeometry(.3,16,16),gold,2.1,0,0,w);
+ let parent=w,px=2.2;
+ for(let k=0;k<3;k++){const g=new T.Group();g.position.x=px;parent.add(g);
+  M(Box(3.6,.09,5),panelMats,1.8,0,0,g);
+  for(const z of[-2.5,2.5])M(Box(3.7,.14,.12),silver,1.8,0,z,g);
+  for(const x of[0,3.6])M(Box(.12,.14,5),silver,x,0,0,g);
+  for(const z of[-1.2,1.2])M(Box(3.4,.08,.08),silver,1.8,-.1,z,g);
+  CZ(.1,4.8,gold,0,0,0,g);pv.push(g);parent=g;px=3.7;}
+ w.position.set(2*side,0,0);if(side<0)w.rotation.y=PI;wingPivots.push(pv);return w;}
+part('wR','Solar array, starboard','One of two articulating arrays. MRO makes about 2 kW (site-reported, check the Sources page). Dust storms cut power in the game.',['Game arrays: 1,200 W or 1,800 W (game values)'],[9,0,0],[8.5,0,0],wing(1));
+part('wL','Solar array, port','The second array. Together they charge the battery for eclipses.',['Game batteries: 100 Wh or 500 Wh (game values)'],[-9,0,0],[8.5,0,0],wing(-1));
+
+// ---- high-gain dish
+const dish=new T.Group();dish.position.set(0,2,-.4);
+M(Cyl(.8,.9,.35),silver,0,.18,0,dish);M(Cyl(.3,.3,.9),silver,0,.7,0,dish);M(Box(1.6,.2,.2),silver,0,1.2,0,dish);
+const dg=new T.Group();dg.position.set(0,2.1,0);dg.rotation.x=.75;dish.add(dg);
+link(V(-.8,1.2,0),V(-.5,2.1,0),.09,silver,dish);link(V(.8,1.2,0),V(.5,2.1,0),.09,silver,dish);
+const dp=[];for(let i=0;i<=14;i++){const r=i*.15;dp.push(new T.Vector2(r,r*r/6.4));}
+M(new T.LatheGeometry(dp,48),white,0,0,0,dg);
+const rim=M(new T.TorusGeometry(2.1,.05,8,64),gold,0,.69,0,dg);rim.rotation.x=PI/2;
+for(let i=0;i<6;i++){const a=i*PI/3;link(V(0,-.03,0),V(2.1*Math.cos(a),.66,2.1*Math.sin(a)),.03,silver,dg);}
+for(let i=0;i<3;i++){const a=i*2*PI/3+.5;link(V(2.1*Math.cos(a),.69,2.1*Math.sin(a)),V(0,1.6,0),.035,silver,dg);}
+M(Cyl(.06,.22,.45),gold,0,1.62,0,dg);
+part('dish','High-gain antenna','MRO has a 3 m X-band dish with peak downlink up to 6 Mb/s (site-reported). Model not to scale.',['Game radios: 2 or 20 Mb/s (game values)','Data = rate × 0.8 × contact time'],[0,5,0],[0,3.2,.8],dish);
+
+// ---- instruments
+const ins=new T.Group();M(Box(3.6,3.6,.12),black,0,0,2.56,ins);
+CZ(.85,2.6,black,0,-.3,3.8,ins);
+const baf=M(Cyl(1.25,.9,1.3,40,true),white,0,-.3,5.5,ins);baf.rotation.x=PI/2;
+const mir=M(Cyl(.82,.82,.06),glass,0,-.3,4.9,ins);mir.rotation.x=PI/2;
+M(Cyl(.16,.16,.06),silver,0,-.3,5.4,ins).rotation.x=PI/2;
+for(let i=0;i<3;i++){const a=i*2*PI/3+.4;link(V(1.05*Math.cos(a),-.3+1.05*Math.sin(a),5.9),V(0,-.3,5.4),.025,silver,ins);}
+M(Box(1.2,1,1.6),silver,1.35,1.3,3.4,ins);CZ(.2,.1,black,1.35,1.3,4.2,ins);
+M(Box(.9,.9,.9),black,-1.3,1.4,3.1,ins);CZ(.28,.1,glass,-1.3,1.4,3.6,ins);
+part('ins','HiRISE camera and nadir deck','The big telescope is HiRISE, about 25–30 cm per pixel at best. The camera is CTX (about 6 m per pixel). The box is CRISM, off since 2023. MARCI and the Climate Sounder (MCS) also fly on MRO.',['Heritage: MRO instruments (illustrative model)','Objectives: Jezero in context, river delta, water-formed minerals'],[0,0,6],[0,-.3,5.9],ins);
+
+// ---- sensors and small antennas
+const sen=new T.Group();
+for(const s of[-1,1]){M(Box(.6,.6,.7),black,s*1.4,-1.3,3.1,sen);const b=M(Cyl(.38,.22,.5,16,true),white,s*1.4,-1.3,3.6,sen);b.rotation.x=PI/2;
+ M(Cyl(.22,.22,.05),glass,s*1.5,2.06,1.2,sen);M(Cyl(.22,.22,.05),glass,s*1.5,2.06,-1.6,sen);
+ const c=M(Cyl(.04,.2,.35),gold,s*1,2.2,.5,sen);link(V(s*1,-2.1,-1),V(s*1,-3.3,-1),.02,silver,sen);}
+part('sen','Star trackers and sun sensors','Star trackers photograph the sky and match star patterns to work out orientation. Sun sensors give a quick coarse fix. Gold cones are low-gain antennas for backup contact.',['2 star trackers','4 sun sensors','2 low-gain antennas + whips'],[0,3,3],[1.4,-1.3,3.5],sen);
+
+// ---- engine + adapter ring
+const eng=new T.Group(),bp=[];for(let i=0;i<=16;i++){const t=i/16;bp.push(new T.Vector2(.2+.95*Math.pow(t,.65),t*1.8));}
+const bell=M(new T.LatheGeometry(bp,40),silver.clone(),0,0,-2.5,eng);bell.material.side=T.DoubleSide;bell.rotation.x=-PI/2;
+CZ(.35,.7,silver,0,0,-2.6,eng);
+const ring=M(Cyl(1.7,1.9,.45,48,true),silver.clone(),0,0,-2.75,eng);ring.material.side=T.DoubleSide;ring.rotation.x=PI/2;
+M(new T.TorusGeometry(1.8,.07,8,48),silver,0,0,-3,eng);
+for(const s of[-1,1])link(V(0,0,-2.4),V(s*1.6,-1,-2.5),.05,silver,eng);
+part('eng','Main engine','A bell-shaped nozzle for big manoeuvres such as orbit insertion. The ring is the adapter that bolts to the rocket. Delta-v = Isp × g0 × ln(wet mass ÷ dry mass).',['Chemical bipropellant (conceptual)','Burns change the orbit','Propellant sets how far you can go'],[0,0,-6],[0,0,-4.3],eng);
+
+// ---- RCS thrusters
+const rcs=new T.Group();
+for(const a of[-1,1])for(const b of[-1,1]){const x=a*2.3,y=b*2.3;M(Box(.5,.5,.5),black,x,y,-2.2,rcs);
+ const n=(dx,dy,dz)=>{const c=M(Cyl(.03,.13,.28,12),silver,x+dx*.38,y+dy*.38,-2.2+dz*.38,rcs);c.quaternion.setFromUnitVectors(Y,V(dx,dy,dz));c.rotateX(PI);};
+ n(a,0,0);n(0,b,0);n(0,0,-1);}
+part('rcs','Thruster pods','Four pods of small thrusters turn the spacecraft and trim its path. They fire in short pulses to keep the antenna and cameras pointed.',['4 pods, 12 thrusters','Attitude control and fine corrections'],[0,0,-3],[2.3,2.3,-2.5],rcs);
+
+const uhf=G();{const pts=[];for(let i=0;i<=60;i++){const a=i*.55;pts.push(V(.5*Math.cos(a),-2.8-i*.04,1+.5*Math.sin(a)));}M(new T.TubeGeometry(new T.CatmullRomCurve3(pts),180,.04,6),gold,0,0,0,uhf);link(V(0,-2.7,1),V(0,-5.3,1),.05,silver,uhf);}
+part('uhf','Electra UHF relay antenna','Relays data from rovers such as Perseverance. In the game you decide whether to relay rover data.',['Heritage: MRO Electra relay'],[0,-4,0],[.5,-4,1],uhf);
+// ---- magnetometer boom
+const mag=new T.Group();link(V(0,2.15,-2.4),V(0,2.15,-7),.06,silver,mag);
+for(const z of[-3.5,-5.2])CZ(.1,.15,gold,0,2.15,z,mag);
+M(Box(.3,.3,.3),gold,0,2.15,-7.1,mag);
+part('mag','SHARAD radar antenna','Shallow radar for buried ice. The boom shape here is illustrative.',['Heritage: MRO SHARAD (illustrative model)'],[0,3,-4],[0,2.15,-7],mag);
+
+}
+
+// ---- background: stars
+const skyT=tex(2048,1024,(x,w,h)=>{x.fillStyle='#000';x.fillRect(0,0,w,h);
+ for(let i=0;i<1400;i++){const a=Math.random();x.fillStyle='rgba(255,255,255,'+(.35+a*.65)+')';x.beginPath();x.arc(Math.random()*w,Math.random()*h,a>.97?1.8:a>.8?1.2:.8,0,6.283);x.fill();}});
+M(new T.SphereGeometry(1800,48,32),new T.MeshBasicMaterial({map:skyT,side:T.BackSide,depthWrite:false,toneMapped:false}),0,0,0,S);
+const glT=tex(256,256,(x)=>{const g=x.createRadialGradient(128,128,0,128,128,128);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.12,'rgba(255,240,200,.8)');g.addColorStop(.4,'rgba(255,200,120,.18)');g.addColorStop(1,'rgba(255,200,120,0)');x.fillStyle=g;x.fillRect(0,0,256,256);});
+const glare=new T.Sprite(new T.SpriteMaterial({map:glT,blending:T.AdditiveBlending,transparent:true,depthWrite:false}));glare.position.copy(sun.position).normalize().multiplyScalar(1100);glare.scale.setScalar(520);S.add(glare);
+
+// ---- tags
+let tagsEl=[],fl=null,fire=false,bp=false,brief=false;
+function applyBp(){sat.traverse(o=>{if(o.isMesh&&o!==fl&&o.parent!==fl)[].concat(o.material).forEach(m=>m.wireframe=bp);});}
+function load(id){cur=MIS[id];sel=null;tagsEl.forEach(x=>x.remove());while(sat.children.length)sat.remove(sat.children[0]);P.length=0;wingPivots.length=0;leds=[];
+ cur.fn();P.forEach(p=>{p.add=(cur.added||[]).indexOf(p.id)>=0;});sat.traverse(o=>{if(o.isMesh)o.castShadow=o.receiveShadow=true;});
+ fl=null;{const ep=P.find(p=>p.id==='eng');if(cur.fl&&ep){const f=cur.fl;fl=M(new T.CylinderGeometry(f.rt,f.rb,f.len,24,1,true),new T.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:.75,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide}),f.p[0],f.p[1],f.p[2],ep.g);fl.rotation.x=f.rx;M(new T.CylinderGeometry(f.rt*.5,f.rb*.45,f.len*.8,16,1,true),new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.9,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide}),0,(f.rt>f.rb?1:-1)*f.len*.1,0,fl);const L=new T.PointLight(0x8fd0ff,0,14);fl.add(L);fl.userData.l=L;}}
+ $('bF').style.display=fl?'':'none';applyBp();
+ tagsEl=P.map(p=>{const b=document.createElement('button');b.className='tag';b.textContent=p.name;b.onclick=e=>{e.stopPropagation();pick(p);};document.body.appendChild(b);p.el=b;return b;});
+ $('h').textContent=cur.title;$('ct').textContent='Overview';$('cd').textContent=cur.ov;$('cs').innerHTML='';
+ document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.m===id));}
+let sel=null;
+function pick(p){sel=sel===p?null:p;tagsEl.forEach(b=>b.classList.remove('on'));
+ $('ct').textContent=sel?sel.name:'Overview';
+ $('cd').textContent=sel?sel.desc:cur.ov;
+ $('cs').innerHTML=sel?sel.spec.map(s=>'<li>'+s+'</li>').join('')+'<li><b>Status:</b> '+(sel.add?'extra concept detail, hidden by Core parts only':'core mission part, based on the cited NASA missions')+'</li>':'';if(sel)sel.el.classList.add('on');}
+
+// ---- state + UI
+let showL=true,expl=0,explG=0,dep=1,depG=1,auto=true,zoom=1,yaw=.7,pitch=.25,dist=60,t=0,drag=false,lx=0,ly=0,pd=0;const pts={},tgt=V(0,0,0),v=V(0,0,0);
+const clamp=(a,lo,hi)=>Math.max(lo,Math.min(hi,a)),reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function ui(){$('bL').setAttribute('aria-pressed',showL);$('bE').setAttribute('aria-pressed',explG>0);$('bA').setAttribute('aria-pressed',auto);$('bD').textContent=depG?'Stow arrays':'Deploy arrays';}
+$('bL').onclick=()=>{showL=!showL;ui();};$('bE').onclick=()=>{explG=explG?0:1;ui();};
+$('bD').onclick=()=>{depG=depG?0:1;ui();};$('bS').onclick=()=>{brief=!brief;$('bS').setAttribute('aria-pressed',brief);if(brief&&sel&&sel.add)pick(sel);};$('bF').onclick=()=>{fire=!fire;$('bF').setAttribute('aria-pressed',fire);};$('bB').onclick=()=>{bp=!bp;$('bB').setAttribute('aria-pressed',bp);applyBp();};
+$('bA').onclick=()=>{auto=!auto;ui();};
+$('bR').onclick=()=>{sel=null;pick(null);zoom=document.documentElement.classList.contains('embed')?.8:1;yaw=.7;pitch=.25;explG=0;depG=1;auto=true;ui();};
+const cv=$('c');
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts[e.pointerId]=[e.clientX,e.clientY];drag=true;lx=e.clientX;ly=e.clientY;});
+cv.addEventListener('pointerup',e=>{delete pts[e.pointerId];drag=false;pd=0;});
+cv.addEventListener('pointermove',e=>{pts[e.pointerId]=[e.clientX,e.clientY];const k=Object.keys(pts);
+ if(k.length==2){const a=pts[k[0]],b=pts[k[1]],d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pd)zoom=clamp(zoom*pd/d,.25,1.6);pd=d;return;}
+ if(!drag)return;yaw-=(e.clientX-lx)*.006;pitch=clamp(pitch+(e.clientY-ly)*.006,-1.45,1.45);lx=e.clientX;ly=e.clientY;auto=false;ui();});
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom=clamp(zoom*(1+e.deltaY*.001),.25,1.6);},{passive:false});
+function resize(){R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();ui();
+
+function loop(){requestAnimationFrame(loop);t+=.016;
+ if(auto&&!reduce&&!drag)yaw+=.003;
+ expl+=(explG-expl)*.06;dep+=(depG-dep)*.05;
+ P.forEach(p=>{const u=p.g.userData;p.g.position.copy(u.base).addScaledVector(u.ex,expl);p.g.visible=!(brief&&p.add);});
+ wingPivots.forEach(pv=>pv.forEach((g,k)=>g.rotation.z=(1-dep)*stow[k]));
+ if(leds[1]){leds[0].visible=Math.sin(t*3)>-.2;leds[1].visible=Math.sin(t*1.5)>0;}
+ if(fl){fl.visible=fire;fl.userData.l.intensity=fire?5+Math.sin(t*50)*1.5:0;fl.scale.set(1+Math.sin(t*40)*.08,1+Math.sin(t*33)*.12,1+Math.sin(t*40)*.08);}
+ const base=Math.max(cur.span*2.4,cur.span/(.364*cam.aspect)*1.05),goal=sel?base*.4:base*zoom*(1+expl*.35);dist+=(goal-dist)*.07;
+ if(sel){v.copy(sel.g.userData.lab);sel.g.localToWorld(v);tgt.lerp(v,.07);}else tgt.lerp(V(0,0,0),.07);
+ cam.position.set(tgt.x+Math.sin(yaw)*Math.cos(pitch)*dist,tgt.y+Math.sin(pitch)*dist,tgt.z+Math.cos(yaw)*Math.cos(pitch)*dist);
+ cam.lookAt(tgt);R.render(S,cam);
+ const w=innerWidth,h=innerHeight;P.forEach(p=>{v.copy(p.g.userData.lab);p.g.localToWorld(v);v.project(cam);
+  p.el.style.display=(showL&&v.z<1&&!(brief&&p.add))?'block':'none';p.el.style.transform='translate('+((v.x*.5+.5)*w)+'px,'+((-v.y*.5+.5)*h)+'px) translate(-50%,-50%)';});}
+document.querySelectorAll('#tabs button').forEach(x=>x.onclick=()=>load(x.dataset.m));
+addEventListener('keydown',e=>{const k={ArrowLeft:[.12,0],ArrowRight:[-.12,0],ArrowUp:[0,-.1],ArrowDown:[0,.1]}[e.key];
+ if(k){e.preventDefault();yaw+=k[0];pitch=clamp(pitch+k[1],-1.45,1.45);auto=false;ui();}
+ else if(e.key==='+'||e.key==='='){zoom=clamp(zoom*.9,.25,1.6);}else if(e.key==='-'){zoom=clamp(zoom*1.1,.25,1.6);}});
+const q=new URLSearchParams(location.search),mm={astra:'astra',lunaris:'luna',luna:'luna',earth:'halo',halo:'halo',mars:'mars'};
+const EMB=q.has('embed');if(EMB){document.documentElement.classList.add('embed');zoom=.8;}
+load(mm[q.get('m')]||'astra');loop();
+})();
+</script>
+</body>
+</html>

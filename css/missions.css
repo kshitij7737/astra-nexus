@@ -242,3 +242,10 @@
 .astra-mm h1, .astra-mm h2 { font-weight: 650; font-stretch: 104%; text-transform: none; letter-spacing: -.02em; line-height: 1.04; }
 .mm-tcard__name, .mm-tdetail h3, .mm-pdetail h3, .mm-icard h3, .mm-frame__label b { text-transform: none; font-stretch: 104%; font-weight: 650; letter-spacing: -.01em; }
 .mm-icard h3 { font-size: 26px; }
+
+/* hangar: the team's concept spacecraft viewer embedded in the stage */
+.mm-stage.has-hangar { cursor: default; touch-action: auto; overflow: hidden; }
+.mm-stage.has-hangar .mm-stage__hint, .mm-stage.has-hangar .mm-stage__note { display: none; }
+.mm-hangar-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: inherit; background: #000; }
+.mm-hangar-how { margin: 0 0 14px; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.mm-hangar-how b { color: var(--fg, #eee); font-weight: 600; }
