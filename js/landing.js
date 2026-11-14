@@ -7,15 +7,17 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const src = k => SOURCES[k] ? `<a class="lx-src" href="${SOURCES[k].url}" target="_blank" rel="noopener">${esc(SOURCES[k].title)}</a>` : '';
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let handingOff = false, handoffTimer;
+let handingOff = false;
 let preloadedGame = false;
 function preloadGame() {
   if (preloadedGame || navigator.connection?.saveData) return;
   preloadedGame = true;
-  const link = document.createElement('link');
-  link.rel = 'modulepreload';
-  link.href = 'js/game.js?v=2';
-  document.head.append(link);
+  for (const href of ['js/game.js?v=3', 'js/sim.js']) {
+    const link = document.createElement('link');
+    link.rel = 'modulepreload';
+    link.href = href;
+    document.head.append(link);
+  }
 }
 const store = () => { try { return JSON.parse(localStorage.getItem('nexus04') || '{}'); } catch { return {}; } };
 
@@ -106,7 +108,7 @@ async function sky() {
   const context = canvas.getContext('webgl2',{antialias:true,alpha:true});
   if (!context) return;
   const [THREE, {buildWorld,latLonToVec}, craftModule, {MISSIONS}, {RoomEnvironment}] = await Promise.all([
-    import('../vendor/three.module.min.js'), import('./scene.js'), import('./craft.js'),
+    import('../vendor/three.module.min.js'), import('./scene.js?v=2'), import('./craft.js'),
     import('./data.js'), import('../vendor/RoomEnvironment.js')
   ]);
   const {buildCraft,fullCfg} = craftModule;
@@ -290,7 +292,7 @@ async function sky() {
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();failed=true;fallBack();},{once:true});
   let lastFocus = '';
   const draw = now => {
-    if (document.hidden || handingOff || document.querySelector('.lx-brief')) {
+    if (document.hidden || handingOff || document.body.classList.contains('lx-briefing')) {
       clock.getDelta();
       return;
     }
@@ -443,11 +445,15 @@ async function sky() {
   let failed = false;
   r.setAnimationLoop(draw);
   addEventListener('pagehide', () => r.setAnimationLoop(null));
-  // leaving for another page: stop drawing at once so the next page gets the whole GPU while it loads
   addEventListener('nx-leave', () => r.setAnimationLoop(null));
-  document.addEventListener('click', e => { const a = e.target.closest?.('a[href]'); if (!a || a.target === '_blank' || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    const href = a.getAttribute('href'); if (!href || href.startsWith('#') || href.startsWith('http')) return;
-    setTimeout(() => { if (!e.defaultPrevented) r.setAnimationLoop(null); }, 0); });
+  document.addEventListener('click', event => {
+    const anchor=event.target.closest?.('a[href]');
+    if (!anchor || event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+        || (anchor.target && anchor.target!=='_self') || anchor.hasAttribute('download')) return;
+    const target=new URL(anchor.href,location.href);
+    if(target.origin!==location.origin || target.pathname===location.pathname) return;
+    setTimeout(()=>{if(!event.defaultPrevented)r.setAnimationLoop(null);},0);
+  });
   addEventListener('pageshow', event => {
     if (event.persisted && !failed) {
       lastFrame = -Infinity;
@@ -490,7 +496,7 @@ function openSheet(id) {
 }
 window.__nxSheet = openSheet;
 
-// ---------- briefing (typed), then a skippable 3-2-1 countdown into the game
+// ---------- mission preview and handoff
 function brief(id) {
   const m = GAME[id], c = CH[id];
   if (!m || document.querySelector('.lx-brief')) return;
@@ -505,47 +511,30 @@ function brief(id) {
     <div class="lx-row"><button class="lx-btn lx-btn--go" type="button" data-go>Start mission</button><button class="lx-btn" type="button" data-x>Not now</button></div>
   </div>`;
   document.body.appendChild(mo);
+  document.body.classList.add('lx-briefing');
   const full = `${c.h} ${c.sub} ${m.tagline} Only data that reaches Earth counts. Good luck.`;
   const txt = mo.querySelector('.lx-brief__txt');
   txt.textContent = full;
-  const close = () => { mo.remove(); prev?.focus?.({preventScroll:true}); };
+  const close = () => {
+    mo.remove();
+    document.body.classList.remove('lx-briefing');
+    prev?.focus?.({preventScroll:true});
+  };
   mo.querySelector('[data-x]').onclick = close;
   mo.addEventListener('click', e => { if (e.target === mo) close(); });
   mo.addEventListener('keydown', e => { if (e.key === 'Escape') close(); if (e.key === 'Tab') { const f = [...mo.querySelectorAll('button')]; if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); } else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); } } });
-  mo.querySelector('[data-go]').onclick = () => countdown(mo, id);
-  mo.querySelector('[data-go]').focus();
-}
-function countdown(mo, id) {
-  const url = `play.html?mission=${id}`;
-  const go = () => {
+  mo.querySelector('[data-go]').onclick = () => {
     if (handingOff) return;
     handingOff = true;
-    clearInterval(handoffTimer);
     dispatchEvent(new Event('nx-leave'));
-    location.assign(url);
+    location.assign(`play.html?mission=${id}`);
   };
-  if (reduced) { go(); return; }
-  mo.classList.add('lx-brief--handoff');
-  mo.innerHTML = `<div class="lx-count"><b aria-hidden="true">3</b><p role="status">Systems go</p><button class="lx-btn" type="button">Skip countdown</button></div>`;
-  const b = mo.querySelector('b'), p = mo.querySelector('p');
-  let n = 3;
-  const pulse = () => b.animate([{opacity:.5,transform:'scale(1.08)'},{opacity:1,transform:'scale(1)'}],{duration:550,easing:'ease-out'});
-  const skip = mo.querySelector('button');
-  skip.onclick = go;
-  skip.focus();
-  pulse();
-  handoffTimer = setInterval(() => {
-    n--;
-    if (n === 0) { go(); return; }
-    b.textContent = n;
-    p.textContent = n === 2 ? 'Arrays stowed' : 'Handing over to you';
-    pulse();
-  }, 620);
+  mo.querySelector('[data-go]').focus();
 }
 // every "play this mission" link on the home page opens the briefing first
 document.addEventListener('click', e => {
   const a = e.target.closest?.('a[href^="play.html?mission="]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.defaultPrevented) return;
-  const id = new URL(a.href, location.href).searchParams.get('mission'); if (!GAME[id]) return;
+  const id = new URL(a.href, location.href).searchParams.get('mission'); if (!Object.hasOwn(GAME,id)) return;
   e.preventDefault(); brief(id);
 });
 
@@ -555,9 +544,9 @@ for (const event of ['pointerover','focusin']) {
   },{passive:true});
 }
 chapters(); archive();
-if (location.hash === '#team') {
+if (location.hash && document.getElementById(location.hash.slice(1))) {
   $('#lx-intro').hidden = true;
-  $('#team').scrollIntoView();
+  document.getElementById(location.hash.slice(1)).scrollIntoView({behavior:'instant'});
 } else {
   intro();
 }
@@ -569,9 +558,11 @@ sky().catch(error=>{
 document.querySelectorAll('[data-sheet]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openSheet(a.dataset.sheet); }));
 import('./status.js').then(async ({ mountStatus }) => { const { Music } = await import('./music.js'); mountStatus({ music: new Music() }); });
 $('#lx-replay').onclick = () => intro(true);
-addEventListener('pagehide', () => clearInterval(handoffTimer));
 addEventListener('pageshow', event => {
   handingOff = false;
-  if (event.persisted) document.querySelector('.lx-brief')?.remove();
+  if (event.persisted) {
+    document.querySelector('.lx-brief')?.remove();
+    document.body.classList.remove('lx-briefing');
+  }
   archive();
 });

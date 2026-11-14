@@ -1,7 +1,7 @@
 // NEXUS//04 game visuals: spacecraft builder model, launch cinematic, mission-control orbit view.
 import * as THREE from '../vendor/three.module.min.js';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import { buildWorld, latLonToVec } from './scene.js';
+import { buildWorld, latLonToVec } from './scene.js?v=2';
 import { MISSIONS } from './data.js';
 import { buildCraft, setCraftEnv, fullCfg } from './craft.js';
 export { buildCraft };
@@ -741,6 +741,10 @@ export class GameStage {
     let off = null;
     if (this.shakeT > 0) { this.shakeT = Math.max(0, this.shakeT - raw * 1.5); const a = this.shakeT * 0.08; off = new THREE.Vector3((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, 0).applyQuaternion(this.cam.quaternion); this.cam.position.add(off); }
     this.r.render(this.scene, this.cam);
+    if (this.onFirstFrame) {
+      this.onFirstFrame();
+      this.onFirstFrame = null;
+    }
     if (off) this.cam.position.sub(off);
     // project labels
     if (this.labels.length) {

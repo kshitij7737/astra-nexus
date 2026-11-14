@@ -16,12 +16,13 @@
 <link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/missions.css">
 <style>html,body{margin:0;background:#030304}</style>
+<link rel="stylesheet" href="css/navigation.css?v=2">
 </head>
 <body>
 <div id="missions"></div>
 <noscript><p style="color:#eee;font-family:sans-serif;padding:2em">This module needs JavaScript. The mission science content is in js/data.js.</p></noscript>
 <script type="module">
-  import { mountMissionModule } from './js/app.js';
+  import { mountMissionModule } from './js/app.js?v=2';
   const id = new URLSearchParams(location.search).get('mission') || 'astra';
   mountMissionModule(document.getElementById('missions'), { mission: id });
   import('./js/status.js').then(async ({ mountStatus }) => { const { Music } = await import('./js/music.js'); mountStatus({ music: new Music() }); });

@@ -5,13 +5,6 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
 
-export function webglAvailable() {
-  try {
-    const c = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
-  } catch { return false; }
-}
-
 // ---------- procedural helpers (deterministic, so worlds look the same each load)
 function hash(x, y, z, s) { const v = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + s * 19.3) * 43758.5453; return v - Math.floor(v); }
 function noise3(x, y, z, s) {
@@ -330,11 +323,11 @@ function setOpacity(obj, k) {
 function dispose(obj) { obj.traverse(o => { o.geometry?.dispose(); if (o.material) { if (!o.material.map?.userData?.shared) o.material.map?.dispose(); o.material.dispose(); } }); }
 
 export class Stage {
-  constructor(container) {
+  constructor(container, context) {
     this.container = container;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.paused = this.reduced;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ canvas:context.canvas, context });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -348,7 +341,11 @@ export class Stage {
     const key = new THREE.DirectionalLight(0xfff4e6, 3.2); key.position.set(5, 2.5, 3); this.scene.add(key);
     const rim = new THREE.DirectionalLight(0x8fb0ff, 0.3); rim.position.set(-4, 1, -3); this.scene.add(rim);
     const pm = new THREE.PMREMGenerator(this.renderer);
-    this.env = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose();
+    const room = new RoomEnvironment();
+    this.environment = pm.fromScene(room, 0.04);
+    this.env = this.environment.texture;
+    room.dispose();
+    pm.dispose();
     this.dot = dotTexture();
     this.stars = this.makePoints(2200, 40, 90, 0xffffff, 0.16, 0.9); this.scene.add(this.stars);
     this.dust = this.makePoints(380, 3, 9, 0xffffff, 0.06, 0.7, true); this.scene.add(this.dust);
@@ -363,11 +360,22 @@ export class Stage {
     this.worldAnchor = null; this.craftAnchor = null; this.worldFade = 1; this.craftFade = 0; this.worldFill = 0.8;
     this.craftYaw = 0.7; this.craftPitch = 0.55;
     this.mouse = new THREE.Vector2(); this.par = new THREE.Vector2();
-    window.addEventListener('pointermove', e => { this.mouse.set(e.clientX / innerWidth - 0.5, e.clientY / innerHeight - 0.5); }, { passive: true });
+    this.onPointerMove = e => { this.mouse.set(e.clientX / innerWidth - 0.5, e.clientY / innerHeight - 0.5); };
+    window.addEventListener('pointermove', this.onPointerMove, { passive: true });
     this.ray = new THREE.Raycaster();
     this.onResize = () => this.resize(); window.addEventListener('resize', this.onResize); this.resize();
     this.clock = new THREE.Clock(); this.first = true;
-    this.renderer.setAnimationLoop(() => this.tick());
+    this.frameInterval = innerWidth < 760 || (navigator.hardwareConcurrency || 8) < 5 ? 1000 / 30 : 1000 / 60;
+    this.setRunning(true);
+  }
+  setRunning(on) {
+    this.lastFrame = -Infinity;
+    this.clock.getDelta();
+    this.renderer.setAnimationLoop(on ? now => {
+      if (document.hidden || now - this.lastFrame < this.frameInterval - 1.5) return;
+      this.lastFrame = now;
+      this.tick();
+    } : null);
   }
   makePoints(n, rMin, rMax, color, size, opacity, dust = false) {
     const p = new Float32Array(n * 3);
@@ -395,6 +403,7 @@ export class Stage {
       area.userData = { type: 'target', index: i, baseOpacity: 0 }; mk.add(area); mk.userData.hit = area; // larger, invisible click target
       this.pivot.add(mk); return mk;
     });
+    probe.material.dispose();
     const col = new THREE.Color(m.glow);
     this.glow.material.color.copy(col); this.dust.material.color.copy(col).lerp(new THREE.Color(0xffffff), 0.4);
     this.hemi.color.copy(col);
@@ -448,7 +457,7 @@ export class Stage {
   tick() {
     const raw = this.clock.getDelta();
     this._ft = (this._ft || 0) + raw; this._fn = (this._fn || 0) + 1;
-    if (this._fn >= 90) { if (this._ft / this._fn > 0.03 && this.renderer.getPixelRatio() > 1) { this.renderer.setPixelRatio(Math.max(1, this.renderer.getPixelRatio() - 0.25)); this.resize(); } this._ft = 0; this._fn = 0; }
+    if (this._fn >= 90) { if (this._ft / this._fn > this.frameInterval / 1000 * 1.35 && this.renderer.getPixelRatio() > 1) { this.renderer.setPixelRatio(Math.max(1, this.renderer.getPixelRatio() - 0.25)); this.resize(); } this._ft = 0; this._fn = 0; }
     const dt = Math.min(raw, 0.05), k = this.reduced || this.first ? 1 : 1 - Math.pow(0.002, dt);
     this.first = false;
     const lerp = (s, key, v) => { s[key] += (v - s[key]) * k; };
@@ -499,5 +508,13 @@ export class Stage {
     this.stars.position.set(-this.par.x * 1.2, this.par.y * 1.2, 0); this.dust.position.set(-this.par.x * 0.5, this.par.y * 0.5, 0);
     this.renderer.render(this.scene, this.camera);
   }
-  dispose() { this.renderer.setAnimationLoop(null); window.removeEventListener('resize', this.onResize); dispose(this.scene); this.renderer.dispose(); this.renderer.domElement.remove(); }
+  dispose() {
+    this.setRunning(false);
+    window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('pointermove', this.onPointerMove);
+    dispose(this.scene);
+    this.environment.dispose();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+  }
 }

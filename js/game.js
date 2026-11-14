@@ -92,7 +92,7 @@ let mission = Object.hasOwn(GAME,url.get('mission')) ? GAME[url.get('mission')] 
 let cfg = null, d = null, est = null, rd = null, sim = null, stage = null, screen = 'brief';
 let simSpeed = 1, raf = 0, lastFrame = 0, lastTelemetry = 0, acc = 0, flags = {};
 let screenAnimation, guideTimer, closeCoach, recoverLaunch;
-let pageSuspended = false;
+let pageSuspended = false, stagePending = false, stageStarted = false;
 const stageElement = $('#gx-stage');
 
 function loadCfg(m) {
@@ -113,27 +113,48 @@ function boot() {
   document.addEventListener('click', e => { if (e.target.closest?.('button, a.gx-btn, a.nx-pill, summary, label')) audio.click(); }, true);
   if (!mission) pickMission(); else start(mission.id);
   if (!store.get().helped) openHelp(true);
-  requestAnimationFrame(() => setTimeout(initStage, 0));
 }
 
 function disableStage(error) {
   console.warn('NEXUS: continuing with lightweight graphics', error);
-  stage?.dispose();
+  const failedStage = stage;
   stage = null;
+  failedStage?.dispose();
   stageElement.replaceChildren();
   document.body.classList.add('gx-no3d');
   recoverLaunch?.();
 }
 
+function queueStage() {
+  if (stagePending || stageStarted || pageSuspended) return;
+  stagePending = true;
+  // Paint the usable mission controls before starting WebGL.
+  requestAnimationFrame(() => setTimeout(() => {
+    stagePending = false;
+    if (screen !== 'pick' && screen !== 'launch' && !pageSuspended) initStage();
+  }, 0));
+}
+
 async function initStage() {
+  stageStarted = true;
+  let context;
   try {
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('webgl2', { antialias:true, alpha:true });
+    context = canvas.getContext('webgl2', { antialias:true, alpha:true });
     if (!context) return;
-    const { GameStage } = await import('./game3d.js?v=2');
+    const { GameStage } = await import('./game3d.js?v=3');
+    if (screen === 'pick' || screen === 'launch' || pageSuspended) {
+      context.getExtension('WEBGL_lose_context')?.loseContext();
+      stageStarted = false;
+      return;
+    }
     const raw = new GameStage(stageElement, disableStage, context);
     stage = raw;
     raw.setControls(settings);
+    raw.onFirstFrame = () => {
+      document.body.classList.remove('gx-no3d');
+      if (!reduced) stageElement.animate([{opacity:0},{opacity:1}], {duration:340,easing:'ease-out'});
+    };
     raw.r.domElement.addEventListener('webglcontextlost', event => {
       event.preventDefault();
       disableStage(new Error('WebGL context lost'));
@@ -145,10 +166,9 @@ async function initStage() {
       raw.showOps(mission, sim.d);
       lastTelemetry = 0;
     }
-    document.body.classList.remove('gx-no3d');
-    stageElement.animate([{opacity:0},{opacity:1}], {duration:reduced ? 0 : 310,easing:'ease-out'});
   } catch (error) {
     disableStage(error);
+    context?.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }
 
@@ -196,15 +216,16 @@ function setScreen(name) {
   screen = name; document.body.dataset.screen = name;
   stage?.setRunning(name !== 'pick' && !pageSuspended);
   $$('[data-screen]').forEach(s => s.hidden = s.dataset.screen !== name);
+  if (name !== 'pick' && name !== 'launch') queueStage();
   const order = ['brief', 'build', 'launch', 'ops', 'debrief'];
   $$('.gx-steps li').forEach((li, i) => { li.dataset.state = i < order.indexOf(name) ? 'done' : i === order.indexOf(name) ? 'now' : ''; });
   if (mission) { const TR = { brief: 'Briefing opened', build: 'Spacecraft design started', launch: 'Launch sequence started', ops: `Orbit reached around ${mission.world}. Science operations started` }; if (TR[name]) trace(mission.id, TR[name], order.indexOf(name)); }
-  window.scrollTo(0, 0);
+  window.scrollTo({top:0,behavior:'instant'});
   if (!reduced) {
     const active = $(`main > [data-screen="${name}"]`);
     screenAnimation = active.animate(
-      [{opacity:.45},{opacity:1}],
-      {duration:290,easing:'cubic-bezier(.16,.65,.26,1)'}
+      [{opacity:.55},{opacity:1}],
+      {duration:320,easing:'cubic-bezier(.16,.65,.26,1)'}
     );
   }
   guideTimer = setTimeout(() => { if (screen === name) guide(name); }, name === 'ops' ? 1200 : 500);
@@ -1012,6 +1033,7 @@ addEventListener('pageshow', event => {
   pageSuspended = false;
   if (!event.persisted) return;
   stage?.setRunning(screen !== 'pick');
+  if (screen !== 'pick' && screen !== 'launch') queueStage();
   if (screen === 'ops' && !sim.done) {
     lastFrame = performance.now();
     raf = requestAnimationFrame(loop);

@@ -649,22 +649,7 @@ export function createRenderer(host, lite, context, invalidate) {
   let model=new T.Group(), motion, start=0, moved=false;
   const size=new T.Vector2();
   scene.add(model);
-  // scene change: keep a still of the old frame on top and dissolve it while the new scene eases in
-  function ghost() {
-    const src=renderer.domElement; if(!src.width||!src.height||!model.children.length) return;
-    try{
-      renderer.render(scene,camera);
-      const g=document.createElement('canvas'); g.className='cx-ghost';
-      g.width=Math.max(1,src.width>>1); g.height=Math.max(1,src.height>>1);
-      g.getContext('2d').drawImage(src,0,0,g.width,g.height);
-      host.querySelectorAll('.cx-ghost').forEach(x=>x.remove());
-      host.append(g);
-      const a=g.animate([{opacity:1,transform:'scale(1)',filter:'blur(0px)'},{opacity:0,transform:'scale(1.045)',filter:'blur(5px)'}],{duration:950,easing:'cubic-bezier(.25,.7,.3,1)',fill:'forwards'});
-      a.onfinish=()=>g.remove();
-    }catch{ /* a still frame is optional */ }
-  }
-  function setChapter(chapter, beat, state, dissolve) {
-    if(dissolve) ghost();
+  function setChapter(chapter, beat, state) {
     scene.background=new T.Color('#040710').lerp(new T.Color(chapter.bg),.13);
     scene.remove(model);
     const disposed=new Set();
@@ -711,5 +696,10 @@ export function createRenderer(host, lite, context, invalidate) {
     for(const resource of resources)resource.dispose();
     renderer.dispose();
   }
-  return {renderer,setChapter,frame,dispose};
+  function capture(context){
+    // A WebGL drawing buffer is valid immediately after drawing.
+    renderer.render(scene,camera);
+    context.drawImage(renderer.domElement,0,0,context.canvas.width,context.canvas.height);
+  }
+  return {renderer,setChapter,frame,capture,dispose};
 }

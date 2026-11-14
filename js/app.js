@@ -26,7 +26,7 @@ export async function mountMissionModule(root, opts = {}) {
   const cfg = { area: BUILDER.arrayArea.def, eff: 0, angle: 0, vol: BUILDER.dataVolume.def, rate: 0, alt: null, instruments: ['Camera'] };
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  root.classList.add('astra-mm');
+  root.classList.add('astra-mm', 'mm-no3d');
   root.innerHTML = `
     <div class="mm-canvas" aria-hidden="true"></div>
     <div class="mm-vignette" aria-hidden="true"></div>
@@ -45,18 +45,9 @@ export async function mountMissionModule(root, opts = {}) {
     <main class="mm-main"></main>`;
   const $ = s => root.querySelector(s);
 
-  try {
-    const sc = await import('./scene.js');
-    if (!sc.webglAvailable()) throw new Error('WebGL unavailable');
-    stage = new sc.Stage($('.mm-canvas'));
-  } catch (e) {
-    console.warn('NEXUS: 3D disabled, showing text-only layout.', e);
-    root.classList.add('mm-no3d'); $('button.mm-pause').hidden = true;
-  }
-
   const pauseBtn = $('button.mm-pause');
+  pauseBtn.hidden = true;
   const syncPause = () => { pauseBtn.setAttribute('aria-pressed', String(stage.paused)); pauseBtn.textContent = stage.paused ? 'Resume motion' : 'Pause motion'; };
-  if (stage) { syncPause(); pauseBtn.onclick = () => { stage.paused = !stage.paused; syncPause(); }; }
   root.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMission(b.dataset.m));
   const goto = n => root.querySelector(`#mm-ch-${n}`).scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
   root.querySelectorAll('.mm-progress [data-goto]').forEach(b => b.onclick = () => goto(b.dataset.goto));
@@ -173,22 +164,27 @@ export async function mountMissionModule(root, opts = {}) {
     root.querySelectorAll('[data-hs]').forEach(b => { b.onclick = () => selectHotspot(b.dataset.hs); b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectHotspot(b.dataset.hs); } }; });
     root.querySelector('.mm-next').onclick = () => setMission(next.id);
     root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { hangarTab = b.dataset.tab; renderHangar(); });
-    if (stage) {
-      // build the 3D world just after the text has painted, so the page never sits blank
-      const token = (renderToken = (renderToken || 0) + 1);
-      requestAnimationFrame(() => setTimeout(() => {
-        if (token !== renderToken) return;
-        stage.setMission(m); applyLayout(active);
-      }, 30));
-      const frame = root.querySelector('.mm-frame');
-      frame.addEventListener('click', e => { const hit = stage.pick(e.clientX, e.clientY); if (hit?.type === 'target') selectTarget(hit.index); });
-      bindStage(root.querySelector('.mm-stage'));
-    }
+    if (stage) prepareWorld(m);
     selectTarget(0, true);
     renderHangar();
     observe();
     fitGiant();
     applyLayout(1);
+  }
+
+  function prepareWorld(m) {
+    const token = ++renderToken;
+    const frame = $('.mm-frame');
+    frame.addEventListener('click', e => {
+      const hit = stage?.pick(e.clientX, e.clientY);
+      if (hit?.type === 'target') selectTarget(hit.index);
+    });
+    bindStage($('.mm-stage'));
+    requestAnimationFrame(() => setTimeout(() => {
+      if (!stage || token !== renderToken) return;
+      stage.setMission(m);
+      applyLayout(active);
+    }, 0));
   }
 
   // Scale the giant mission word to the page width (fonts differ in width per letter).
@@ -410,12 +406,49 @@ export async function mountMissionModule(root, opts = {}) {
   }
 
   function setMission(id) {
-    const m = MISSIONS.find(x => x.id === id); if (!m) return;
+    const m = MISSIONS.find(x => x.id === id); if (!m || m === mission) return;
     mission = m; cfg.alt = null; hangarTab = 'craft';
     render(); const pl = root.querySelector('#mm-playlink'); if (pl) pl.href = `play.html?mission=${id}`;
-    window.scrollTo({ top: root.offsetTop, behavior: 'auto' });
+    window.scrollTo({ top: root.offsetTop, behavior: 'instant' });
+    if (!reduced) $('.mm-main').animate([{opacity:.4,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}], {duration:320,easing:'ease-out'});
   }
 
   render();
-  return { setMission, destroy() { window.removeEventListener('resize', onResize); io?.disconnect(); hangarIO?.disconnect(); revealIO?.disconnect(); stage?.dispose(); root.innerHTML = ''; } };
+  const stopStage = () => stage?.setRunning(false);
+  const resumeStage = event => { if (event.persisted) stage?.setRunning(true); };
+  window.addEventListener('pagehide', stopStage);
+  window.addEventListener('pageshow', resumeStage);
+  requestAnimationFrame(() => setTimeout(async () => {
+    let context;
+    try {
+      context = document.createElement('canvas').getContext('webgl2', {antialias:true,alpha:true});
+      if (!context) throw new Error('WebGL unavailable');
+      const { Stage } = await import('./scene.js?v=2');
+      if (!pauseBtn.isConnected) {
+        context.getExtension('WEBGL_lose_context')?.loseContext();
+        return;
+      }
+      stage = new Stage($('.mm-canvas'), context);
+      root.classList.remove('mm-no3d');
+      pauseBtn.hidden = false;
+      syncPause();
+      pauseBtn.onclick = () => { stage.paused = !stage.paused; syncPause(); };
+      prepareWorld(mission);
+      stage.hideCraft(hangarTab === 'craft');
+      if (hangarTab === 'builder') stage.setCraft('concept', cfg);
+    } catch (error) {
+      stage?.dispose();
+      stage = null;
+      context?.getExtension('WEBGL_lose_context')?.loseContext();
+      pauseBtn.hidden = true;
+      root.classList.add('mm-no3d');
+    }
+  }, 0));
+  return { setMission, destroy() {
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('pagehide', stopStage);
+    window.removeEventListener('pageshow', resumeStage);
+    io?.disconnect(); hangarIO?.disconnect(); revealIO?.disconnect(); stage?.dispose();
+    root.innerHTML = '';
+  } };
 }

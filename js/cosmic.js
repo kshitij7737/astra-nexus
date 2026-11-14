@@ -17,8 +17,9 @@ const progress=new Map(), branches=new Map();
 const videoDialog=$('media-dialog');
 let displayPreference = 'auto', activeDisplay = 'model', loadedObservation = null, pendingObservation;
 let sceneBuild = 0, sceneAnimation, lastDraw = 0, viewerVisible = true, fadingObservation;
+let modelDirty = true, modelReady = false;
 const stage = document.querySelector('.cx-stage');
-const sceneVeil = $('scene-veil');
+const handoff = $('scene-handoff');
 const clips = {
   nebula: [{file:'nebula', title:'Nebula evolution', time:'0:34'}],
   planets: [
@@ -32,12 +33,34 @@ const clips = {
   ],
 };
 
-function revealScene() {
+function clearHandoff() {
   sceneAnimation?.cancel();
-  if(still || !viewerVisible) return;
-  sceneAnimation = sceneVeil.animate([
-    {opacity:.68}, {opacity:0},
-  ], {duration:380,easing:'cubic-bezier(.17,.74,.31,1)'});
+  sceneAnimation = null;
+  handoff.hidden = true;
+}
+function captureModel() {
+  clearHandoff();
+  if (still || !viewerVisible || !modelReady || activeDisplay !== 'model') return false;
+  const width = stage.clientWidth, height = stage.clientHeight;
+  if (!width || !height) return false;
+  const scale = Math.min(1, Math.sqrt(420000 / (width * height)));
+  handoff.width = Math.round(width * scale);
+  handoff.height = Math.round(height * scale);
+  const context = handoff.getContext('2d', {alpha:false});
+  try {
+    if (visual) visual.capture(context);
+    else context.drawImage(canvas, 0, 0, handoff.width, handoff.height);
+  } catch {
+    return false;
+  }
+  handoff.hidden = false;
+  return true;
+}
+function revealModel() {
+  sceneAnimation = handoff.animate([{opacity:1}, {opacity:0}], {
+    duration:360, easing:'cubic-bezier(.2,.65,.3,1)',
+  });
+  sceneAnimation.onfinish = clearHandoff;
 }
 const missingImages = new Set();
 
@@ -46,14 +69,14 @@ function syncDisplay() {
   const available = id && !missingImages.has(id);
   const show = available && (displayPreference==='telescope' || displayPreference==='auto' && !visual);
   activeDisplay = show ? 'telescope' : 'model';
-  $('observation').hidden = !show;
+  $('observation').hidden = !show || !loadedObservation;
   if (!show) {
     pendingObservation = null;
     $('observation').removeAttribute('aria-busy');
   }
   $('observation-notes').hidden = !show;
   $('model-controls').hidden = show;
-  viewport.hidden = show;
+  viewport.hidden = show && Boolean(loadedObservation);
   $('model-labels').hidden = show || !labels;
   $('scale').hidden = show || chapter.id!=='universe' || !state.scale;
   $('show-observation').hidden = !available;
@@ -70,8 +93,8 @@ function syncDisplay() {
   $('replay').hidden = show;
   $('feature-marker').hidden=show || !state.feature;
   $('scene-hotspots').hidden=show||!labels||free;
-  if(visual) visual.renderer.domElement.hidden=show;
-  canvas.hidden=Boolean(visual);
+  if(visual) visual.renderer.domElement.hidden=!modelReady;
+  canvas.hidden=Boolean(visual && modelReady);
   $('retry-renderer').hidden=Boolean(visual);
   if (show && free) setFree(false);
   if (!show || pendingObservation?.id === id) return;
@@ -94,19 +117,26 @@ function syncDisplay() {
   img.decode().then(()=>{
     if(pendingObservation !== request) return;
     const old = $('observation-image');
+    const wasVisible = !$('observation').hidden;
     fadingObservation?.remove();
     fadingObservation = null;
     old.removeAttribute('id');
     img.id = 'observation-image';
     old.before(img);
-    if (loadedObservation && !still && viewerVisible) {
+    $('observation').hidden = false;
+    if (wasVisible && !still && viewerVisible) {
+      viewport.hidden = true;
       fadingObservation = old;
       old.setAttribute('aria-hidden','true');
-      const fade = old.animate([{opacity:.92,transform:'scale(1)'},{opacity:0,transform:'scale(1.03)'}],{duration:800,easing:'cubic-bezier(.25,.7,.3,1)',fill:'forwards'});
+      const fade = old.animate([{opacity:1},{opacity:0}],{duration:380,easing:'ease-out',fill:'forwards'});
       fade.onfinish=()=>{old.remove(); if(fadingObservation===old) fadingObservation=null;};
     } else {
       old.remove();
-      revealScene();
+      if (!still && viewerVisible) {
+        const incoming = $('observation').animate([{opacity:0},{opacity:1}], {duration:300,easing:'ease-out'});
+        incoming.onfinish=()=>{if(activeDisplay==='telescope')viewport.hidden=true;};
+      }
+      else viewport.hidden=true;
     }
     loadedObservation = id;
     pendingObservation = null;
@@ -172,7 +202,6 @@ function media(asset) {
     video.controls=true;video.playsInline=true;video.preload='none';
     const path=asset.local ? file=>'textures/cosmic/'+file : assetPath;
     video.poster=path(asset.file);video.src=path(asset.video);
-    if(asset.local){video.preload='auto';video.autoplay=true;} // opened by a click, so it may play with its soundtrack
     const status=el('p');status.setAttribute('role','status');
     video.addEventListener('waiting',()=>{status.textContent='Loading video…';});
     video.addEventListener('playing',()=>{status.textContent='';});
@@ -193,8 +222,10 @@ function media(asset) {
       scroll.append(image);pane.append(zoom,scroll);
     }else pane.append(image);
   }
-  setGuided(false);frozen=true;
+  setGuided(false);
   videoDialog.showModal();
+  if (asset.local) pane.querySelector('video').play().catch(() => {});
+
 }
 videoDialog.addEventListener('close',()=>{
   const pane=$('media-content'), video=pane.querySelector('video');
@@ -212,10 +243,9 @@ function renderClips() {
       file:clip.file+'-poster.webp', video:clip.file+'.mp4', local:true,
     }));
     open.className='cx-film';
-    open.replaceChildren();
-    const thumb=el('span','', 'cx-film-thumb'); thumb.style.backgroundImage=`url(textures/cosmic/${clip.file}-poster.webp)`; thumb.setAttribute('aria-hidden','true');
-    const meta=el('span',null,'cx-film-meta'); meta.append(el('b',clip.title),el('span',clip.time));
-    open.append(thumb,meta);
+    open.prepend(el('span','', 'cx-film-play'));
+    open.firstElementChild.setAttribute('aria-hidden','true');
+    open.append(el('span',clip.time,'cx-film-time'));
     open.setAttribute('aria-label','Watch '+clip.title+' ('+clip.time+')');
     return open;
   }));
@@ -264,27 +294,49 @@ function resetCamera() { yaw=0; pitch=0; zoom=1; viewChanged=true; }
 function drawFallback(){
   if(visual||activeDisplay==='telescope'||!viewerVisible||hubOpen)return;
   cancelAnimationFrame(diagramFrame);
-  diagramFrame=requestAnimationFrame(()=>drawDiagram(canvas,chapter,beat,state,drawFallback));
+  diagramFrame=requestAnimationFrame(()=>{
+    drawDiagram(canvas,chapter,beat,state,drawFallback);
+    modelReady = true;
+  });
 }
 let animateScene=false, firstModelFrame=true;
 function rebuild(transition=false) {
+  modelDirty = true;
   animateScene ||= transition;
   if(sceneBuild) return;
   sceneBuild=requestAnimationFrame(()=>{
     sceneBuild=0;
     const animate=animateScene;
     animateScene=false;
+    if (hubOpen) return;
+    const wasTelescope = activeDisplay === 'telescope' && !$('observation').hidden;
     syncDisplay();
-    if(activeDisplay==='telescope') return;
+    if(activeDisplay==='telescope') {
+      if(!loadedObservation && !modelReady && !visual) {
+        drawDiagram(canvas,chapter,beat,state,drawFallback);
+        modelReady=true;
+      }
+      return;
+    }
+    const captured = animate && !wasTelescope && captureModel();
     if(visual){
-      try{visual.setChapter(chapter,beat,{...state,still},animate&&!still&&viewerVisible);}
+      if (!viewerVisible) return;
+      try{
+        if (modelDirty) visual.setChapter(chapter,beat,{...state,still});
+        modelDirty=false;
+        viewChanged=true;
+        renderModel(performance.now());
+      }
       catch(error){console.warn('Could not build the 3D scene.',error);useFallback();return;}
     }else{
       cancelAnimationFrame(diagramFrame);
       drawDiagram(canvas,chapter,beat,state,drawFallback);
+      modelReady=true;
     }
-    viewChanged=true;
-    if(animate && !visual) revealScene();
+    if (captured) revealModel();
+    else if (animate && wasTelescope && !still && viewerVisible) {
+      viewport.animate([{opacity:.45},{opacity:1}],{duration:250,easing:'ease-out'});
+    }
   });
 }
 function setFree(on) {
@@ -304,7 +356,7 @@ function setGuided(on) {
   if(on && free) setFree(false);
   $('play').textContent=on?'Pause guided tour':beat===5?'Replay chapter':'Play guided tour';
   $('stage-play').textContent=on?'Pause tour':beat===5?'Replay tour':'Play tour';
-  $('stage-play').toggleAttribute('data-playing',on); $('play').toggleAttribute('data-playing',on);
+  $('stage-play').toggleAttribute('data-playing',on);
   deadline=performance.now()+(chapter.id==='nebula'?20000:10000);
 }
 function buildControls() {
@@ -609,7 +661,12 @@ function go(index, fromTour=false, keepFeature=false, transition=true){
   $('beat-title').textContent=chapter.beats[beat][0];
   $('beat-copy').textContent=chapter.beats[beat][1];
   $('stage-beat').replaceChildren(el('b',chapter.beats[beat][0]),el('span',chapter.beats[beat][1]));
-  if(!still) for(const id of ['stage-beat','beat-title','beat-copy','beat-number']){const n=$(id);n.classList.remove('cx-swap');void n.offsetWidth;n.classList.add('cx-swap');}
+  if(transition && !still && viewerVisible){
+    for(const id of ['stage-beat','beat-title','beat-copy']){
+      $(id).animate([{opacity:.5,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],
+        {duration:270,easing:'ease-out'});
+    }
+  }
   $('timeline').value=beat;
   $('timeline').setAttribute('aria-valuetext',chapter.beats[beat][0]);
   $('timeline-value').textContent=(beat+1)+' of '+chapter.beats.length;
@@ -643,7 +700,6 @@ function openChapter(item, start=0){
   $('chapter-number').textContent='Chapter '+String(index+1).padStart(2,'0')+' / 06';
   $('chapter-title').textContent=item.title;
   $('chapter-intro').textContent=item.intro;
-  if(!still) for(const id of ['chapter-title','chapter-intro','chapter-number']){const n=$(id);n.classList.remove('cx-swap');void n.offsetWidth;n.classList.add('cx-swap');}
   $('duration').textContent='Guided tour · about '+(item.id==='nebula'?'2 minutes':'1 minute')+(item.id==='stars'?' · Stellar time compressed':'');
   $('chapter-help').textContent='Choose a named feature or change an option in '+item.short+'. Scene controls remain available in the diagram.';
   renderScaleReference();
@@ -679,6 +735,7 @@ function navigate(){
   $('chapter-hub').hidden=!hubOpen;
   $('chapter-view').hidden=hubOpen;
   if(hubOpen){
+    clearHandoff();
     setGuided(false);frozen=true;
     $('continue-chapter').href=lastScene;
     $('continue-chapter').textContent=progress.size?'Continue exploring →':'Start exploring →';
@@ -700,13 +757,21 @@ function navigate(){
 }
 function loop(now){
   frameId=requestAnimationFrame(loop);
-  if(document.hidden||hubOpen||videoDialog.open){previous=0;return;}
+  if(document.hidden||hubOpen||videoDialog.open||$('help-dialog').open){previous=0;return;}
   if(guided&&now>=deadline){
     if(beat<chapter.beats.length-1)go(beat+1,true);
     else {setGuided(false);frozen=true;}
   }
-  if(!visual||activeDisplay==='telescope'||!viewerVisible||sceneBuild){previous=0;return;}
+  if(!visual||activeDisplay==='telescope'||!viewerVisible||sceneBuild||modelDirty){previous=0;return;}
   if((still||frozen)&&!viewChanged)return;
+  try { renderModel(now); }
+  catch (error) {
+    console.warn('Cosmic Explorer is switching to its diagram view.', error);
+    useFallback();
+    $('renderer-status').textContent='3D was interrupted. The diagram is ready.';
+  }
+}
+function renderModel(now) {
   const quality=$('quality').value;
   const limit=quality==='lite'||quality==='auto'&&autoLite ? 1000/30 : 1000/60;
   if(!viewChanged && now-lastDraw<limit-1.5) return;
@@ -723,24 +788,25 @@ function loop(now){
     const theta=Math.atan2(eye.x,eye.z)+yaw;
     eye.set(r*Math.sin(phi)*Math.sin(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.cos(theta));
   }
-  try {
-    const smoothing=(still||frozen||firstModelFrame)?1:1-Math.exp(-dt*4.6);
-    visual.frame(clock,view,smoothing,width,height);
-    firstModelFrame=false;
-  } catch (error) {
-    console.warn('Cosmic Explorer is switching to its diagram view.', error);
-    useFallback();
-    $('renderer-status').textContent='3D was interrupted. The diagram is ready.';
-  }
+  const smoothing=(still||frozen||firstModelFrame)?1:1-Math.exp(-dt*4.6);
+  visual.frame(clock,view,smoothing,width,height);
+  firstModelFrame=false;
   viewChanged=false;
+  if(!modelReady){
+    modelReady=true;
+    visual.renderer.domElement.hidden=false;
+    canvas.hidden=true;
+  }
 }
 function useFallback(){
+  clearHandoff();
+  modelReady=false;
   if(visual){
     const old=visual;
+    visual=null;
     old.dispose();
     old.renderer.domElement.remove();
     old.renderer.forceContextLoss();
-    visual=null;
   }
   canvas.hidden=false;
   setFree(false);
@@ -751,26 +817,30 @@ async function startRenderer(){
   $('renderer-status').textContent='Loading 3D…';
   if (!hubOpen) $('stage-status').textContent='Loading 3D · diagram available';
   if(visual)useFallback();
+  let context;
   try{
-    const context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
+    context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
     if(!context)throw Error('WebGL unavailable');
-    art=await import('./cosmic-art.js?v=5');
+    art=await import('./cosmic-art.js?v=8');
     if(generation!==renderGeneration){context.getExtension('WEBGL_lose_context')?.loseContext();return;}
     const quality=$('quality').value;
     visual=art.createRenderer(viewport,quality==='lite'||quality==='auto'&&autoLite,context,()=>{viewChanged=true;});
     firstModelFrame=true;
+    modelReady=false;
     const current=visual;
+    current.renderer.domElement.hidden=true;
     current.renderer.domElement.addEventListener('webglcontextlost',event=>{
       event.preventDefault();
       if(visual===current){useFallback();$('renderer-status').textContent='3D was interrupted. The diagram is ready.';}
     },{once:true});
-    canvas.hidden=true;
     rebuild();
     $('renderer-status').textContent='Interactive 3D is ready.';
     $('stage-status').textContent='';
   }catch{
     if(generation!==renderGeneration)return;
+    const hadRenderer=Boolean(visual);
     useFallback();
+    if(!hadRenderer)context?.getExtension('WEBGL_lose_context')?.loseContext();
     $('renderer-status').textContent='3D is unavailable. Diagrams and telescope views are ready.';
     $('stage-status').textContent='';
   }
@@ -800,7 +870,7 @@ $('labels').onclick=()=>{
 function setStill(on){
   still=on;pressed($('motion'),still);pressed($('help-motion'),still);
   $('stage-status').textContent='';
-  if(still){setGuided(false);sceneAnimation?.cancel();fadingObservation?.remove();}
+  if(still){setGuided(false);clearHandoff();fadingObservation?.remove();}
   rebuild();
   viewChanged=true;
 }
@@ -810,7 +880,14 @@ $('reset').onclick=()=>{setFree(false);resetCamera();};
 $('replay').onclick=()=>{
   setGuided(false);clearTimeout(pulseTimer);state.pulse=false;frozen=false;rebuild();showReading();
 };
-$('help').onclick=()=>{setGuided(false);frozen=true;$('help-dialog').showModal();};
+$('help').onclick=()=>{setGuided(false);$('help-dialog').showModal();};
+for(const dialog of [$('help-dialog'),videoDialog]){
+  dialog.addEventListener('click',event=>{
+    if(event.target!==dialog)return;
+    const bounds=dialog.getBoundingClientRect();
+    if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)dialog.close();
+  });
+}
 $('quality').onchange=startRenderer;
 $('retry-renderer').onclick=startRenderer;
 for(const [id,delta] of [['zoom-in',-.1],['zoom-out',.1]]){
@@ -848,11 +925,15 @@ new ResizeObserver(()=>{viewChanged=true;drawFallback();}).observe(viewport);
 new IntersectionObserver(([entry])=>{
   viewerVisible=entry.isIntersecting;
   previous=0;
-  if(viewerVisible){viewChanged=true;drawFallback();}
+  if(viewerVisible){
+    viewChanged=true;
+    if(visual&&modelDirty)rebuild();
+    else drawFallback();
+  }
 }).observe(stage);
 window.addEventListener('hashchange',navigate);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setGuided(false);});
-window.addEventListener('pagehide',()=>cancelAnimationFrame(frameId));
+window.addEventListener('pagehide',()=>{cancelAnimationFrame(frameId);videoDialog.querySelector('video')?.pause();});
 window.addEventListener('pageshow',event=>{if(event.persisted){previous=0;frameId=requestAnimationFrame(loop);}});
 navigate();
 pressed($('motion'),still);pressed($('help-motion'),still);

@@ -7,13 +7,13 @@
 <meta name="description" content="Six interactive astronomy chapters from ASTRA NEXUS, from stellar nurseries to the observable horizon.">
 <title>Cosmic Explorer · ASTRA NEXUS</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/cosmic.css?v=7">
-<link rel="stylesheet" href="css/navigation.css">
+<link rel="stylesheet" href="css/cosmic.css?v=8">
+<link rel="stylesheet" href="css/navigation.css?v=2">
 </head>
 <body>
 <header class="cx-header">
   <a class="cx-brand" href="./"><span class="cx-mark" aria-hidden="true">✧</span><span>ASTRA <span class="cx-slash">NEXUS</span><small>Cosmic Explorer</small></span></a>
-  <div class="cx-header-actions"><a class="cx-back" href="#chapters">Chapter hub</a><button id="help" type="button">Controls</button><a class="cx-back" href="./#dash">Mission control</a></div>
+  <div class="cx-header-actions"><a class="cx-back" href="#chapters">Chapter hub</a><button id="help" type="button" aria-haspopup="dialog">Controls</button><a class="cx-back cx-exit" href="./#dash">Exit Explorer <span aria-hidden="true">↗</span></a></div>
 </header>
 <nav id="chapters" class="cx-chapters" aria-label="Chapters"></nav>
 <main id="explorer">
@@ -34,7 +34,7 @@
         <a id="observation-credit" target="_blank" rel="noopener"></a>
       </figcaption>
     </figure>
-    <div id="scene-veil" class="cx-scene-veil" aria-hidden="true"></div>
+    <canvas id="scene-handoff" class="cx-scene-handoff" aria-hidden="true" hidden></canvas>
     <div class="cx-caption">
       <div class="cx-eyebrow" id="chapter-number">Chapter 01 / 06</div>
       <h1 id="chapter-title">Inside a Nebula</h1>
@@ -113,7 +113,10 @@
   </div>
 </main>
 <dialog id="help-dialog" class="cx-dialog" aria-labelledby="help-title">
-  <h2 id="help-title">Explorer controls</h2>
+  <div class="cx-dialog-head">
+    <h2 id="help-title">Explorer controls</h2>
+    <form method="dialog"><button class="cx-dialog-x" aria-label="Close Explorer controls" autofocus>×</button></form>
+  </div>
   <p>Use the scene arrows or timeline to advance. Guided tour plays each scene in order. Use Still mode to step through at your own pace.</p>
   <p>In Free look, drag or use the arrow keys to rotate. Use the wheel, + and −, or the zoom buttons to zoom. Escape exits Free look.</p>
   <p id="chapter-help"></p>
@@ -121,13 +124,16 @@
   <button id="help-motion" type="button" aria-pressed="false">Still mode</button>
   <button id="retry-renderer" type="button">Try 3D again</button>
   <p id="renderer-status" role="status"></p>
-  <form method="dialog"><button autofocus>Close controls</button></form>
+  <form method="dialog" class="cx-dialog-actions"><button class="cx-primary">Close controls</button><a class="cx-back" href="./#dash">Exit Explorer to Mission Control ↗</a></form>
 </dialog>
 <dialog id="media-dialog" class="cx-dialog cx-media-dialog" aria-labelledby="media-title">
-  <form method="dialog"><button autofocus>Close media</button></form>
-  <h2 id="media-title"></h2><div id="media-content"></div><p id="media-caption"></p><div id="media-links"></div>
+  <div class="cx-dialog-head">
+    <h2 id="media-title"></h2>
+    <form method="dialog"><button class="cx-dialog-x" aria-label="Close media" autofocus>×</button></form>
+  </div>
+  <div id="media-content"></div><p id="media-caption"></p><div id="media-links"></div>
 </dialog>
 <noscript><p class="cx-noscript">Enable JavaScript to explore the six interactive chapters. <a href="https://science.nasa.gov/universe/">Explore NASA’s universe guide</a>.</p></noscript>
-<script type="module" src="js/cosmic.js?v=8"></script>
+<script type="module" src="js/cosmic.js?v=9"></script>
 </body>
 </html>
