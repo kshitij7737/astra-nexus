@@ -1,7 +1,7 @@
 // NEXUS//04 game visuals: spacecraft builder model, launch cinematic, mission-control orbit view.
 import * as THREE from '../vendor/three.module.min.js';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import { buildWorld, latLonToVec } from './scene.js?v=2';
+import { buildWorld, latLonToVec } from './scene.js?v=3';
 import { MISSIONS } from './data.js';
 import { buildCraft, setCraftEnv, fullCfg } from './craft.js';
 export { buildCraft };

@@ -214,3 +214,14 @@ button.cx-film:hover:not(:disabled){color:var(--accent);background:transparent;b
   .cx-header-actions button,.cx-header-actions .cx-back{min-height:44px}
   .cx-header-actions .cx-back{display:inline-flex;align-items:center}
 }
+
+/* Chapter hub: title -> Nova quest, separate Continue Exploring -> chapter page */
+.cx-hub-grid .cx-hub-card{display:grid;grid-template-columns:2rem minmax(10rem,1fr) minmax(0,1.6fr) auto;align-items:baseline;gap:clamp(.75rem,2vw,1.75rem);padding:1.1rem 0;border-top:1px solid var(--line);line-height:1.42}
+.cx-hub-grid .cx-hub-title{display:block;padding:0;border:0;text-decoration:none;color:#eef2ff}
+.cx-hub-grid .cx-hub-title strong{color:#eef2ff}
+.cx-hub-grid .cx-hub-title strong::after{content:' ▶';font-size:.7em;color:var(--accent);opacity:.8}
+.cx-hub-grid .cx-hub-title:hover strong,.cx-hub-grid .cx-hub-title:focus-visible strong{color:var(--accent)}
+.cx-hub-grid .cx-hub-more{display:inline-block;padding:.45rem .8rem;border:1px solid var(--line);border-radius:999px;text-decoration:none;white-space:nowrap;font-size:.86rem;color:var(--accent)}
+.cx-hub-grid .cx-hub-more:hover,.cx-hub-grid .cx-hub-more:focus-visible{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.cx-hub-grid .cx-hub-title:focus-visible,.cx-hub-grid .cx-hub-more:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media (max-width:760px){.cx-hub-grid .cx-hub-card{grid-template-columns:1.55rem minmax(0,1fr);gap:.3rem .8rem}.cx-hub-grid .cx-hub-card .cx-hub-intro,.cx-hub-grid .cx-hub-more{grid-column:2}.cx-hub-grid .cx-hub-more{justify-self:start;margin-top:.3rem}}

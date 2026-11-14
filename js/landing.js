@@ -81,12 +81,19 @@ function chapters() {
       <p class="lx-card__k"><span class="lx-dot" aria-hidden="true"></span>${esc(m.world)} · ${ROLE[id]}</p>
       <h3>${esc(m.name)}</h3><p>${esc(GOAL[id])}</p>
       <p class="lx-card__meta"><span>Challenge ${'●'.repeat(CHAL[id])}${'○'.repeat(3 - CHAL[id])}</span><span>${best != null ? `Best score ${best}` : 'Not flown yet'}</span></p>
-      <div class="lx-row"><a class="lx-btn lx-btn--go" href="play.html?mission=${id}">Start mission</a><a class="lx-btn" href="explore.html?mission=${id}">Explore</a></div></article>`; }).join('')}</div>
+      <div class="lx-row"><a class="lx-btn lx-btn--go" href="play.html?mission=${id}">Start mission</a><a class="lx-btn" href="explore.html?mission=${id}">Explore</a></div></article>`; }).join('')}
+      <article class="lx-card lx-card--cosmic" style="--acc:#e9b04a;--acc2:#a78bfa">
+      <p class="lx-card__k"><span class="lx-dot" aria-hidden="true"></span>Universe · Story quests</p>
+      <h3>Cosmic Explorer</h3><p>Six chapters from nebulae and stars to black holes and the edge of the universe</p>
+      <p class="lx-card__meta"><span>6 chapters</span><span>142 quest parts</span></p>
+      <div class="lx-row"><a class="lx-btn lx-btn--go" href="nova.html">Play Nova Quest</a><a class="lx-btn" href="cosmic.html?v=15#chapters">Explore</a></div></article></div>
   </section>`;
   const ORB = { astra: 'moon', earth: 'earth-day', lunaris: 'moon', mars: 'mars' };
   $('.lx-bodies').innerHTML = STORY.map((id, i) => `<li><a href="#ch-${id}" data-sheet="${id}" style="--acc:${GAME[id].accent}">
     <i class="lx-orb lx-orb--${id}" style="background-image:url(textures/sm/${ORB[id]}.jpg)" aria-hidden="true"></i>
-    <span class="lx-card__n">0${i + 1}</span><b>${esc(GAME[id].name)}</b><em>${esc(GAME[id].world)}</em><small>${esc(CH[id].h)}</small></a></li>`).join('');
+    <span class="lx-card__n">0${i + 1}</span><b>${esc(GAME[id].name)}</b><em>${esc(GAME[id].world)}</em><small>${esc(CH[id].h)}</small></a></li>`).join('') + `<li><a href="cosmic.html?v=15#chapters" class="lx-bodies__cosmic" style="--acc:#e9b04a">
+    <i class="lx-orb lx-orb--cosmic" style="background-image:url(textures/cosmic/carina.webp)" aria-hidden="true"></i>
+    <span class="lx-card__n">05</span><b>Cosmic Explorer</b><em>Universe</em><small>From nebulae to the edge of the universe.</small></a></li>`;
 }
 
 // ---------- archive
@@ -114,7 +121,7 @@ async function sky() {
   const context = canvas.getContext('webgl2',{antialias:true,alpha:true});
   if (!context) return;
   const [THREE, {buildWorld,latLonToVec}, craftModule, {MISSIONS}, {RoomEnvironment}] = await Promise.all([
-    import('../vendor/three.module.min.js'), import('./scene.js?v=2'), import('./craft.js'),
+    import('../vendor/three.module.min.js'), import('./scene.js?v=3'), import('./craft.js'),
     import('./data.js'), import('../vendor/RoomEnvironment.js')
   ]);
   const {buildCraft,fullCfg} = craftModule;
@@ -145,6 +152,14 @@ async function sky() {
   for (let i = 0; i < n; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(600 + Math.random() * 600); p.set([v.x, v.y, v.z], i * 3); }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(p, 3));
   scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.3, sizeAttenuation: true, transparent: true, opacity: 0.75 })));
+  // nearer star layer and a few faint distant galaxies, so camera moves give gentle depth parallax
+  {
+    const m = 1400, mp = new Float32Array(m * 3); for (let i = 0; i < m; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(160 + Math.random() * 260); mp.set([v.x, v.y, v.z], i * 3); }
+    const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(mp, 3));
+    scene.add(new THREE.Points(mg, new THREE.PointsMaterial({ color: 0xdfe8ff, size: 0.55, sizeAttenuation: true, transparent: true, opacity: 0.55, depthWrite: false })));
+    const gl = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.translate(32, 32); g.scale(1, 0.42); const gr = g.createRadialGradient(0, 0, 0, 0, 0, 30); gr.addColorStop(0, 'rgba(255,240,220,.9)'); gr.addColorStop(.25, 'rgba(200,190,255,.35)'); gr.addColorStop(1, 'rgba(120,120,200,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 30, 0, 7); g.fill(); return new THREE.CanvasTexture(c); })();
+    for (let i = 0; i < 18; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: gl, transparent: true, opacity: 0.25 + Math.random() * 0.3, depthWrite: false, rotation: Math.random() * 3 })); sp.position.copy(new THREE.Vector3().randomDirection().multiplyScalar(700 + Math.random() * 300)); sp.scale.setScalar(10 + Math.random() * 18); scene.add(sp); }
+  }
   // Milky Way: a soft band of dense, slightly tinted stars plus faint glow clouds along one great circle (illustrative)
   {
     const m = 9000, mp = new Float32Array(m * 3), mc = new Float32Array(m * 3), axis = new THREE.Vector3(0.35, 1, -0.25).normalize();
@@ -173,14 +188,22 @@ async function sky() {
       float h(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719)))*43758.5453); }
       float n(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z); }
+      float f(vec3 p){ float s=0.0, a=0.5; for(int i=0;i<5;i++){ s+=a*n(p); p=p*2.07+vec3(1.3,7.1,3.7); a*=0.5; } return s; }
       void main(){ float mu = max(dot(vN,vV),0.0);
-        float g = n(vP*4.0+uT*0.15)*0.6 + n(vP*10.0-uT*0.25)*0.4;
-        vec3 core = vec3(1.0,0.96,0.86), limb = vec3(1.0,0.42,0.08);
-        vec3 c = mix(limb, core, pow(mu, 0.45)) * (0.82 + 0.3*g);
-        gl_FragColor = vec4(c*1.15*uB, 1.0); }`,
+        vec3 q = normalize(vP);
+        float gran = f(q*9.0 + vec3(0.0, uT*0.05, 0.0));
+        float cell = f(q*26.0 - vec3(uT*0.08));
+        float spot = smoothstep(0.74, 0.8, f(q*3.1 + vec3(uT*0.004, 0.0, 0.0))) * smoothstep(0.95, 0.4, abs(q.y));
+        float fac = smoothstep(0.55, 0.75, f(q*5.0 + 11.0)) * pow(1.0 - mu, 2.0);
+        float limbDark = 0.42 + 0.58 * pow(mu, 0.55);
+        vec3 core = vec3(1.0,0.95,0.84), warm = vec3(1.0,0.55,0.16);
+        vec3 c = mix(warm, core, pow(mu, 0.6)) * (0.8 + 0.22*gran + 0.12*cell) * limbDark;
+        c *= 1.0 - spot * 0.45;
+        c += vec3(1.0,0.85,0.6) * fac * 0.35;
+        gl_FragColor = vec4(c*1.2*uB, 1.0); }`,
   });
   const sun = new THREE.Mesh(new THREE.SphereGeometry(3.2, 64, 48), sunMat); scene.add(sun);
-  const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a50, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.5 })); corona.scale.setScalar(44); scene.add(corona);
+  const corona = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a50, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.36 })); corona.scale.setScalar(38); scene.add(corona);
   const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sunGlow.scale.setScalar(24); scene.add(sunGlow);
   // illustrative scale: inner planets 20 units per AU, outer planets squeezed (log) so all eight fit one frame
   const dist = au => au <= 1.6 ? 20 * au : 30.5 + 14 * Math.log(au / 1.524);
@@ -228,7 +251,7 @@ async function sky() {
   const sizeOf = { astra: 0.32, earth: 1.1, lunaris: 0.32, mars: 0.8 };
   // Earth: thin, natural blue edge and less glare, so the surface reads (violet stays in the interface)
   const atmos = [];
-  earth.traverse(o => { const u = o.material?.uniforms; if (u?.uStrength) { u.uStrength.value = 0.6; u.uPower.value = 3.6; atmos.push(u); } });
+  earth.traverse(o => { const u = o.material?.uniforms; if (u?.uStrength) { u.uStrength.value = 0.75; u.uPower.value = 3.2; atmos.push(u); } });
   const clouds = earth.children.find(c => c.userData.layer === 'clouds');
   // intro only: a thin sunrise limb, orange where the Sun is about to break through, fading to blue along the horizon
   const limb = new THREE.Mesh(new THREE.SphereGeometry(1.03, 128, 96), new THREE.ShaderMaterial({
@@ -269,6 +292,8 @@ async function sky() {
   const tgt = document.createElement('p'); tgt.className = 'lx-target'; tgt.setAttribute('aria-hidden', 'true'); document.body.appendChild(tgt); let tgtW = 0, tgtH = 0; addEventListener('resize', () => { tgt.dataset.k = ''; mk.dataset.k = ''; }); document.fonts?.ready.then(() => { tgt.dataset.k = ''; mk.dataset.k = ''; });
   const mk = document.createElement('p'); mk.className = 'lx-marklbl'; mk.setAttribute('aria-hidden', 'true'); document.body.appendChild(mk); let mkW = 0;
   let t0 = 0.9, focus = 'sun', shown = 'earth';
+  const mouse = { x: 0, y: 0 }, par = { x: 0, y: 0 };
+  addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { mouse.x = e.clientX / innerWidth * 2 - 1; mouse.y = e.clientY / innerHeight * 2 - 1; } }, { passive: true });
   const HERO = new THREE.Vector3(0, 62, 96);
   const camPos = HERO.clone(), camLook = new THREE.Vector3();
   const goal = { pos: camPos.clone(), look: new THREE.Vector3() };
@@ -338,15 +363,15 @@ async function sky() {
       // stand on the sunlit side, a little off the Sun line, so the target is mostly lit and the shading reads
       const toSun = b.position.clone().multiplyScalar(-1).normalize(), tangent = new THREE.Vector3(-toSun.z, 0, toSun.x);
       const lunar = key === 'lunaris';
-      off.copy(toSun).multiplyScalar(lunar ? 0.42 : 0.75).addScaledVector(tangent, lunar ? 0.9 : 0.62).add(new THREE.Vector3(0, lunar ? -0.85 : 0.35, 0)).normalize()
-        .multiplyScalar(size * (narrow ? (lunar ? 5.2 : 9) : (lunar ? 4.3 : key === 'astra' ? 8.2 : 6.5))); // the Moon is framed closer so crater relief and the shadow line read
+      off.copy(toSun).multiplyScalar(lunar ? 0.42 : key === 'astra' ? 0.55 : 0.75).addScaledVector(tangent, lunar ? 0.9 : key === 'astra' ? 0.85 : 0.62).add(new THREE.Vector3(0, lunar ? -0.85 : 0.35, 0)).normalize()
+        .multiplyScalar(size * (narrow ? (lunar ? 5.2 : 9) : (lunar ? 4.3 : key === 'astra' ? 6.8 : 6.5))); // the Moon is framed closer so crater relief and the shadow line read
       goal.pos.copy(b.position).add(off);
       side.crossVectors(off, new THREE.Vector3(0, 1, 0)).normalize();
       goal.look.copy(b.position).addScaledVector(side, narrow ? 0 : size * (lunar ? 1.1 : 2.2)).add(new THREE.Vector3(0, narrow ? -size * 0.9 : 0, 0));
       // turn the target so its marker faces the camera (Mars: Jezero; Moon: south pole is seen from below)
       const m = marks[key];
       if (m) { const d = off.clone().normalize(); const want = Math.atan2(m.position.z, m.position.x) - Math.atan2(d.z, d.x); spin[key] = spin[key] ?? b.rotation.y; spin[key] += Math.atan2(Math.sin(want - spin[key]), Math.cos(want - spin[key])) * Math.min(1, dt * 2); b.rotation.y = spin[key]; }
-      else b.rotation.y += dt * 0.05;
+      else { b.rotation.y += dt * 0.05; if (key === 'astra') b.rotation.z = 0.35 + Math.sin(performance.now() * 0.00012) * 0.08; }
       // the craft rides a thin ring around the target, on the side nearest the camera, payload pointed at the target
       const ringR = size * (key === 'astra' ? 1.7 : lunar ? 1.3 : 1.6), toCam = off.clone().normalize();
       // ring tilted toward the camera so it reads as an orbit; craft sits on its upper arc, clear of the copy card
@@ -379,7 +404,11 @@ async function sky() {
       const k = reduced || first ? 1 : 1 - Math.pow(outT < 3.2 && introWas ? 0.3 : 0.04, dt);
       camPos.lerp(goal.pos, k); camLook.lerp(goal.look, k); camUp.lerp(Y, k).normalize();
     }
-    cam.position.copy(camPos); cam.up.copy(camUp); cam.lookAt(camLook); cam.updateMatrixWorld();
+    cam.position.copy(camPos);
+    if (!reduced && !introOn) { par.x += (mouse.x - par.x) * Math.min(1, dt * 2); par.y += (mouse.y - par.y) * Math.min(1, dt * 2);
+      const dist0 = camPos.distanceTo(camLook), side0 = v3.subVectors(camLook, camPos).cross(Y).normalize();
+      cam.position.addScaledVector(side0, par.x * dist0 * 0.025).addScaledVector(Y, -par.y * dist0 * 0.018); }
+    cam.up.copy(camUp); cam.lookAt(camLook); cam.updateMatrixWorld();
     { const sd = v3.copy(sun.position).sub(earth.position).normalize().transformDirection(cam.matrixWorldInverse); atmos.forEach(u => { u.uSun.value.copy(sd); u.uSunOn.value = 1; }); limb.material.uniforms.uSun.value.copy(sd); }
     limb.visible = introOn; if (clouds) clouds.visible = !introOn;
     if (surf) { const m = surf.material; // sunrise shot: no grazing glints or bump ridges flickering along the horizon

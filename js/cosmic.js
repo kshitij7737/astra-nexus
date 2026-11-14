@@ -281,14 +281,20 @@ function renderEvidence() {
     return card;
   }));
 }
+// Each chapter: the title opens the matching Nova quest; "Continue Exploring" opens the original chapter page.
 const hubCards=chapters.map((item,i)=>{
-  const a=link('',route(item.id));
-  const arrow=el('span','→','cx-hub-arrow');
-  arrow.setAttribute('aria-hidden','true');
+  const card=el('div',null,'cx-hub-card');
+  const title=link('',questLink(item.id));
+  title.className='cx-hub-title';
+  title.setAttribute('aria-label',item.title+': play Nova Quest chapter '+(i+1));
+  title.append(el('strong',item.title));
   const intro=el('span',item.intro,'cx-hub-intro');
   intro.append(el('span',null,'cx-objective-count'));
-  a.append(el('span',String(i+1).padStart(2,'0'),'cx-eyebrow'),el('strong',item.title),intro,arrow);
-  return a;
+  const more=link('Continue Exploring →',route(item.id));
+  more.className='cx-hub-more';
+  more.setAttribute('aria-label','Continue exploring '+item.title);
+  card.append(el('span',String(i+1).padStart(2,'0'),'cx-eyebrow'),title,intro,more);
+  return card;
 });
 $('hub-grid').append(...hubCards);
 const questNav=el('nav',null,'cx-chapters');

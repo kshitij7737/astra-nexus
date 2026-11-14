@@ -128,11 +128,11 @@ function rockDetail(mat) {
         return mix(mix(mix(rh(i),rh(i+vec3(1,0,0)),f.x),mix(rh(i+vec3(0,1,0)),rh(i+vec3(1,1,0)),f.x),f.y),mix(mix(rh(i+vec3(0,0,1)),rh(i+vec3(1,0,1)),f.x),mix(rh(i+vec3(0,1,1)),rh(i+vec3(1,1,1)),f.x),f.y),f.z); }
       float rockH(vec3 p){ float h = rn(p*9.0)*0.5 + rn(p*21.0)*0.3 + rn(p*44.0)*0.2; float b = rn(p*16.0+7.0); return h + smoothstep(0.7, 0.92, b)*0.5; }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-      float rk = rockH(vOP); diffuseColor.rgb *= 0.9 + 0.35*rk; diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.15,1.1,1.02), smoothstep(0.7,0.92,rn(vOP*16.0+7.0)));`)
+      float rk = rockH(vOP); diffuseColor.rgb *= 0.82 + 0.4*rk; diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.15,1.1,1.02), smoothstep(0.7,0.92,rn(vOP*16.0+7.0)));`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       { float hgt = rockH(vOP); vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition); float dhx = dFdx(hgt), dhy = dFdy(hgt);
         vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx); float det = dot(dpx, r1);
-        vec3 grad = sign(det) * (dhx * r1 + dhy * r2); normal = normalize(abs(det) * normal - 0.012 * grad); }`);
+        vec3 grad = sign(det) * (dhx * r1 + dhy * r2); normal = normalize(abs(det) * normal - 0.02 * grad); }`);
   };
 }
 
@@ -161,13 +161,19 @@ export function buildWorld(m) {
       // The real shape of Apophis is only known roughly from radar, so this stays illustrative.
       const n = fbm(v.clone().multiplyScalar(2.2), 3);
       const mid = fbm(v.clone().multiplyScalar(7), 5, 4), fine = fbm(v.clone().multiplyScalar(22), 8, 3);
-      const ridged = 1 - Math.abs(fbm(v.clone().multiplyScalar(11), 12, 3) * 2 - 1); // boulder fields
-      const lobe = Math.exp(-((v.x - 0.55) ** 2) * 4) + Math.exp(-((v.x + 0.55) ** 2) * 4);
-      const neck = Math.exp(-(v.x ** 2) * 14) * 0.07;
-      h = (n - 0.5) * 0.34 + (mid - 0.5) * 0.07 + (fine - 0.5) * 0.012 + Math.pow(ridged, 6) * 0.03 + craters(v, 9, 9, 0.3) + craters(v, 19, 30, 0.09) * 0.6 + lobe * 0.13 - neck;
-      v.multiply(new THREE.Vector3(1.34, 0.8, 0.86));
-      c.set(0xb3a595).lerp(new THREE.Color(0x8d8073), THREE.MathUtils.smoothstep(mid, 0.42, 0.6)).lerp(new THREE.Color(0xcfc2b0), Math.pow(ridged, 6) * 0.8);
-      c.multiplyScalar(0.85 + n * 0.45);
+      const ridged = 1 - Math.abs(fbm(v.clone().multiplyScalar(11), 12, 3) * 2 - 1); // boulder fields and ridges
+      const lobe = Math.exp(-((v.x - 0.55) ** 2) * 4) * 1.1 + Math.exp(-((v.x + 0.6) ** 2) * 4) * 0.85; // unequal lobes
+      const neck = Math.exp(-(v.x ** 2) * 12) * 0.09;
+      // shallow grooves running around the long axis, broken up by noise (illustrative, as seen on Eros and Itokawa)
+      const gr = Math.abs(Math.sin(v.x * 26 + v.y * 4 + mid * 5)); const groove = THREE.MathUtils.smoothstep(gr, 0.93, 1) * THREE.MathUtils.smoothstep(n, 0.42, 0.6);
+      const crBig = craters(v, 9, 7, 0.32), crMid = craters(v, 19, 26, 0.1), crSmall = craters(v, 23, 70, 0.04);
+      h = (n - 0.5) * 0.36 + (mid - 0.5) * 0.08 + (fine - 0.5) * 0.014 + Math.pow(ridged, 6) * 0.035 + crBig * 0.9 + crMid * 0.6 + crSmall * 0.35 + lobe * 0.14 - neck - groove * 0.012;
+      v.multiply(new THREE.Vector3(1.48, 0.78, 0.86));
+      v.y += 0.07 * v.x * v.x - 0.05; v.z += 0.04 * Math.sin(v.x * 2.2); // slight bend, so it is not symmetric
+      const dark = new THREE.Color(0x5a554f), brown = new THREE.Color(0x6a5a4b), grey = new THREE.Color(0x837e76), mineral = new THREE.Color(0xa09482);
+      c.copy(dark).lerp(brown, THREE.MathUtils.smoothstep(mid, 0.4, 0.62)).lerp(grey, THREE.MathUtils.smoothstep(fine, 0.45, 0.7) * 0.5);
+      c.lerp(mineral, Math.pow(ridged, 6) * 0.7);
+      c.multiplyScalar(THREE.MathUtils.clamp(0.82 + n * 0.4 + (crBig + crMid) * 3.5, 0.55, 1.25)); // crater floors read darker, rims lighter
     } else if (kind === 'moon') {
       const n = fbm(v.clone().multiplyScalar(3), 7);
       const mare = fbm(v.clone().multiplyScalar(1.2), 11, 3);
@@ -340,6 +346,7 @@ export class Stage {
     this.hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.1); this.scene.add(this.hemi);
     const key = new THREE.DirectionalLight(0xfff4e6, 3.2); key.position.set(5, 2.5, 3); this.scene.add(key);
     const rim = new THREE.DirectionalLight(0x8fb0ff, 0.3); rim.position.set(-4, 1, -3); this.scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xdfe6ff, 0.6); fill.position.set(-3, 1.5, 4); this.scene.add(fill); // soft fill so dark rock keeps its detail
     const pm = new THREE.PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
     this.environment = pm.fromScene(room, 0.04);

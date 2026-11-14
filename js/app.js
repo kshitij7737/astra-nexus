@@ -423,7 +423,7 @@ export async function mountMissionModule(root, opts = {}) {
     try {
       context = document.createElement('canvas').getContext('webgl2', {antialias:true,alpha:true});
       if (!context) throw new Error('WebGL unavailable');
-      const { Stage } = await import('./scene.js?v=2');
+      const { Stage } = await import('./scene.js?v=3');
       if (!pauseBtn.isConnected) {
         context.getExtension('WEBGL_lose_context')?.loseContext();
         return;

@@ -142,7 +142,7 @@ async function initStage() {
     const canvas = document.createElement('canvas');
     context = canvas.getContext('webgl2', { antialias:true, alpha:true });
     if (!context) return;
-    const { GameStage } = await import('./game3d.js?v=3');
+    const { GameStage } = await import('./game3d.js?v=4');
     if (screen === 'pick' || screen === 'launch' || pageSuspended) {
       context.getExtension('WEBGL_lose_context')?.loseContext();
       stageStarted = false;
