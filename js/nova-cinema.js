@@ -3,7 +3,19 @@ const clamp=x=>Math.max(0,Math.min(1,x));
 const pick=(xs,i)=>xs[Math.min(xs.length-1,i)];
 const blue='#77bbff', gold='#ffaf68', violet='#b28afa', white='#fbedd9', mint='#80ead8';
 
-export function drawCinema(canvas,chapter,part,n,time,yaw,pitch){
+const maps={
+  Earth:'sm/earth-day.jpg', Mercury:'planets/mercury.jpg', Venus:'planets/venus.jpg', Mars:'sm/mars.jpg',
+  Jupiter:'planets/jupiter.jpg', Saturn:'planets/saturn.jpg', Uranus:'planets/uranus.jpg', Neptune:'planets/neptune.jpg',
+};
+const images=new Map();
+function texture(name,src,onLoad){
+  if(!images.has(name)){
+    const image=new Image();image.addEventListener('load',onLoad,{once:true});image.src=new URL('../textures/'+src,import.meta.url).href;images.set(name,image);
+  }
+  const image=images.get(name);
+  return image.complete&&image.naturalWidth?image:null;
+}
+export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
   const w=canvas.clientWidth,h=canvas.clientHeight;
   if(!w||!h)return;
   const ratio=Math.min(devicePixelRatio,1.5);
@@ -112,6 +124,117 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch){
   }
   g.translate(Math.sin(yaw)*.13,pitch*.06);
 
+  function texturedPlanet(name,x,y,size){
+    const image=texture(name,maps[name],onLoad);
+    if(!image){planet(x,y,size,blue);return;}
+    glow(x,y,size*1.17,blue,.35);
+    if(name==='Saturn')ring(x,y,size*1.74,'#ead2aa',.36,-.28);
+    g.save();g.beginPath();g.arc(x,y,size,0,tau);g.clip();
+    g.drawImage(image,0,0,image.naturalWidth*.58,image.naturalHeight,x-size,y-size,size*2,size*2);
+    const shade=g.createLinearGradient(x-size,y-size,x+size,y+size);
+    shade.addColorStop(0,'#fff4cf36');shade.addColorStop(.47,'#090e2200');shade.addColorStop(1,'#03050cea');
+    g.fillStyle=shade;g.fillRect(x-size,y-size,size*2,size*2);
+    g.restore();
+    if(name==='Saturn'){
+      g.beginPath();g.ellipse(x,y,size*1.74,size*.62,-.28,0,Math.PI);
+      g.strokeStyle='#ecd2a7';g.lineWidth=.016;g.stroke();
+    }
+  }
+  function solarPullback(){
+    const names=Object.keys(maps);
+    const zoom=1.31-n*.65;
+    g.save();g.scale(zoom,zoom);g.translate(0,-.10+n*.08);
+    star(0,-.1,.25,gold);glow(0,-.1,.84,gold,.22);
+    const orbit={Mercury:[.31,.026],Venus:[.40,.044],Earth:[.53,.146],Mars:[.67,.039],
+      Jupiter:[.83,.128],Saturn:[.99,.106],Uranus:[1.12,.056],Neptune:[1.24,.063]};
+    const angles=[1.54,-1.83,-2.54,.45,-2.08,-.98,2.49,.87];
+    const bodies=names.map((name,i)=>{
+      const [distance,size]=orbit[name],a=angles[i]+time*.07/(i+1)+n*.85;
+      ring(0,-.1,distance,'#b7cce235',.69,-.14);
+      return {name,size,x:Math.cos(a)*distance,y:-.1+Math.sin(a)*distance*.69};
+    }).sort((a,b)=>a.y-b.y);
+    for(const b of bodies)texturedPlanet(b.name,b.x,b.y,b.size);
+    g.restore();
+  }
+  function nebulaFlythrough(){
+    const image=texture('carina','cosmic/carina.webp',onLoad);
+    if(image){
+      g.save();
+      const zoom=1.35+n*1.45+Math.sin(time*.19)*.12;
+      g.globalAlpha=.66;
+      g.globalCompositeOperation='screen';
+      g.filter='hue-rotate(24deg) saturate(0.85)';
+      g.drawImage(image,-zoom*.73+yaw*.05,-zoom*.55,zoom*1.46,zoom*1.08);
+      g.restore();
+    }
+    cloud(-.14,.10,.93+n*.43,violet,part===12?1:0);
+    cloud(.30,-.19,.66+n*.37,blue);
+    for(let i=0;i<100;i++){
+      const a=rand()*tau,q=(rand()+time*.045)%1,d=.15+q*(1.02+n*.48);
+      const x=Math.cos(a)*d,y=Math.sin(a)*d*.76;
+      dot(x,y,.002+q*.009,i%11? '#b8d8ff99':'#ffdcbbe0');
+    }
+  }
+  function lensJourney(){
+    const offset=(1-n)*.37;
+    function warp(x,z){
+      const q=x*x+z*z;
+      return [x+.37*z,z*.64+.16*Math.exp(-q*6)];
+    }
+    for(let i=-8;i<=8;i++){
+      path(Array.from({length:25},(_,j)=>warp(i*.115,(j-12)*.077)),'#94a9ee50',.004);
+      path(Array.from({length:25},(_,j)=>warp((j-12)*.082,i*.112)),'#94a9ee50',.004);
+    }
+    spiral(0,0,.43,violet,3,.69);
+    glow(0,0,.26,gold,.58);
+    const source=[offset,-.72],observer=[-.13,.71];
+    for(const sign of [-1,1]){
+      const pts=Array.from({length:47},(_,i)=>{
+        const t=i/46;
+        return [source[0]*(1-t)+observer[0]*t+sign*(.35+n*.16)*Math.sin(Math.PI*t),source[1]*(1-t)+observer[1]*t];
+      });
+      path(pts,'#b4cfff45',.043);path(pts,'#fff5df',.011);
+      const [x,y]=pts[Math.floor(((time*.32+n*.38)%1)*46)];glow(x,y,.064,white);
+    }
+    star(...source,.038,white);text(source[0],-.82,'Distant galaxy');
+    texturedPlanet('Earth',...observer,.048);text(observer[0],.86,'Observer');
+    if(part===6||part===19){
+      g.save();g.translate(.75,-.35);
+      dot(0,0,.24,'#091630');ring(0,0,.24,'#9bbdff95');
+      glow(0,0,.09,gold,.56);
+      const spread=Math.min(tau,.8+n*5.5);
+      arc(.16,-spread/2,spread,blue,.019);
+      if(n<.94)arc(.16,2.81,.59+n*.72,mint,.013);
+      text(0,.34,'Illustrated telescope view');
+      g.restore();
+    }
+  }
+  function merger(){
+    const spread=.72*Math.pow(1-n,1.4);
+    const a=time*(.55+n*2.2)+n*8;
+    for(const sign of [-1,1]){
+      const trail=Array.from({length:30},(_,i)=>{
+        const t=i/29,angle=a-t*(1.35+n),r=spread+t*.14;
+        return [sign*Math.cos(angle)*r,sign*Math.sin(angle)*r*.58];
+      });
+      path(trail,'#6cd4ffa0',.013);
+      if(n<.88){
+        const [x,y]=trail[0];glow(x,y,.20,'#64dbff',.93);dot(x,y,.052,'#050a14');ring(x,y,.063,blue);
+        for(let i=0;i<20;i++){const q=trail[Math.min(i+2,29)];dot(q[0]+(rand()-.5)*.04,q[1]+(rand()-.5)*.04,.006,blue+'77');}
+      }
+    }
+    if(n>.58){
+      const phase=(n-.58)/.42;
+      glow(0,0,.82*phase+.12,violet,Math.sin(phase*Math.PI)*.81);
+      for(let i=0;i<5;i++)ring(0,0,.13+i*.10+phase*.48,violet+'8a',.56,-.18);
+      if(n>=.88){glow(0,0,.28,blue,.58);dot(0,0,.091,'#03060e');ring(0,0,.102,blue);}
+    }
+  }
+  if(chapter==='nebula'&&[0,7,8,10,12,22].includes(part)){nebulaFlythrough();return;}
+  if((chapter==='universe'&&part===3)||(chapter==='planets'&&part===20)){solarPullback();return;}
+  if(chapter==='lensing'&&[4,5,6,12,19,20].includes(part)){lensJourney();return;}
+  if(chapter==='black-holes'&&part===19){merger();return;}
+
   if(chapter==='nebula'){
     if(part===1){
       for(const [x,count,name] of [[-.47,145,'Room air'],[.47,9,'Nebula']]){
@@ -202,9 +325,6 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch){
     if(part===0||part===1){
       for(let i=0;i<5;i++){const q=.28+i*.12,a=time*(1+n)/(i+1)+i;ring(0,0,q,blue+'68',.62,i*.28);star(Math.cos(a)*q,Math.sin(a)*q*.62,.024,white);}
       dot(0,0,.095,'#020309');
-    }else if(part===19){
-      const gap=.48-n*.43;dot(-gap,0,radius*.65,'#020309');dot(gap,0,radius*.65,'#020309');
-      for(let i=0;i<5;i++)ring(0,0,.18+((i*.15+n*.46)% .69),violet+'9b',.82);
     }else if(part===22){
       for(const [x,caption] of [[-.45,'M87*'],[.45,'Sagittarius A*']]){glow(x,0,.38,gold);dot(x,0,.17,'#080607');ring(x,0,.185,gold);text(x,.49,caption);}
     }else if(part===13){

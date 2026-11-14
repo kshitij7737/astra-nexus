@@ -1,7 +1,7 @@
 import { acts, parts as nebulaParts } from './nova-data.js';
 import { chapters, initialSettings } from './cosmic-data.js?v=4';
-import { drawCinema } from './nova-cinema.js';
-import { series, questLink } from './nova-series.js?v=12';
+import { drawCinema } from './nova-cinema.js?v=13';
+import { series, questLink } from './nova-series.js?v=13';
 
 const requested=new URLSearchParams(location.search).get('quest');
 const questIndex=Math.max(0,series.findIndex(([id])=>id===requested));
@@ -65,6 +65,12 @@ function go(index) {
   $('title').textContent=heading;
   $('story').textContent=story;
   $('visual').textContent=graphic;
+  const credit=$('credit');
+  const nebula=questId==='nebula'&&[0,7,8,10,12,22].includes(part);
+  const planets=questId==='universe'&&part===3||questId==='planets'&&part===20;
+  credit.hidden=!nebula&&!planets;
+  credit.href=nebula?'https://science.nasa.gov/asset/webb/cosmic-cliffs-in-the-carina-nebula-nircam-image/':'sources.html';
+  credit.textContent=nebula?'Backdrop: NASA, ESA, CSA, STScI · color adapted':'Planet texture credits · sizes and distances illustrative';
   $('move').textContent=quest?(label==='View'?'Drag the scene or use the View dial.':action):action;
   $('dial-name').textContent=label||labels[part];
   $('dial-value').textContent='0%';
@@ -87,7 +93,7 @@ function draw(now) {
   if(!dial.still)animationTime+=Math.min(.06,(now-last)/1000);
   last=now;redraw=false;
   if(!visual){
-    drawCinema(canvas,questId,part,dial.value,animationTime,yaw,pitch);
+    drawCinema(canvas,questId,part,dial.value,animationTime,yaw,pitch,()=>{redraw=true;});
     return;
   }
   if(quest)syncModel();

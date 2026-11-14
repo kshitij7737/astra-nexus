@@ -8,5 +8,5 @@ export const series = [
 ];
 
 export function questLink(id) {
-  return id==='nebula'?'nova.html?v=12':'nova.html?v=12'+'&quest='+encodeURIComponent(id);
+  return id==='nebula'?'nova.html?v=13':'nova.html?v=13'+'&quest='+encodeURIComponent(id);
 }
