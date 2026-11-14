@@ -233,7 +233,12 @@
   };
   const PARTS = { solar: { S: 'Small solar: 1,200 W, 20 kg, 80 credits', L: 'Large solar: 1,800 W, 30 kg, 140 credits' },
     radio: { S: 'Small radio: 2 Mb/s, 15 kg, 60 credits', L: 'Large radio: 20 Mb/s, 20 kg, 120 credits' } };
-  const cfg = { mission: 'astra', orbit: 0, solar: 'S', radio: 'S' };
+  // Each mission opens on the game's recommended Cadet build (RECOMMENDED in js/game-data.js)
+  const REC = { astra: { orbit: 1, solar: 'S', radio: 'L' }, lunaris: { orbit: 1, solar: 'S', radio: 'L' }, earth: { orbit: 0, solar: 'S', radio: 'L' }, mars: { orbit: 1, solar: 'S', radio: 'L' } };
+  const cfg = Object.assign({ mission: 'astra' }, REC.astra);
+  function syncPills() {
+    [['gcard-2', 'solar'], ['gcard-3', 'radio']].forEach(([id, k]) => document.querySelectorAll('#' + id + ' .cfg-pill').forEach((p, i) => p.classList.toggle('active', (i ? 'L' : 'S') === cfg[k])));
+  }
   function orbitPills() {
     const box = document.getElementById('orbit-pills'); box.textContent = '';
     GAME[cfg.mission].orbits.forEach(([, label], i) => {
@@ -242,10 +247,10 @@
     });
   }
   function setCfg(step, val, el) {
-    cfg[step] = val; if (step === 'mission') cfg.orbit = 0;
+    cfg[step] = val; if (step === 'mission') Object.assign(cfg, REC[val]);
     el.parentElement.querySelectorAll('.cfg-pill').forEach(p => p.classList.remove('active')); el.classList.add('active');
     document.querySelectorAll('.game-card').forEach(c => c.classList.remove('focused-card')); el.closest('.game-card').classList.add('focused-card');
-    if (step === 'mission') { orbitPills(); const m = missions[GAME[val].cam]; targetPos.copy(m.pos); targetLook.copy(m.look); }
+    if (step === 'mission') { orbitPills(); syncPills(); const m = missions[GAME[val].cam]; targetPos.copy(m.pos); targetLook.copy(m.look); }
     summary();
   }
   function summary() {
@@ -258,8 +263,68 @@
     document.getElementById('sim-s3-val').textContent = cfg.solar === 'L' ? 'LARGE SOLAR' : 'SMALL SOLAR';
     document.getElementById('sim-s4-val').textContent = cfg.radio === 'L' ? 'LARGE RADIO' : 'SMALL RADIO';
     document.getElementById('cfg-play').href = 'play.html?mission=' + cfg.mission;
+    viz();
+  }
+  // Live numbers from the game's own model (js/sim.js + js/game-data.js)
+  const INFO = {
+    astra: ['asteroid', 'OSIRIS-APEX', 'How does a close Earth pass change an asteroid?', '340 m wide · passes ~32,000 km from Earth on 13 Apr 2029'],
+    lunaris: ['moon', 'LRO', 'Where could water ice survive on the Moon?', 'Polar craters near 35 K that sunlight never reaches'],
+    earth: ['earth', 'Terra, Aqua and Aura', 'What do haze, ozone and clouds look like from orbit?', 'Aura flies a 705 km sun-synchronous orbit'],
+    mars: ['mars', 'Mars Reconnaissance Orbiter', 'What traces remain of an ancient lake?', 'Jezero is a 45 km crater with a river delta'],
+  };
+  let engine = null;
+  const fmt = (v, d = 0) => Number(v).toLocaleString('en', { maximumFractionDigits: d, minimumFractionDigits: d });
+  const meter = (label, have, need, unit, scale, okText, badText, d = 0) => {
+    const ok = have >= need, max = Math.max(have, need) * 1.18 || 1;
+    return `<div class="meter-row"><div class="meter-lab"><span>${label}</span><span><b>${fmt(have, d)}</b> / ${fmt(need, d)} ${unit}</span></div>
+      <div class="meter${ok ? '' : ' bad'}"><i style="width:${(have / max * 100).toFixed(1)}%"></i><u style="left:${(need / max * 100).toFixed(1)}%"></u></div>
+      <div class="meter-note ${ok ? 'ok' : 'bad'}">${ok ? okText : badText}</div></div>`;
+  };
+  async function viz() {
+    if (!engine) {
+      try { const [sim, data] = await Promise.all([import('./sim.js'), import('./game-data.js')]); engine = { sim, data }; }
+      catch (e) { return; }
+    }
+    const { sim, data } = engine, m = data.GAME[cfg.mission], info = INFO[cfg.mission];
+    const c = Object.assign(sim.defaultConfig(m), data.RECOMMENDED[cfg.mission].cadet);
+    c.orbit = GAME[cfg.mission].orbits[cfg.orbit][0]; c.solar = cfg.solar; c.radio = cfg.radio;
+    const d = sim.derive(m, c, 'cadet');
+    // 01 mission
+    document.getElementById('gviz-0').innerHTML = `<img class="gviz-orb" src="textures/orbs/${info[0]}.webp" alt="${m.world}">
+      <div class="gviz-txt"><div class="gviz-k">${m.world} · modelled on ${info[1]}</div><b>${info[2]}</b><br>${info[3]}<br><span style="color:rgba(234,242,250,.5)">${m.objectives.length} science objectives · ${m.instruments.length} instruments to choose from</span></div>`;
+    // 02 orbit diagram
+    const R = m.body.radiusKm, a = d.a || (R + (c.orbit === 'near' ? 5 : 20));
+    const ro = 48, rb = Math.max(7, ro * R / a), half = (d.eclipseFrac || 0) * Math.PI;
+    const arc = half ? `<path d="M${60 + ro * Math.cos(-half)} ${60 + ro * Math.sin(-half)} A${ro} ${ro} 0 0 1 ${60 + ro * Math.cos(half)} ${60 + ro * Math.sin(half)}" stroke="#a78bfa" stroke-width="4" fill="none" stroke-linecap="round"/>` : '';
+    const col = { astra: '#a08a74', lunaris: '#b8bcc4', earth: '#3f7fd8', mars: '#d0674c' }[cfg.mission];
+    document.getElementById('gviz-1').innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true">
+      <rect x="60" y="${60 - rb}" width="60" height="${rb * 2}" fill="rgba(10,6,30,.75)"/>
+      <circle cx="60" cy="60" r="${ro}" stroke="rgba(54,200,232,.45)" stroke-dasharray="3 3" fill="none"/>${arc}
+      <circle cx="60" cy="60" r="${rb}" fill="${col}"/><path d="M60 ${60 - rb} A${rb} ${rb} 0 0 1 60 ${60 + rb}Z" fill="rgba(0,0,0,.55)"/>
+      <circle cx="${60 + ro * Math.cos(-2.3)}" cy="${60 + ro * Math.sin(-2.3)}" r="4" fill="#ffb45c"/>
+      <text x="4" y="12" fill="#ffb45c" font-size="8" font-family="IBM Plex Mono,monospace">SUN ←</text></svg>
+      <div class="gviz-stats">
+        <span class="gviz-k">Period</span><span class="gviz-k">${d.eclipseMin ? 'In shadow' : 'Shadow'}</span>
+        <span class="gviz-big">${fmt(d.periodMin)} min</span><span class="gviz-big" style="color:${d.eclipseMin ? '#c4b0ff' : '#7fe6b0'}">${d.eclipseMin ? fmt(d.eclipseMin) + ' min' : 'none'}</span>
+        <span class="gviz-k" style="margin-top:6px">Target pass</span><span class="gviz-k" style="margin-top:6px">Ground contact</span>
+        <span class="gviz-big">${fmt(d.passMin)} min</span><span class="gviz-big">${fmt(d.contactMin)} min</span>
+      </div>`;
+    // 03 power
+    document.getElementById('gviz-2').innerHTML = `<div class="gviz-meters">
+      ${meter('ARRAYS IN SUNLIGHT', d.solarW, d.sunLoad, 'W', 0, 'Arrays carry every load at once.', 'Arrays cannot run everything together.')}
+      ${d.eclipseWh ? meter('BATTERY IN SHADOW', d.battWh, d.eclipseWh, 'Wh', 0, 'Battery lasts through each eclipse.', 'Battery runs flat in every eclipse.') : '<div class="meter-note ok">No eclipse on this orbit, so the battery only covers faults.</div>'}
+      ${cfg.mission === 'mars' ? '<div class="meter-note">Mars is 1.52 AU from the Sun: arrays give 43% of their Earth output.</div>' : ''}</div>`;
+    // 04 radio
+    document.getElementById('gviz-3').innerHTML = `<div class="gviz-meters">
+      ${meter('SENT HOME PER CONTACT', d.perContactGbit, d.perPassGbit, 'Gbit', 0, 'Every pass of data gets home.', 'Data piles up faster than it can be sent home.', 1)}
+      <div class="meter-note">Link rate here: <b style="color:#fff">${fmt(d.rateMbps, 1)} Mb/s</b>${m.radioMul !== 1 ? ` (distance cuts it to ${Math.round(m.radioMul * 100)}%)` : ''} · recorder ${fmt(d.storage)} Gbit</div></div>`;
+    // checklist
+    const ok = d.checks.every(x => x.ok), v = document.getElementById('cfg-verdict');
+    v.textContent = ok ? 'GO FOR LAUNCH' : 'NO-GO'; v.className = 'go-verdict ' + (ok ? 'go' : 'nogo');
+    document.getElementById('cfg-checks').innerHTML = d.checks.map(x => `<div class="go-row ${x.ok ? 'ok' : 'bad'}"><span>${x.ok ? '✓' : '✕'}</span><span>${x.label}</span><em>${x.detail}</em></div>`).join('');
   }
   function runMissionSimulation() {
+    document.querySelectorAll('#cfg-checks .go-row').forEach((r, i) => setTimeout(() => { r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash'); }, 300 + i * 220));
     const ids = ['sim-s1', 'sim-s2', 'sim-s3', 'sim-s4'];
     ids.forEach(id => document.getElementById(id).classList.remove('done', 'running'));
     ids.forEach((id, i) => setTimeout(() => {
@@ -268,7 +333,7 @@
       setTimeout(() => { el.classList.remove('running'); el.classList.add('done'); if (i === 3) toast('Checklist done. Press "Fly it in NEXUS//04" to launch ' + GAME[cfg.mission].name + '.'); }, 360);
     }, i * 420));
   }
-  orbitPills(); summary();
+  orbitPills(); syncPills(); summary();
 
   // Slide 5: Cosmic Explorer chapters
   const chapters = [
