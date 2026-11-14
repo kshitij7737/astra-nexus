@@ -1,7 +1,7 @@
 import { acts, parts as nebulaParts } from './nova-data.js';
 import { chapters, initialSettings } from './cosmic-data.js?v=4';
-import { drawCinema } from './nova-cinema.js?v=14';
-import { series, questLink } from './nova-series.js?v=14';
+import { drawCinema } from './nova-cinema.js?v=15';
+import { series, questLink } from './nova-series.js?v=15';
 
 const requested=new URLSearchParams(location.search).get('quest');
 const questIndex=Math.max(0,series.findIndex(([id])=>id===requested));

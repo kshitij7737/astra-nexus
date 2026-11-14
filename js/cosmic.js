@@ -1,4 +1,4 @@
-import { series, questLink } from './nova-series.js?v=14';
+import { series, questLink } from './nova-series.js?v=15';
 import { objectives, readObjectives, completeObjective } from './cosmic-progress.js';
 import { chapters, initialSettings, lensNames, lensState } from './cosmic-data.js?v=4';
 import { drawDiagram } from './cosmic-diagram.js?v=4';

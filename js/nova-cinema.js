@@ -232,12 +232,12 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
   }
   function accretionFlyby(){
     const jetsOn=part===18, warped=part===20||part===21;
-    const tilt=part===17?-.46+n*.85:-.38;
-    const flatten=part===17?.19+n*.61:warped?.31:.43;
+    const tilt=part===17?-.62+n*.72:-.42+Math.sin(time*.24)*.09;
+    const flatten=part===17?.17+n*.80:warped?.24+n*.51:.43;
     const horizon=.17+n*.16;
     const outer=.96+n*.20;
-    const silver=warped||part===17;
-    const near=silver?'#e9efff':'#ff7153', far=silver?'#b8cdff':'#50bcff';
+    const silver=part===17||part===21;
+    const near=silver?'#e9efff':warped?'#ffc18a':'#ff7153', far=silver?'#b8cdff':warped?'#e67b47':'#50bcff';
     g.save();g.rotate(tilt);
     glow(0,0,outer,far,.25);
     for(let i=0;i<47;i++){
@@ -246,7 +246,7 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
       for(const side of [-1,1]){
         const points=Array.from({length:38},(_,j)=>{
           const a=phase+j*.091+side*Math.PI*.5;
-          const r=q+.011*Math.sin(a*9+i+time*2);
+          const r=q+.013*Math.sin(a*9+i+time*2)+.007*Math.cos(a*17+i*3);
           return [Math.cos(a)*r,Math.sin(a)*r*flatten];
         });
         path(points,(side>0?near:far)+(i%3?'48':'88'),i%4?.005:.012);
@@ -257,20 +257,32 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
         const a=Math.PI+i*Math.PI/51;
         return [Math.cos(a)*horizon*1.24,Math.sin(a)*horizon*1.29];
       });
-      path(bent,far+'66',.071);path(bent,white,.017);
+      path(bent,far+'48',.13);path(bent,near+'a0',.055);path(bent,white,.013);
+      for(let i=0;i<12;i++){
+        const offset=i*.013;
+        path(bent.map(([x,y],j)=>[x*(1+offset*4),y-offset*Math.sin(j*Math.PI/51)]),near+'48',.004);
+      }
     }
     glow(0,0,horizon*1.52,far,.48);
     dot(0,0,horizon,'#020409');
     ring(0,0,horizon*1.03,silver?'#f2f4ff':near);
     if(part===21)ring(0,0,horizon*.66,blue+'da');
     if(jetsOn){
+      glow(0,0,horizon*2.8,gold,.59);
       for(const sign of [-1,1]){
         for(let i=0;i<38;i++){
           const q=(rand()+time*.38)%1,length=.28+n*.71;
           const x=(rand()-.5)*(.025+q*.21),y=sign*(.10+q*length);
           glow(x,y,.03+q*.023,i%3?blue:white,(1-q)*.65);
         }
-        path([[0,sign*horizon],[0,sign*(.31+n*.68)]],far+'aa',.014);
+        const length=.32+n*.70;
+        const beam=[[0,sign*horizon],[sign*.075,sign*length]];
+        path(beam,blue+'45',.076);
+        path(beam,blue+'b5',.025);
+        path(beam,white,.009);
+        const q=(time*.55)%1;
+        glow(sign*.075*q,sign*(horizon+(length-horizon)*q),.046,white);
+
       }
     }
     g.restore();
@@ -293,6 +305,28 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
     }
     g.restore();
   }
+  function deepFieldFlight(){
+    const palette=['#f6c27a','#d2a6ff','#a5d6ff','#ff9276','#b4ddb9'];
+    const travel=.1+n*.74;
+    // A curved sheet of distant galaxies surrounds the near flyby objects.
+    for(let i=0;i<880;i++){
+      const y=rand()*2.1-1.05,q=rand(),offset=y*y*.48-.28;
+      const x=offset+(rand()-.5)*(.66-y*y*.27);
+      dot(x*(1+n*.31),y,.0013+q*.005,palette[i%5]+(q>.94?'d9':'64'));
+    }
+    for(let i=0;i<38;i++){
+      const originX=rand()*2-1,originY=rand()*1.7-.85;
+      const z=(rand()+1-travel-time*.058%1+1)%1;
+      const depth=.25+z*1.55, x=originX/depth, y=originY/depth;
+      if(Math.abs(x)>1.3||Math.abs(y)>1.1)continue;
+      const size=(.023+rand()*.044)/depth, c=palette[i%5];
+      g.save();g.translate(x,y);g.rotate(i*2.39996);
+      glow(0,0,size*2.3,c,.35);
+      spiral(0,0,size,c,i%2+2,i%3===0?.32:.64);
+      g.restore();
+    }
+  }
+  if(chapter==='universe'&&part===18){deepFieldFlight();return;}
   if(chapter==='black-holes'&&[15,16,17,18,20,21].includes(part)){accretionFlyby();return;}
   if(chapter==='universe'&&[8,9,10].includes(part)){galacticSweep();return;}
   if(chapter==='nebula'&&[0,7,8,10,12,22].includes(part)){nebulaFlythrough();return;}
