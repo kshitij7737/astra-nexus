@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#050B18">
+  <title>Mission Briefing · ASTRA NEXUS</title>
+  <meta name="description" content="A six-slide 3D briefing on the ASTRA NEXUS missions: ASTRA, LUNARIS, HALO and JEZERO ECHO.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <style>
+    @font-face{font-family:'Archivo';src:url(fonts/archivo.woff2) format('woff2');font-weight:100 900;font-display:swap}
+    @font-face{font-family:'IBM Plex Mono';src:url(fonts/plex-mono-400.woff2) format('woff2');font-weight:400;font-display:swap}
+    @font-face{font-family:'IBM Plex Mono';src:url(fonts/plex-mono-500.woff2) format('woff2');font-weight:500 700;font-display:swap}
+    :root {
+      --navy: #050B18;
+      --midnight: #0B1730;
+      --cosmic: #122B4A;
+      --cyan: #36C8E8;
+      --white: #EAF2FA;
+      --amber: #FFB45C;
+      --panel-bg: rgba(11, 23, 48, 0.72);
+      --panel-border: rgba(54, 200, 232, 0.28);
+      --amber-border: rgba(255, 180, 92, 0.42);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Outer viewport centering 16:9 widescreen stage */
+    #app-shell {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #091428 0%, #050B18 100%);
+      position: relative;
+    }
+
+    #stage-16x9 {
+      position: relative;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      background: var(--navy);
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(54, 200, 232, 0.18);
+    }
+
+    /* Continuous 3D Deep Space Canvas */
+    #space-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #space-canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Subtle vignette for cinematic depth & typography contrast */
+    .cinema-vignette {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at 72% 48%, rgba(5, 11, 24, 0.06) 0%, rgba(5, 11, 24, 0.58) 78%, rgba(5, 11, 24, 0.84) 100%),
+        linear-gradient(90deg, rgba(5, 11, 24, 0.78) 0%, rgba(5, 11, 24, 0.34) 48%, rgba(5, 11, 24, 0.12) 100%);
+    }
+
+    /* Top Mission Telemetry HUD */
+    #top-hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.4% 2.6%;
+      pointer-events: none;
+    }
+
+    .hud-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .hud-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan);
+      animation: pulseDot 2.4s infinite ease-in-out;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 0.45; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.25); }
+    }
+
+    .hud-title {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(11px, 1.05vw, 15px);
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--white);
+    }
+
+    .hud-tag {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(9px, 0.78vw, 11px);
+      color: var(--cyan);
+      background: rgba(54, 200, 232, 0.1);
+      border: 1px solid rgba(54, 200, 232, 0.3);
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.08em;
+    }
+
+    .hud-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .hud-btn {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(9px, 0.76vw, 11px);
+      letter-spacing: 0.06em;
+      color: var(--white);
+      background: rgba(11, 23, 48, 0.82);
+      border: 1px solid rgba(54, 200, 232, 0.32);
+      padding: 6px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-btn:hover {
+      background: rgba(18, 43, 74, 0.95);
+      border-color: var(--cyan);
+      box-shadow: 0 0 14px rgba(54, 200, 232, 0.25);
+    }
+
+    .hud-btn.active {
+      background: rgba(54, 200, 232, 0.18);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .hud-btn.amber-btn {
+      border-color: rgba(255, 180, 92, 0.5);
+      color: var(--amber);
+    }
+
+    .hud-btn.amber-btn:hover {
+      background: rgba(255, 180, 92, 0.16);
+      border-color: var(--amber);
+      box-shadow: 0 0 16px rgba(255, 180, 92, 0.28);
+    }
+
+    /* Slide Container */
+    #slides-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 5.8% 3.4% 6.4% 3.4%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1), transform 0.65s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.65s;
+      pointer-events: none;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .interactive-zone {
+      pointer-events: auto;
+    }
+
+    /* Typography System */
+    .kicker {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(10px, 0.85vw, 12px);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kicker::before {
+      content: "";
+      width: 22px;
+      height: 1.5px;
+      background: var(--cyan);
+      display: inline-block;
+    }
+
+    .hero-title {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(32px, 4.4vw, 64px);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      line-height: 1.04;
+      color: var(--white);
+      text-shadow: 0 8px 32px rgba(5, 11, 24, 0.85);
+    }
+
+    .slide-title {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(20px, 2.3vw, 34px);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.15;
+      color: var(--white);
+    }
+
+    .slide-subtitle {
+      font-size: clamp(11px, 1.02vw, 15px);
+      color: rgba(234, 242, 250, 0.78);
+      max-width: 56ch;
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+
+    /* Glass Panels */
+    .glass-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      backdrop-filter: blur(12px);
+      padding: clamp(10px, 1.15vw, 16px);
+      transition: all 0.25s ease;
+    }
+
+    .glass-card.clickable {
+      cursor: pointer;
+    }
+
+    .glass-card.clickable:hover,
+    .glass-card.selected {
+      background: rgba(18, 43, 74, 0.86);
+      border-color: var(--cyan);
+      box-shadow: 0 8px 28px rgba(5, 11, 24, 0.6), 0 0 18px rgba(54, 200, 232, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .glass-card.amber-accent {
+      border-color: var(--amber-border);
+    }
+
+    .glass-card.amber-accent.selected,
+    .glass-card.amber-accent:hover {
+      border-color: var(--amber);
+      box-shadow: 0 8px 28px rgba(5, 11, 24, 0.6), 0 0 18px rgba(255, 180, 92, 0.2);
+    }
+
+    /* Editable Text Indicator */
+    body.edit-mode [data-editable] {
+      outline: 1px dashed rgba(255, 180, 92, 0.75);
+      outline-offset: 3px;
+      border-radius: 3px;
+      cursor: text;
+      pointer-events: auto !important;
+    }
+
+    body.edit-mode [data-editable]:focus {
+      outline: 1.5px solid var(--amber);
+      background: rgba(18, 43, 74, 0.92);
+    }
+
+    /* Slide 1 Specific Layout */
+    .s1-hero {
+      max-width: 54%;
+      margin-top: 2.2%;
+    }
+
+    .s1-tagline {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(13px, 1.3vw, 19px);
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      color: var(--amber);
+      margin-top: 10px;
+    }
+
+    .s1-desc {
+      font-size: clamp(12px, 1.05vw, 15px);
+      line-height: 1.55;
+      color: rgba(234, 242, 250, 0.85);
+      margin-top: 12px;
+      max-width: 48ch;
+    }
+
+    .s1-cta-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .primary-cta {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(11px, 0.9vw, 13px);
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--navy);
+      background: var(--cyan);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 0 24px rgba(54, 200, 232, 0.35);
+    }
+
+    .primary-cta:hover {
+      background: #5ad7f2;
+      transform: translateY(-1px);
+      box-shadow: 0 0 32px rgba(54, 200, 232, 0.55);
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      width: 100%;
+    }
+
+    .team-num {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(10px, 0.8vw, 12px);
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    .team-role {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(11px, 0.95vw, 14px);
+      font-weight: 700;
+      color: var(--white);
+      margin-top: 3px;
+    }
+
+    .team-scope {
+      font-size: clamp(10px, 0.8vw, 12px);
+      color: rgba(234, 242, 250, 0.72);
+      margin-top: 2px;
+    }
+
+    /* Slide 2 Layout */
+    .s2-body {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      align-items: end;
+      height: 100%;
+      margin-top: 10px;
+    }
+
+    .missions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 11px;
+    }
+
+    .mission-badge {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(9px, 0.75vw, 11px);
+      letter-spacing: 0.1em;
+      color: var(--cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .mission-name {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(15px, 1.35vw, 20px);
+      font-weight: 700;
+      color: var(--white);
+      margin: 4px 0;
+    }
+
+    .mission-metric {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(16px, 1.55vw, 23px);
+      font-weight: 700;
+      color: var(--amber);
+      margin: 2px 0;
+    }
+
+    .mission-text {
+      font-size: clamp(10px, 0.82vw, 12.5px);
+      line-height: 1.4;
+      color: rgba(234, 242, 250, 0.82);
+    }
+
+    .s2-focus-panel {
+      align-self: end;
+    }
+
+    /* Slide 3 Layout */
+    .s3-grid {
+      display: grid;
+      grid-template-columns: 36% 1fr 27%;
+      gap: 14px;
+      align-items: center;
+      flex: 1;
+      margin: 8px 0;
+    }
+
+    .subsystem-list {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .sub-title {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(12px, 1vw, 15px);
+      font-weight: 600;
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sub-desc {
+      font-size: clamp(10px, 0.8vw, 12px);
+      color: rgba(234, 242, 250, 0.76);
+      margin-top: 3px;
+      line-height: 1.38;
+    }
+
+    .arch-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .flow-node {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(5, 11, 24, 0.65);
+      border: 1px solid rgba(54, 200, 232, 0.25);
+    }
+
+    .flow-step {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--amber);
+      font-weight: 600;
+    }
+
+    /* Slide 4 Mission Configurator */
+    .s4-layout {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 16px;
+      flex: 1;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .config-steps {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    /* Slide 3 3D-Projected Spacecraft Callout Pin */
+    #sc-callout-pin {
+      position: absolute;
+      z-index: 15;
+      pointer-events: none;
+      transform: translate(-50%, -125%);
+      display: none;
+      align-items: center;
+      gap: 7px;
+      background: rgba(5, 11, 24, 0.88);
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      padding: 5px 11px;
+      box-shadow: 0 0 20px rgba(54, 200, 232, 0.32);
+      backdrop-filter: blur(8px);
+      transition: border-color 0.25s ease;
+    }
+
+    #sc-callout-pin.visible {
+      display: flex;
+    }
+
+    #sc-callout-pin .pin-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber);
+    }
+
+    #sc-callout-pin .pin-text {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10px;
+      color: var(--white);
+      white-space: nowrap;
+      letter-spacing: 0.06em;
+    }
+
+    /* Slide 4 Authentic ASTRA NEXUS In-Game Configurator HUD */
+    .game-hud-shell {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      flex: 1;
+      margin: 4px 0;
+    }
+
+    .game-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 14px;
+      border-radius: 10px;
+      background: rgba(11, 23, 48, 0.78);
+      border: 1px solid rgba(54, 200, 232, 0.32);
+      backdrop-filter: blur(12px);
+    }
+
+    .game-topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .game-mode-badge {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: var(--navy);
+      background: var(--cyan);
+      padding: 3px 9px;
+      border-radius: 5px;
+    }
+
+    .game-main-grid {
+      display: grid;
+      grid-template-columns: 1.32fr 0.68fr;
+      gap: 12px;
+      align-items: stretch;
+      flex: 1;
+    }
+
+    .game-cards-2x2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .game-card {
+      background: rgba(11, 23, 48, 0.8);
+      border: 1px solid rgba(54, 200, 232, 0.28);
+      border-radius: 11px;
+      padding: 11px 13px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.22s ease;
+    }
+
+    .game-card:hover, .game-card.focused-card {
+      border-color: var(--cyan);
+      background: rgba(18, 43, 74, 0.88);
+      box-shadow: 0 0 20px rgba(54, 200, 232, 0.16);
+    }
+
+    .game-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .game-step-num {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.06em;
+    }
+
+    .game-open-pill {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 9.5px;
+      color: var(--amber);
+      border: 1px solid rgba(255, 180, 92, 0.45);
+      background: rgba(255, 180, 92, 0.08);
+      padding: 2px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .game-open-pill:hover {
+      background: rgba(255, 180, 92, 0.22);
+      border-color: var(--amber);
+    }
+
+    .game-card-title {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(13px, 1.08vw, 15.5px);
+      font-weight: 600;
+      color: var(--white);
+      margin-top: 3px;
+    }
+
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 7px;
+    }
+
+    .cfg-pill {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(10px, 0.78vw, 11.5px);
+      padding: 4px 9px;
+      border-radius: 6px;
+      background: rgba(5, 11, 24, 0.78);
+      border: 1px solid rgba(54, 200, 232, 0.25);
+      color: rgba(234, 242, 250, 0.84);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .cfg-pill:hover {
+      border-color: var(--cyan);
+      color: var(--white);
+    }
+
+    .cfg-pill.active {
+      background: rgba(54, 200, 232, 0.22);
+      border-color: var(--cyan);
+      color: var(--cyan);
+      font-weight: 600;
+      box-shadow: 0 0 12px rgba(54, 200, 232, 0.22);
+    }
+
+    .game-console-panel {
+      background: rgba(11, 23, 48, 0.84);
+      border: 1px solid rgba(255, 180, 92, 0.44);
+      border-radius: 12px;
+      padding: 13px 14px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .sim-track {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin: 8px 0;
+    }
+
+    .sim-step-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(5, 11, 24, 0.65);
+      border: 1px solid rgba(54, 200, 232, 0.16);
+      color: rgba(234, 242, 250, 0.65);
+      transition: all 0.25s ease;
+    }
+
+    .sim-step-row.done {
+      border-color: rgba(54, 200, 232, 0.55);
+      color: var(--cyan);
+      background: rgba(54, 200, 232, 0.1);
+    }
+
+    .sim-step-row.running {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: rgba(255, 180, 92, 0.14);
+    }
+
+    .game-jump-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 9px;
+      background: rgba(5, 11, 24, 0.78);
+      border: 1px solid rgba(54, 200, 232, 0.22);
+    }
+
+    .jump-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .jump-btn {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10px;
+      color: var(--white);
+      background: rgba(18, 43, 74, 0.75);
+      border: 1px solid rgba(54, 200, 232, 0.32);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .jump-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    /* Slide 5: Scientific Data & Exploration Domains */
+    .s5-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 14px;
+      flex: 1;
+      align-items: stretch;
+      margin: 8px 0;
+    }
+
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .bar-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .bar-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10.5px;
+      color: var(--white);
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(5, 11, 24, 0.85);
+      border: 1px solid rgba(54, 200, 232, 0.22);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--cyan), #6EE2FA);
+      transition: width 0.6s ease;
+    }
+
+    .bar-fill.amber {
+      background: linear-gradient(90deg, var(--amber), #FFD296);
+    }
+
+    .domain-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .domain-tag {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 10px;
+      padding: 5px 9px;
+      border-radius: 6px;
+      background: rgba(5, 11, 24, 0.78);
+      border: 1px solid rgba(54, 200, 232, 0.26);
+      color: rgba(234, 242, 250, 0.82);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .domain-tag:hover,
+    .domain-tag.active {
+      border-color: var(--cyan);
+      background: rgba(54, 200, 232, 0.2);
+      color: var(--cyan);
+    }
+
+    /* Slide 6 Conclusion */
+    .s6-layout {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      margin-top: 6px;
+    }
+
+    .impact-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      max-width: 78%;
+    }
+
+    .closing-quote {
+      max-width: 68%;
+      padding: 14px 18px;
+      border-left: 3px solid var(--amber);
+      background: rgba(11, 23, 48, 0.78);
+      border-radius: 0 10px 10px 0;
+      backdrop-filter: blur(12px);
+    }
+
+    .closing-quote p {
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: clamp(13px, 1.25vw, 18px);
+      line-height: 1.45;
+      color: var(--white);
+    }
+
+    /* Bottom Navigation Bar */
+    #bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.1% 2.6%;
+      pointer-events: none;
+    }
+
+    .nav-cluster {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .slide-dots {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(11, 23, 48, 0.8);
+      border: 1px solid rgba(54, 200, 232, 0.24);
+      padding: 6px 14px;
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+
+    .dot-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      color: rgba(234, 242, 250, 0.55);
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(9px, 0.76vw, 11px);
+      cursor: pointer;
+      padding: 3px 7px;
+      border-radius: 999px;
+      transition: all 0.2s ease;
+    }
+
+    .dot-btn .pip {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(234, 242, 250, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .dot-btn.active {
+      color: var(--cyan);
+      background: rgba(54, 200, 232, 0.14);
+    }
+
+    .dot-btn.active .pip {
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      transform: scale(1.25);
+    }
+
+    .dot-btn:hover {
+      color: var(--white);
+    }
+
+    .nav-arrow {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: clamp(10px, 0.82vw, 12px);
+      color: var(--white);
+      background: rgba(11, 23, 48, 0.85);
+      border: 1px solid rgba(54, 200, 232, 0.32);
+      padding: 6px 13px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .nav-arrow:hover:not(:disabled) {
+      border-color: var(--cyan);
+      background: rgba(18, 43, 74, 0.95);
+    }
+
+    .nav-arrow:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Toast Notification */
+    #toast {
+      position: absolute;
+      top: 54px;
+      right: 2.6%;
+      z-index: 40;
+      background: rgba(11, 23, 48, 0.95);
+      border: 1px solid var(--cyan);
+      color: var(--white);
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 11px;
+      padding: 9px 14px;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: all 0.28s ease;
+      max-width: 380px;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hud-link{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:clamp(9px,.76vw,11px);color:var(--cyan);text-decoration:none;border:1px solid rgba(54,200,232,.32);padding:6px 11px;border-radius:6px;background:rgba(11,23,48,.82)}
+    .hud-link:hover{border-color:var(--cyan);color:var(--white)}
+    .team-name{font-family:'Archivo',system-ui,sans-serif;font-size:clamp(14px,1.25vw,19px);font-weight:800;color:var(--white);margin-top:2px}
+    a.primary-cta,a.jump-btn{text-decoration:none;display:inline-block}
+    .spec-list{display:flex;flex-direction:column;gap:4px;margin-top:6px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10px;color:rgba(234,242,250,.78)}
+    .spec-list b{color:var(--cyan);font-weight:500}
+    .fact-big{font-family:'Archivo',system-ui,sans-serif;font-weight:800;font-size:clamp(15px,1.4vw,21px);color:var(--amber)}
+    .src{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:9px;color:rgba(234,242,250,.5);margin-top:3px}
+    .src a{color:rgba(54,200,232,.8)}
+    @media (max-width:820px),(max-height:520px){
+      #stage-16x9{width:100vw;height:auto;min-height:100vh;overflow:visible}
+      html,body{overflow:auto}
+      #slides-layer{position:relative}
+      .slide{position:relative;display:none;padding:70px 16px 90px}
+      .slide.active{display:flex}
+      #space-canvas,.cinema-vignette{position:fixed}
+      .team-grid,.missions-grid,.config-steps,.game-cards-2x2,.impact-grid{grid-template-columns:1fr 1fr}
+      .s2-body,.s3-grid,.s5-grid,.game-main-grid{grid-template-columns:1fr}
+      .s1-hero,.impact-grid,.closing-quote{max-width:100%}
+      #bottom-nav{position:fixed}.slide-dots{display:none}
+      .hud-controls .hud-btn:not(.amber-btn){display:none}
+      .hud-tag,#bottom-nav > div:last-child{display:none}
+    }
+  </style>
+</head>
+<body>
+  <div id="app-shell">
+    <div id="stage-16x9">
+      <canvas id="space-canvas" aria-hidden="true"></canvas>
+      <div class="cinema-vignette"></div>
+
+      <div id="sc-callout-pin">
+        <span class="pin-dot"></span>
+        <span class="pin-text" id="sc-pin-label">01 · SCIENCE INSTRUMENTS</span>
+      </div>
+
+      <header id="top-hud">
+        <div class="hud-brand">
+          <span class="hud-pulse"></span>
+          <span class="hud-title">ASTRA NEXUS</span>
+          <span class="hud-tag" id="slide-telemetry-tag">SLIDE 01 / 06 · MISSION LAUNCH</span>
+        </div>
+        <div class="hud-controls">
+          <a class="hud-link" href="./#dash">← MISSION CONTROL</a>
+          <button class="hud-btn" id="btn-orbit-toggle" title="Put the 3D view back to centre">RECENTER VIEW</button>
+          <button class="hud-btn" id="btn-edit-mode" title="Click any text on the slides to change it for this session">EDIT TEXT: OFF</button>
+          <button class="hud-btn amber-btn" id="btn-export-pptx" title="Download the six slides as an editable PowerPoint file">DOWNLOAD .PPTX ⬇</button>
+        </div>
+      </header>
+
+      <div id="toast" role="status"></div>
+
+      <main id="slides-layer">
+
+        <!-- SLIDE 1 -->
+        <section class="slide active" data-slide="0" data-tag="SLIDE 01 / 06 · MISSION LAUNCH">
+          <div class="s1-hero">
+            <div class="kicker" data-editable>NASA SPACE APPS · TEAM ASTRA NEXUS</div>
+            <h1 class="hero-title" data-editable>ASTRA NEXUS</h1>
+            <div class="s1-tagline" data-editable>FOUR WORLDS · ONE MISSION CONTROL</div>
+            <p class="s1-desc" data-editable>
+              An interactive mission site built on NASA science. Follow four missions from an asteroid to Mars, build and fly a spacecraft in NEXUS//04, and explore how the universe works in the Cosmic Explorer.
+            </p>
+            <div class="s1-cta-row interactive-zone">
+              <button class="primary-cta" onclick="goToSlide(1)">START THE BRIEFING ↗</button>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(234,242,250,0.65);">DRAG SPACE TO TURN THE 3D VIEW</span>
+            </div>
+          </div>
+
+          <div class="team-grid interactive-zone">
+            <div class="glass-card">
+              <div class="team-num">01 · ASTRA</div>
+              <div class="team-name" data-editable>Sneha</div>
+              <div class="team-scope" data-editable>Apophis research · opening experience and navigation</div>
+            </div>
+            <div class="glass-card">
+              <div class="team-num">02 · LUNARIS</div>
+              <div class="team-name" data-editable>Karishma</div>
+              <div class="team-scope" data-editable>Moon research · integration and quality checks</div>
+            </div>
+            <div class="glass-card">
+              <div class="team-num">03 · HALO</div>
+              <div class="team-name" data-editable>Kshitij</div>
+              <div class="team-scope" data-editable>Earth atmosphere research · mission worlds and spacecraft</div>
+            </div>
+            <div class="glass-card">
+              <div class="team-num">04 · JEZERO ECHO</div>
+              <div class="team-name" data-editable>Anttariksha</div>
+              <div class="team-scope" data-editable>Mars research · mission control and challenges</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 2 -->
+        <section class="slide" data-slide="1" data-tag="SLIDE 02 / 06 · FOUR MISSIONS">
+          <div>
+            <div class="kicker" data-editable>THE ROUTE</div>
+            <h2 class="slide-title" data-editable>FOUR MISSIONS, FOUR WORLDS</h2>
+            <p class="slide-subtitle" data-editable>Each mission is modelled on a real NASA spacecraft. Pick a mission to fly the camera to its world.</p>
+          </div>
+
+          <div class="s2-body">
+            <div class="missions-grid interactive-zone">
+              <div class="glass-card clickable selected" onclick="selectMission('astra', this)">
+                <div class="mission-badge"><span>MISSION 01 · APOPHIS</span><span>OSIRIS-APEX</span></div>
+                <div class="mission-name" data-editable>ASTRA</div>
+                <div class="mission-metric" data-editable>~32,000 KM</div>
+                <div class="mission-text" data-editable>Watch asteroid Apophis change as Earth pulls on it during its close pass on 13 April 2029.</div>
+              </div>
+              <div class="glass-card clickable amber-accent" onclick="selectMission('lunaris', this)">
+                <div class="mission-badge"><span style="color:var(--amber);">MISSION 02 · MOON</span><span style="color:var(--amber);">LRO</span></div>
+                <div class="mission-name" data-editable>LUNARIS</div>
+                <div class="mission-metric" data-editable>~35 K</div>
+                <div class="mission-text" data-editable>A lunar polar orbiter that reads the coldest, permanently shadowed craters on the Moon.</div>
+              </div>
+              <div class="glass-card clickable" onclick="selectMission('halo', this)">
+                <div class="mission-badge"><span>MISSION 03 · EARTH</span><span>AURA · TERRA · AQUA</span></div>
+                <div class="mission-name" data-editable>HALO</div>
+                <div class="mission-metric" data-editable>705 KM</div>
+                <div class="mission-text" data-editable>An atmospheric observation satellite watching aerosols, gases and clouds in the thin blue line that keeps us alive.</div>
+              </div>
+              <div class="glass-card clickable amber-accent" onclick="selectMission('jezero', this)">
+                <div class="mission-badge"><span style="color:var(--amber);">MISSION 04 · MARS</span><span style="color:var(--amber);">MRO</span></div>
+                <div class="mission-name" data-editable>JEZERO ECHO</div>
+                <div class="mission-metric" data-editable>25 CM / PIXEL</div>
+                <div class="mission-text" data-editable>A reconnaissance orbiter reading the ancient lake in Jezero crater from Mars orbit.</div>
+              </div>
+            </div>
+
+            <div class="glass-card s2-focus-panel interactive-zone">
+              <div class="mission-badge"><span id="mf-code">SELECTED · MISSION 01</span><span style="color:var(--amber);" id="mf-metric">99942 APOPHIS</span></div>
+              <div class="mission-name" id="mf-title" style="color:var(--cyan);">ASTRA · Asteroid Apophis encounter</div>
+              <p class="mission-text" id="mf-detail" style="margin-top:6px;">A 340 metre asteroid will pass about 32,000 km from Earth on 13 April 2029, close enough to see without a telescope. OSIRIS-APEX arrives just after the pass.</p>
+              <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(54,200,232,0.2);font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:rgba(234,242,250,0.72);" id="mf-verified">
+                Science reference: NASA OSIRIS-APEX at asteroid 99942 Apophis
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 3 -->
+        <section class="slide" data-slide="2" data-tag="SLIDE 03 / 06 · SPACECRAFT">
+          <div>
+            <div class="kicker" data-editable>WHAT EVERY ORBITER CARRIES</div>
+            <h2 class="slide-title" data-editable>INSIDE THE SPACECRAFT</h2>
+            <p class="slide-subtitle" data-editable>The same four systems decide whether a mission brings its science home. Pick one to highlight it on the spacecraft.</p>
+          </div>
+
+          <div class="s3-grid">
+            <div class="subsystem-list interactive-zone">
+              <div class="glass-card clickable selected" onclick="focusSubsystem(0, this)">
+                <div class="sub-title"><span data-editable>01 · Science instruments</span><span style="color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:11px;">SCIENCE</span></div>
+                <div class="sub-desc" data-editable>Cameras, spectrometers, altimeters and sounders, modelled on OSIRIS-APEX, LRO, Aura and MRO instruments.</div>
+              </div>
+              <div class="glass-card clickable" onclick="focusSubsystem(1, this)">
+                <div class="sub-title"><span data-editable>02 · Recorder and flight computer</span><span style="color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:11px;">DATA</span></div>
+                <div class="sub-desc" data-editable>Stores data between contacts with Earth. When the recorder is full, new data is lost.</div>
+              </div>
+              <div class="glass-card clickable" onclick="focusSubsystem(2, this)">
+                <div class="sub-title"><span data-editable>03 · Radio and high-gain antenna</span><span style="color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:11px;">COMMS</span></div>
+                <div class="sub-desc" data-editable>Sends data home only while a ground station or the Deep Space Network can hear it.</div>
+              </div>
+              <div class="glass-card clickable" onclick="focusSubsystem(3, this)">
+                <div class="sub-title"><span data-editable>04 · Solar arrays and battery</span><span style="color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:11px;">POWER</span></div>
+                <div class="sub-desc" data-editable>Arrays power the craft in sunlight; the battery carries it through eclipse.</div>
+              </div>
+            </div>
+
+            <div style="text-align:center;align-self:end;padding-bottom:6px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--cyan);background:rgba(5,11,24,0.75);padding:5px 12px;border-radius:999px;border:1px solid rgba(54,200,232,0.3);" id="sub-callout-pill">HIGHLIGHTED: 01 · SCIENCE INSTRUMENTS</span>
+            </div>
+
+            <div class="glass-card arch-flow interactive-zone">
+              <div class="mission-badge"><span>HOW DATA GETS HOME</span><span style="color:var(--amber);">4 STEPS</span></div>
+              <div class="flow-node"><span class="flow-step">1</span><div><div style="font-size:12px;font-weight:600;color:var(--white);" data-editable>Collect</div><div style="font-size:10.5px;color:rgba(234,242,250,0.7);">Instruments observe over the target</div></div></div>
+              <div class="flow-node"><span class="flow-step">2</span><div><div style="font-size:12px;font-weight:600;color:var(--white);" data-editable>Store</div><div style="font-size:10.5px;color:rgba(234,242,250,0.7);">Recorder holds data until contact</div></div></div>
+              <div class="flow-node"><span class="flow-step">3</span><div><div style="font-size:12px;font-weight:600;color:var(--white);" data-editable>Send</div><div style="font-size:10.5px;color:rgba(234,242,250,0.7);">Radio downlinks during each pass</div></div></div>
+              <div class="flow-node"><span class="flow-step">4</span><div><div style="font-size:12px;font-weight:600;color:var(--white);" data-editable>Score</div><div style="font-size:10.5px;color:rgba(234,242,250,0.7);">Data returned is the mission result</div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 4 -->
+        <section class="slide" data-slide="3" data-tag="SLIDE 04 / 06 · NEXUS//04">
+          <div class="game-hud-shell">
+            <div class="game-topbar interactive-zone">
+              <div class="game-topbar-left">
+                <span class="game-mode-badge">NEXUS//04</span>
+                <div>
+                  <div class="slide-title" style="font-size:clamp(16px,1.75vw,24px);line-height:1.1;" data-editable>BUILD AND FLY A MISSION</div>
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:0.08em;" data-editable>THE SAME CHOICES AS THE GAME · VALUES FROM THE GAME FILES</div>
+                </div>
+              </div>
+              <button class="primary-cta" style="padding:7px 14px;font-size:11px;" onclick="runMissionSimulation()">RUN THE CHECKLIST ▶</button>
+            </div>
+
+            <div class="game-main-grid interactive-zone">
+              <div class="game-cards-2x2">
+                <div class="game-card focused-card" id="gcard-0">
+                  <div><div class="game-card-head"><span class="game-step-num">01</span><button class="game-open-pill" onclick="goToSlide(1)">MISSIONS ↗</button></div>
+                  <div class="game-card-title" data-editable>Pick a mission</div></div>
+                  <div class="pill-group">
+                    <button class="cfg-pill active" onclick="setCfg('mission','astra',this)">ASTRA</button>
+                    <button class="cfg-pill" onclick="setCfg('mission','lunaris',this)">LUNARIS</button>
+                    <button class="cfg-pill" onclick="setCfg('mission','earth',this)">HALO</button>
+                    <button class="cfg-pill" onclick="setCfg('mission','mars',this)">JEZERO ECHO</button>
+                  </div>
+                </div>
+                <div class="game-card" id="gcard-1">
+                  <div><div class="game-card-head"><span class="game-step-num">02</span><button class="game-open-pill" onclick="goToSlide(2)">SPACECRAFT ↗</button></div>
+                  <div class="game-card-title" data-editable>Choose the orbit</div></div>
+                  <div class="pill-group" id="orbit-pills"></div>
+                </div>
+                <div class="game-card" id="gcard-2">
+                  <div><div class="game-card-head"><span class="game-step-num">03</span><button class="game-open-pill" onclick="goToSlide(2)">SPACECRAFT ↗</button></div>
+                  <div class="game-card-title" data-editable>Size the power</div></div>
+                  <div class="pill-group">
+                    <button class="cfg-pill active" onclick="setCfg('solar','S',this)">Small solar</button>
+                    <button class="cfg-pill" onclick="setCfg('solar','L',this)">Large solar</button>
+                  </div>
+                </div>
+                <div class="game-card" id="gcard-3">
+                  <div><div class="game-card-head"><span class="game-step-num">04</span><button class="game-open-pill" onclick="goToSlide(2)">SPACECRAFT ↗</button></div>
+                  <div class="game-card-title" data-editable>Size the radio</div></div>
+                  <div class="pill-group">
+                    <button class="cfg-pill active" onclick="setCfg('radio','S',this)">Small radio</button>
+                    <button class="cfg-pill" onclick="setCfg('radio','L',this)">Large radio</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="game-console-panel">
+                <div>
+                  <div class="mission-badge"><span style="color:var(--amber);">YOUR MISSION</span><span id="cfg-budget">1,200 CREDITS</span></div>
+                  <div class="mission-name" id="cfg-match-name" style="color:var(--cyan);font-size:17px;margin-top:4px;">ASTRA · Apophis</div>
+                  <p class="mission-text" id="cfg-summary-text" style="margin-top:5px;font-size:11.5px;">Watch an asteroid change as Earth pulls on it.</p>
+                  <div class="spec-list" id="cfg-specs"></div>
+                </div>
+                <div class="sim-track">
+                  <div class="sim-step-row done" id="sim-s1"><span>01 · MISSION</span><span id="sim-s1-val">ASTRA</span></div>
+                  <div class="sim-step-row done" id="sim-s2"><span>02 · ORBIT</span><span id="sim-s2-val"></span></div>
+                  <div class="sim-step-row done" id="sim-s3"><span>03 · POWER</span><span id="sim-s3-val"></span></div>
+                  <div class="sim-step-row done" id="sim-s4"><span>04 · RADIO</span><span id="sim-s4-val"></span></div>
+                </div>
+                <a class="primary-cta" id="cfg-play" href="play.html?mission=astra" style="text-align:center;">FLY IT IN NEXUS//04 ↗</a>
+              </div>
+            </div>
+
+            <div class="game-jump-bar interactive-zone">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--cyan);letter-spacing:0.1em;">ON THE SITE</span>
+              <div class="jump-links">
+                <a class="jump-btn" href="./#dash">MISSION CONTROL ↗</a>
+                <a class="jump-btn" href="hangar.html">SATELLITE HANGAR ↗</a>
+                <a class="jump-btn" href="cosmic.html#chapters">COSMIC EXPLORER ↗</a>
+                <a class="jump-btn" style="border-color:rgba(255,180,92,0.5);color:var(--amber);" href="sources.html">SOURCES ↗</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 5 -->
+        <section class="slide" data-slide="4" data-tag="SLIDE 05 / 06 · SCIENCE AND DATA">
+          <div>
+            <div class="kicker" data-editable>EVERY NUMBER HAS A SOURCE</div>
+            <h2 class="slide-title" data-editable>THE SCIENCE BEHIND IT</h2>
+            <p class="slide-subtitle" data-editable>Key facts from NASA for each mission, and the six chapters of the Cosmic Explorer.</p>
+          </div>
+
+          <div class="s5-grid interactive-zone">
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <div class="glass-card">
+                <div class="mission-badge"><span>ONE NUMBER PER MISSION</span><span style="color:var(--amber);">NASA SOURCES</span></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                  <div><div class="fact-big">~32,000 km</div><div class="mission-text">Apophis passes this close to Earth's surface on 13 April 2029</div><div class="src"><a href="https://science.nasa.gov/solar-system/asteroids/apophis/">NASA Science · Apophis</a></div></div>
+                  <div><div class="fact-big">~35 K</div><div class="mission-text">Coldest ground LRO has measured, inside shadowed lunar craters</div><div class="src"><a href="https://www.incose-cc.org/s/2010_06_16_Everett_LRO_Systems_Overview.pdf">NASA GSFC · LRO Systems Overview</a></div></div>
+                  <div><div class="fact-big">1 to 2 days</div><div class="mission-text">MODIS images the whole Earth in 36 spectral bands</div><div class="src"><a href="https://ael.gsfc.nasa.gov/earth/acd/projects">NASA GSFC · MODIS on Terra and Aqua</a></div></div>
+                  <div><div class="fact-big">25 cm / pixel</div><div class="mission-text">HiRISE pixels from Mars orbit, still the sharpest camera at Mars</div><div class="src"><a href="https://engrxiv.org/preprint/download/4921/8404/6980">Fieseler et al. · MRO capabilities</a></div></div>
+                </div>
+              </div>
+
+              <div class="glass-card" style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
+                <div>
+                  <div class="mission-badge"><span>COSMIC EXPLORER · SIX CHAPTERS</span><span style="color:var(--cyan);">PICK ONE</span></div>
+                  <div class="domain-tags">
+                    <button class="domain-tag active" onclick="selectDomain(0,this)">01 NEBULAE</button>
+                    <button class="domain-tag" onclick="selectDomain(1,this)">02 STAR LIFE</button>
+                    <button class="domain-tag" onclick="selectDomain(2,this)">03 PLANET FORMATION</button>
+                    <button class="domain-tag" onclick="selectDomain(3,this)">04 BLACK HOLES</button>
+                    <button class="domain-tag" onclick="selectDomain(4,this)">05 LENSING</button>
+                    <button class="domain-tag" onclick="selectDomain(5,this)">06 UNIVERSE TOUR</button>
+                  </div>
+                </div>
+                <p class="mission-text" id="domain-readout" style="margin-top:8px;"></p>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr;gap:9px;">
+              <div class="glass-card"><div class="sub-title"><span style="color:var(--cyan);" data-editable>ASTRA instruments</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);">OSIRIS-APEX</span></div><div class="sub-desc" data-editable>OCAMS camera, OLA laser altimeter, OVIRS and OTES spectrometers.</div></div>
+              <div class="glass-card"><div class="sub-title"><span style="color:var(--cyan);" data-editable>LUNARIS instruments</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);">LRO</span></div><div class="sub-desc" data-editable>LROC camera, LOLA altimeter, Diviner radiometer, Mini-RF radar and LEND neutron detector.</div></div>
+              <div class="glass-card"><div class="sub-title"><span style="color:var(--cyan);" data-editable>HALO instruments</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);">TERRA · AQUA · AURA</span></div><div class="sub-desc" data-editable>MODIS imager, OMI ultraviolet spectrometer, AIRS infrared sounder and MLS limb sounder.</div></div>
+              <div class="glass-card"><div class="sub-title"><span style="color:var(--cyan);" data-editable>JEZERO ECHO instruments</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);">MRO</span></div><div class="sub-desc" data-editable>CTX context camera, HiRISE camera, CRISM mineral spectrometer and Electra relay radio.</div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SLIDE 6 -->
+        <section class="slide" data-slide="5" data-tag="SLIDE 06 / 06 · WHY IT MATTERS">
+          <div>
+            <div class="kicker" data-editable>WHAT VISITORS TAKE AWAY</div>
+            <h2 class="slide-title" data-editable>WHY IT MATTERS</h2>
+            <p class="slide-subtitle" data-editable>Real NASA science, turned into things people can try for themselves.</p>
+          </div>
+
+          <div class="s6-layout">
+            <div class="impact-grid interactive-zone">
+              <div class="glass-card"><div class="mission-badge"><span>01</span><span>MISSIONS</span></div><div class="sub-title" style="margin-top:4px;color:var(--cyan);" data-editable>Learn by flying</div><div class="sub-desc" data-editable>In NEXUS//04 you trade power, radio and orbit against a budget, then see how much science reaches Earth.</div></div>
+              <div class="glass-card"><div class="mission-badge"><span>02</span><span>DATA</span></div><div class="sub-title" style="margin-top:4px;color:var(--cyan);" data-editable>Every number is checked</div><div class="sub-desc" data-editable>Facts are tagged as NASA-published, team research or illustrative, with sources one click away.</div></div>
+              <div class="glass-card amber-accent"><div class="mission-badge"><span style="color:var(--amber);">03</span><span style="color:var(--amber);">EXPLORE</span></div><div class="sub-title" style="margin-top:4px;color:var(--amber);" data-editable>From a nebula to the whole universe</div><div class="sub-desc" data-editable>The Cosmic Explorer and Nova's six quests turn hard ideas into scenes you can play with.</div></div>
+            </div>
+
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+              <div class="closing-quote">
+                <p data-editable>“From an asteroid passing close to Earth to an ancient lake on Mars, ASTRA NEXUS lets anyone fly the mission and see the science for themselves.”</p>
+              </div>
+              <div class="interactive-zone" style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="hud-btn" onclick="goToSlide(0)">START AGAIN ↺</button>
+                <a class="primary-cta" href="./#dash">OPEN MISSION CONTROL ↗</a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer id="bottom-nav">
+        <div class="nav-cluster">
+          <button class="nav-arrow" id="btn-prev" onclick="prevSlide()" disabled>◀ BACK</button>
+          <button class="nav-arrow" id="btn-next" onclick="nextSlide()">NEXT ▶</button>
+        </div>
+        <div class="slide-dots">
+          <button class="dot-btn active" onclick="goToSlide(0)"><span class="pip"></span>01 LAUNCH</button>
+          <button class="dot-btn" onclick="goToSlide(1)"><span class="pip"></span>02 MISSIONS</button>
+          <button class="dot-btn" onclick="goToSlide(2)"><span class="pip"></span>03 SPACECRAFT</button>
+          <button class="dot-btn" onclick="goToSlide(3)"><span class="pip"></span>04 GAME</button>
+          <button class="dot-btn" onclick="goToSlide(4)"><span class="pip"></span>05 SCIENCE</button>
+          <button class="dot-btn" onclick="goToSlide(5)"><span class="pip"></span>06 IMPACT</button>
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(234,242,250,0.55);">KEYS: ← → SPACE</div>
+      </footer>
+    </div>
+  </div>
+
+  <script src="vendor/three.r128.min.js"></script>
+  <script src="js/presentation.js"></script>
+</body>
+</html>
