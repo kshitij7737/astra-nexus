@@ -1,3 +1,4 @@
+import { series, questLink } from './nova-series.js';
 import { objectives, readObjectives, completeObjective } from './cosmic-progress.js';
 import { chapters, initialSettings, lensNames, lensState } from './cosmic-data.js?v=4';
 import { drawDiagram } from './cosmic-diagram.js?v=4';
@@ -290,7 +291,11 @@ const hubCards=chapters.map((item,i)=>{
   return a;
 });
 $('hub-grid').append(...hubCards);
-$('continue-chapter').after(link('Play Nova’s Nebula Quest →','nova.html'));
+const questNav=el('nav',null,'cx-chapters');
+questNav.setAttribute('aria-label','Nova story quests');
+questNav.append(...series.map(([id,name])=>link(name+' Quest',questLink(id))));
+$('hub-grid').after(questNav);
+$('continue-chapter').after(link('Play Nova’s Quests →',questLink('nebula')));
 function renderObjectives() {
   const progress=readObjectives();
   const total=chapters.filter(c=>progress[c.id]?.length===objectives[c.id].length).length;
@@ -661,7 +666,7 @@ function renderRelated() {
   const root=$('chapter-related'), summary=$('chapter-summary');
   root.replaceChildren();
   const id=chapter.id;
-  if(id==='nebula')root.append(link('Play Nova’s Nebula Quest →','nova.html'));
+  root.append(link('Play Nova’s '+series.find(([key])=>key===id)[1]+' Quest →',questLink(id)));
   if(id==='stars'&&beat===2)root.append(link('Explore how planets form →',route('planets',0)));
   if(id==='stars'&&beat===0)root.append(link('Recap the stellar nursery →',route('nebula',3)));
   if(id==='stars'&&beat>=4)root.append(link('Part 04 · Black-hole structure and evidence →',route('black-holes',0)));

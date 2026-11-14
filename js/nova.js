@@ -1,10 +1,21 @@
-import { acts, parts } from './nova-data.js';
+import { acts, parts as nebulaParts } from './nova-data.js';
+import { chapters, initialSettings } from './cosmic-data.js?v=4';
+import { drawDiagram } from './cosmic-diagram.js?v=4';
+import { series, questLink } from './nova-series.js';
+
+const requested=new URLSearchParams(location.search).get('quest');
+const questIndex=Math.max(0,series.findIndex(([id])=>id===requested));
+const [questId]=series[questIndex];
+const quest=questIndex? (await import('./nova-'+questId+'.js')).default : null;
+const parts=quest?.parts||nebulaParts;
+const title=quest?.title||'Nova’s Nebula Quest';
+document.title=title+' · ASTRA NEXUS';
 
 const $=id=>document.getElementById('nova-'+id);
 const canvas=$('diagram'), viewport=$('viewport');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const dial={value:0,still:reduced.matches};
-const key='nexus-nova';
+const key=quest?'nexus-nova-'+questId:'nexus-nova';
 const thresholds=[25,55,85];
 const ranks=['Rookie','Scout','Pilot','Captain','Star master'];
 const colors=['#c5aaff','#84dfef','#ffad9f','#f6d797','#91e1be'];
@@ -12,28 +23,50 @@ const labels=['Drift','Zoom','Light speed','Atoms','Dust','Backlight','Infrared'
 let progress={};
 try { progress=JSON.parse(localStorage.getItem(key))||{}; } catch {}
 let part=0, visual, visible=true, redraw=true, raf=0, last=0, yaw=0, pitch=0, pointer=null;
-const chapter={id:'nova',bg:'#262950'};
-const state={novaDial:dial};
+const chapter=quest?chapters.find(c=>c.id===questId):{id:'nova',bg:'#262950'};
+let state={novaDial:dial};
+let visualKey='';
+function syncModel(){
+  if(!quest){visual?.setChapter(chapter,part,state);return;}
+  const n=dial.value, label=parts[part][4], scene=quest.scenes[part];
+  state={...initialSettings,still:dial.still,scale:true,observer:scene>=2,alignment:Math.round((1-n)*90),
+    branch:n>.5?'massive':'sun',cutaway:label==='Cutaway'&&n>.15,forces:label==='Gravity',
+    thermal:scene===1,collision:n<.34?'stick':n<.67?'bounce':'fragment',system:n>.5?'rocky':'mixed',
+    mass:n>.5?'supermassive':'stellar',jets:label==='Power'&&n>.15,binary:part===19&&questId==='black-holes',
+    trace:scene===4,paths:true,angle:label==='Tilt'&&n>.5?'edge':'oblique',magnify:label==='Zoom'&&n>.5};
+  if(questId==='lensing')state.alignment=Math.round(state.alignment/4)*4;
+  const key=JSON.stringify([scene,state]);
+  if(visual&&key!==visualKey){visual.setChapter(chapter,scene,state);visualKey=key;}
+}
+for(const [id,name] of series){
+  const a=document.createElement('a');a.href=questLink(id);a.textContent=name;
+  if(id===questId)a.setAttribute('aria-current','page');
+  $('series').append(a);
+}
+const nextQuest=series[questIndex+1];
+$('star-life').href=nextQuest?questLink(nextQuest[0]):'cosmic.html?v=11#chapters';
+$('star-life').textContent=nextQuest?'Continue to '+nextQuest[1]+' →':'Return to Cosmic Explorer →';
+
 
 function refreshStars() {
   const stars=parts.reduce((total,_,i)=>total+(progress[i]||0),0);
-  const rank=ranks[Math.min(4,Math.floor(stars/18))];
-  $('stars').textContent=(progress[part]||0)+' of 3 stars in this part · '+stars+' / 72 total · '+rank;
+  const rank=ranks[Math.min(4,Math.floor(stars/(parts.length*3/4)))];
+  $('stars').textContent=(progress[part]||0)+' of 3 stars in this part · '+stars+' / '+parts.length*3+' total · '+rank;
 }
 function save() {
   try { localStorage.setItem(key,JSON.stringify(progress)); } catch {}
 }
 function go(index) {
   part=Math.max(0,Math.min(parts.length-1,index));
-  const [title,story,graphic,action]=parts[part];
+  const [heading,story,graphic,action,label]=parts[part];
   const act=acts.findLastIndex(([start])=>start<=part);
-  document.body.style.setProperty('--accent',colors[act]);
-  $('act').textContent='Nova’s Nebula Quest · '+acts[act][1]+' · '+(part+1)+' / '+parts.length;
-  $('title').textContent=title;
+  document.body.style.setProperty('--accent',quest?chapter.accent:colors[act]);
+  $('act').textContent=title+' · '+(quest?'':acts[act][1]+' · ')+(part+1)+' / '+parts.length;
+  $('title').textContent=heading;
   $('story').textContent=story;
-  $('visual').textContent=graphic;
-  $('move').textContent=action;
-  $('dial-name').textContent=labels[part];
+  $('visual').textContent=quest?'Illustrative scene for this story part.':graphic;
+  $('move').textContent=quest?(label==='View'?'Drag the scene or use the View dial.':action):action;
+  $('dial-name').textContent=label||labels[part];
   $('dial-value').textContent='0%';
   $('dial').value=0;
   $('part').value=part;
@@ -41,7 +74,7 @@ function go(index) {
   $('next').disabled=part===parts.length-1;
   $('star-life').hidden=part!==parts.length-1;
   dial.value=0; yaw=pitch=0;
-  visual?.setChapter(chapter,part,state);
+  visualKey='';syncModel();
   refreshStars();
   redraw=true;
 }
@@ -88,10 +121,14 @@ function draw(now) {
   raf=requestAnimationFrame(draw);
   if(document.hidden||!visible||(!redraw&&(!visual||dial.still))||now-last<31)return;
   last=now;redraw=false;
-  if(!visual){diagram();return;}
+  if(quest){
+    syncModel();
+    if(!visual){drawDiagram(canvas,chapter,quest.scenes[part],state,()=>{redraw=true;});return;}
+  }else if(!visual){diagram();return;}
   const w=viewport.clientWidth,h=viewport.clientHeight;
   if(!w||!h)return;
-  const view=art.cameraPreset('nebula',1,{},w<700);
+  const view=art.cameraPreset(quest?questId:'nebula',quest?quest.scenes[part]:1,state,w<700);
+  if(quest)view.eye.multiplyScalar(1-dial.value*.26);
   view.eye.x+=Math.sin(yaw)*3;
   view.eye.y+=pitch;
   if(part===12)view.eye.z-=dial.value*2;
@@ -114,7 +151,7 @@ async function start3d() {
     art=await import('./cosmic-art.js?v=9');
     visual=art.createRenderer(viewport,true,context,()=>{redraw=true;});
     visual.renderer.domElement.addEventListener('webglcontextlost',fallback,{once:true});
-    visual.setChapter(chapter,part,state);
+    visualKey='';syncModel();
     $('status').textContent='Illustrative 3D model';
     canvas.hidden=true;redraw=true;
   } catch { context?.getExtension('WEBGL_lose_context')?.loseContext();fallback(); }
@@ -127,7 +164,7 @@ $('next').onclick=()=>go(part+1);
 $('dial').oninput=e=>{
   const value=+e.target.value;
   dial.value=value/100;
-  $('dial-value').textContent=part===9?['Hydrogen','Oxygen','Sulfur'][Math.min(2,Math.floor(value/34))]:value+'%';
+  $('dial-value').textContent=!quest&&part===9?['Hydrogen','Oxygen','Sulfur'][Math.min(2,Math.floor(value/34))]:value+'%';
   const earned=thresholds.filter(n=>value>=n).length;
   if(earned>(progress[part]||0)){progress[part]=earned;save();refreshStars();}
   redraw=true;
@@ -138,6 +175,11 @@ reduced.addEventListener('change',e=>setStill(e.matches));
 viewport.onpointerdown=e=>{pointer=[e.clientX,e.clientY];viewport.setPointerCapture(e.pointerId);};
 viewport.onpointermove=e=>{
   if(!pointer)return;
+  if(questId==='lensing'&&[0,4,19].includes(part)){
+    const input=$('dial');
+    input.value=Math.max(0,Math.min(100,+input.value+(e.clientY-pointer[1])*.65));
+    input.oninput({target:input});
+  }
   yaw+=(e.clientX-pointer[0])*.009;
   pitch=Math.max(-2,Math.min(2,pitch+(e.clientY-pointer[1])*.012));
   pointer=[e.clientX,e.clientY];redraw=true;
@@ -151,6 +193,8 @@ new ResizeObserver(()=>{redraw=true;}).observe(viewport);
 new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;redraw=true;}).observe(viewport);
 addEventListener('pagehide',()=>cancelAnimationFrame(raf));
 addEventListener('pageshow',e=>{if(e.persisted)raf=requestAnimationFrame(draw);});
+if(quest)document.querySelector('.nova-flight details a').href=chapter.source;
+if(quest)document.querySelector('.nova-flight details a').textContent='Chapter science reference';
 go(0);setStill(dial.still);
 raf=requestAnimationFrame(draw);
 requestAnimationFrame(()=>setTimeout(start3d,0));
