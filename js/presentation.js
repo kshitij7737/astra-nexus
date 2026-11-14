@@ -1,189 +1,460 @@
-// ASTRA NEXUS briefing: six slides over one continuous 3D space scene (three.js r128).
+// NEXUS briefing: six slides over one 3D space scene (three.js r128).
+// Each section has its own "station": a separate, self-contained composition far from the others.
+// All models are illustrative. Spacecraft are "inspired by" NASA missions, not flight hardware.
 (function () {
   const canvas = document.getElementById('space-canvas');
-  const stageEl = document.getElementById('stage-16x9');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
   renderer.outputEncoding = THREE.sRGBEncoding;
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x050B18);
-  scene.fog = new THREE.FogExp2(0x050B18, 0.0022);
-  const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 1200);
-  camera.position.set(0, 2.2, 26);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03060f);
+  const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 6000);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-  const sunLight = new THREE.DirectionalLight(0xFFF6EA, 2.35); sunLight.position.set(28, 14, 22); scene.add(sunLight);
-  const rim = new THREE.DirectionalLight(0x36C8E8, 0.65); rim.position.set(-22, -8, -18); scene.add(rim);
-  scene.add(new THREE.AmbientLight(0x122B4A, 0.55));
+  // One distant Sun for every station, so light agrees across all models
+  const SUN_DIR = V(-0.78, 0.36, 0.52).normalize();
+  const sun = new THREE.DirectionalLight(0xfff3e2, 2.6); sun.position.copy(SUN_DIR).multiplyScalar(100); scene.add(sun);
+  const rim = new THREE.DirectionalLight(0x36c8e8, 0.55); rim.position.set(40, -10, -60); scene.add(rim);
+  const warm = new THREE.DirectionalLight(0xffb45c, 0.25); warm.position.set(30, -20, 40); scene.add(warm);
+  scene.add(new THREE.AmbientLight(0x1a2a44, 0.35));
 
   const loader = new THREE.TextureLoader();
-  function photo(mat, file) { loader.load('textures/' + file, t => { t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true; }); }
-  function glowTex(stops) {
-    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
-    const r = g.createRadialGradient(128, 128, 4, 128, 128, 126); stops.forEach(([o, col]) => r.addColorStop(o, col));
-    g.fillStyle = r; g.fillRect(0, 0, 256, 256); return new THREE.CanvasTexture(c);
+  const texCache = {};
+  function tex(file, srgb = true) {
+    if (texCache[file]) return texCache[file];
+    const t = loader.load('textures/' + file); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return (texCache[file] = t);
   }
-
-  // 1. Nebula backdrop
-  const nebulaGroup = new THREE.Group();
-  const nebTex = glowTex([[0, 'rgba(54,200,232,.22)'], [.45, 'rgba(60,40,120,.16)'], [.78, 'rgba(11,23,48,.07)'], [1, 'rgba(5,11,24,0)']]);
-  for (let i = 0; i < 7; i++) {
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: nebTex, transparent: true, opacity: .42, depthWrite: false, blending: THREE.AdditiveBlending }));
-    s.position.set((i - 3) * 32, Math.sin(i * 1.4) * 16, -95 - i * 8); s.scale.set(95, 65, 1); nebulaGroup.add(s);
-  }
-  scene.add(nebulaGroup);
-
-  // 2. Starfield and dust
-  function points(n, f, size, color, opacity) {
-    const pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) f(pos, i);
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const p = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity })); scene.add(p); return p;
-  }
-  const stars = points(2600, (a, i) => { const r = 140 + Math.random() * 220, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
-    a[i * 3] = r * Math.sin(ph) * Math.cos(th); a[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th); a[i * 3 + 2] = r * Math.cos(ph); }, .42, 0xEAF2FA, .65);
-  const dust = points(340, (a, i) => { a[i * 3] = (Math.random() - .5) * 75; a[i * 3 + 1] = (Math.random() - .5) * 42; a[i * 3 + 2] = -25 + Math.random() * 58; }, .12, 0x36C8E8, .28);
-
-  // 3. Twinkling stars
-  const twinkle = []; const tg = new THREE.SphereGeometry(.14, 6, 6);
-  for (let i = 0; i < 220; i++) {
-    const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: i % 5 === 0 ? 0x36C8E8 : (i % 7 === 0 ? 0xFFB45C : 0xEAF2FA), transparent: true, opacity: .8 }));
-    const r = 75 + Math.random() * 110, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
-    m.position.set(r * Math.sin(ph) * Math.cos(th), r * Math.sin(ph) * Math.sin(th), r * Math.cos(ph));
-    m.userData = { phase: Math.random() * Math.PI * 2, speed: 1.4 + Math.random() * 2.6 }; scene.add(m); twinkle.push(m);
-  }
-
-  // 4. Worlds with NASA-derived colour maps (fallback colours until they load)
-  function world(r, pos, color, file, rough, atmo) {
-    const g = new THREE.Group(); g.position.copy(pos);
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: .04 }); if (file) photo(mat, file);
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 48), mat); g.add(mesh);
-    if (atmo) g.add(new THREE.Mesh(new THREE.SphereGeometry(r * 1.05, 48, 48), new THREE.MeshBasicMaterial({ color: atmo, transparent: true, opacity: .14, side: THREE.BackSide })));
-    scene.add(g); return { g, mesh };
-  }
-  const earth = world(4.4, new THREE.Vector3(7.5, -.8, 2.5), 0x1b4f8a, 'earth-day.jpg', .62, 0x36C8E8);
-  const moon = world(1.75, new THREE.Vector3(17.5, 4.2, -10.5), 0x8c96a6, 'moon.jpg', .92);
-  const mars = world(3.1, new THREE.Vector3(27.5, -2.5, -26), 0xb84a27, 'mars.jpg', .84, 0xFFB45C);
-  const lunarRing = new THREE.Mesh(new THREE.RingGeometry(2.15, 2.22, 64), new THREE.MeshBasicMaterial({ color: 0xFFB45C, side: THREE.DoubleSide, transparent: true, opacity: .45 }));
-  lunarRing.rotation.x = Math.PI * .46; moon.g.add(lunarRing);
-
-  // Apophis: two-lobed shape (illustrative; NASA says the exact shape is not fully known)
-  const apophis = new THREE.Group(); apophis.position.set(-1.5, 4.6, 5.5);
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8070, roughness: .95, metalness: .1 });
-  [[0, .62, [1.2, .85, .9]], [.95, .48, [1, .9, .95]]].forEach(([x, r, s]) => {
-    const geo = new THREE.IcosahedronGeometry(r, 3); const pa = geo.attributes.position;
-    for (let i = 0; i < pa.count; i++) { const vx = pa.getX(i), vy = pa.getY(i), vz = pa.getZ(i); const n = 1 + .12 * Math.sin(vx * 7 + vy * 5) * Math.cos(vz * 6); pa.setXYZ(i, vx * n * s[0], vy * n * s[1], vz * n * s[2]); }
-    geo.computeVertexNormals(); const m = new THREE.Mesh(geo, rockMat); m.position.x = x - .45; apophis.add(m);
+  function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
+  const glow = canvasTex(256, 256, (g) => { const r = g.createRadialGradient(128, 128, 0, 128, 128, 128); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.22, 'rgba(255,255,255,.55)'); r.addColorStop(.55, 'rgba(255,255,255,.12)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); });
+  function rand(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+  const puffTex = canvasTex(256, 256, (g) => {
+    const R = rand(7);
+    for (let i = 0; i < 46; i++) {
+      const a = R() * Math.PI * 2, d = Math.pow(R(), .7) * 70, x = 128 + Math.cos(a) * d, y = 128 + Math.sin(a) * d, r = 22 + R() * 46;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+    }
+    const m = g.createRadialGradient(128, 128, 60, 128, 128, 128); m.addColorStop(0, 'rgba(0,0,0,0)'); m.addColorStop(1, 'rgba(0,0,0,1)');
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = m; g.fillRect(0, 0, 256, 256);
   });
-  scene.add(apophis);
-
-  // 5. Hero orbiter
-  const craft = new THREE.Group(); craft.position.set(2.2, 1.35, 10.2);
-  const busMat = new THREE.MeshStandardMaterial({ color: 0x1A2B4C, roughness: .35, metalness: .75 });
-  const goldMat = new THREE.MeshStandardMaterial({ color: 0xFFB45C, roughness: .28, metalness: .85 });
-  const cyanMat = new THREE.MeshBasicMaterial({ color: 0x36C8E8 });
-  const bus = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1, 1), goldMat); craft.add(bus);
-  const scope = new THREE.Mesh(new THREE.CylinderGeometry(.28, .34, .75, 20), busMat); scope.rotation.z = Math.PI / 2; scope.position.set(.95, .18, 0); craft.add(scope);
-  const lens = new THREE.Mesh(new THREE.CircleGeometry(.24, 24), cyanMat); lens.rotation.y = Math.PI / 2; lens.position.set(1.33, .18, 0); craft.add(lens);
-  const recorder = new THREE.Mesh(new THREE.BoxGeometry(.4, .28, .5), busMat); recorder.position.set(-.2, -.62, .1); craft.add(recorder);
-  const led = new THREE.Mesh(new THREE.BoxGeometry(.06, .06, .06), cyanMat); led.position.set(-.2, -.62, .36); craft.add(led);
-  const dish = new THREE.Mesh(new THREE.SphereGeometry(.52, 24, 16, 0, Math.PI * 2, 0, Math.PI * .42), new THREE.MeshStandardMaterial({ color: 0xEAF2FA, roughness: .3, metalness: .6, side: THREE.DoubleSide }));
-  dish.rotation.x = Math.PI; dish.position.set(-.2, 1.1, 0); craft.add(dish);
-  const horn = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .42, 8), cyanMat); horn.position.set(-.2, 1.2, 0); craft.add(horn);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, .5, 8), busMat); mast.position.set(-.2, .7, 0); craft.add(mast);
-  const solar = new THREE.Group();
-  const panelTex = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#0d2350'; g.fillRect(0, 0, 64, 256); g.strokeStyle = '#3a6ab0'; g.lineWidth = 2; for (let y = 0; y <= 256; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(64, y); g.stroke(); } g.beginPath(); g.moveTo(32, 0); g.lineTo(32, 256); g.stroke(); return new THREE.CanvasTexture(c); })();
-  const wingMat = new THREE.MeshStandardMaterial({ map: panelTex, emissive: 0x0A1F42, roughness: .25, metalness: .7 });
-  [1, -1].forEach(s => { const w = new THREE.Mesh(new THREE.BoxGeometry(.68, .04, 2.6), wingMat); w.position.set(-.1, 0, s * 1.95); solar.add(w); });
-  craft.add(solar);
-  const battery = new THREE.Mesh(new THREE.BoxGeometry(.3, .3, .3), new THREE.MeshStandardMaterial({ color: 0x2a3a5a, metalness: .6, roughness: .4 })); battery.position.set(-.55, -.62, -.2); craft.add(battery);
-  scene.add(craft);
-
-  // HALO observation satellite orbiting Earth
-  const haloSat = new THREE.Group();
-  const hb = new THREE.Mesh(new THREE.BoxGeometry(.32, .22, .22), goldMat); haloSat.add(hb);
-  const hw = new THREE.Mesh(new THREE.BoxGeometry(.04, .02, 1), wingMat); hw.position.x = -.2; haloSat.add(hw);
-  scene.add(haloSat);
-  const haloOrbit = new THREE.Mesh(new THREE.TorusGeometry(5.3, .012, 6, 160), new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: .45 }));
-  haloOrbit.position.copy(earth.g.position); haloOrbit.rotation.x = Math.PI / 2 - .35; scene.add(haloOrbit);
-
-  // Routes between the worlds
-  function arc(pts, color, op) {
-    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 80, .032, 8, false), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op }));
-    scene.add(m); return m;
+  function sprite(map, color, scale, opacity = 1, additive = true) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map, color, transparent: true, opacity, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending }));
+    s.scale.set(scale, scale, 1); return s;
   }
-  const V = (x, y, z) => new THREE.Vector3(x, y, z);
-  const lunarArc = arc([V(7.5, -.8, 2.5), V(12.2, 2.6, -3.5), V(17.5, 4.2, -10.5)], 0x9fe0ea, .42);
-  const marsArc = arc([V(7.5, -.8, 2.5), V(17.8, -3.4, -12), V(27.5, -2.5, -26)], 0xFFB45C, .38);
-  const neaArc = arc([V(-8.5, 6.2, 8), V(-1.5, 4.6, 5.5), V(6, 2.4, 1.5)], 0x4aa8ff, .36);
+  function pointsCloud(n, fn, size, opacity = 1, additive = true) {
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), c = new THREE.Color(), p = V(0, 0, 0);
+    for (let i = 0; i < n; i++) { fn(i, p, c); pos.set([p.x, p.y, p.z], i * 3); col.set([c.r, c.g, c.b], i * 3); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return new THREE.Points(geo, new THREE.PointsMaterial({ size, map: glow, vertexColors: true, transparent: true, opacity, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, sizeAttenuation: true }));
+  }
+  function ring(r, color, opacity, width = .012, dashed = false) {
+    const pts = []; for (let i = 0; i <= 256; i++) { const a = i / 256 * Math.PI * 2; pts.push(V(Math.cos(a) * r, 0, Math.sin(a) * r)); }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = dashed ? new THREE.LineDashedMaterial({ color, transparent: true, opacity, dashSize: r * .05, gapSize: r * .035 }) : new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+    const l = new THREE.Line(geo, mat); if (dashed) l.computeLineDistances(); l.userData.r = r; return l;
+  }
 
-  const slideCams = [
-    { pos: V(0, 1.8, 24.5), look: V(3.8, .2, 2) },
-    { pos: V(4.5, 3.2, 22), look: V(12.5, .5, -6) },
-    { pos: V(2.4, 2.1, 14.2), look: V(2.2, 1.35, 10.2) },
-    { pos: V(6.2, 7.5, 25.5), look: V(11, .2, -4) },
-    { pos: V(14.5, 2.8, 8.5), look: V(19.5, 1.2, -14) },
-    { pos: V(-3.5, 4.2, 31), look: V(8.5, 0, -4) },
-  ];
-  const targetPos = slideCams[0].pos.clone(), targetLook = slideCams[0].look.clone(), curLook = slideCams[0].look.clone();
+  // ---------- Stars: a sky sphere that travels with the camera, so every station has the same quiet sky
+  const sky = new THREE.Group(); scene.add(sky);
+  sky.add(pointsCloud(3200, (i, p, c) => { const R = Math.random, th = R() * Math.PI * 2, ph = Math.acos(2 * R() - 1), r = 2400;
+    p.set(r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)); const t = R(); c.setRGB(.85 + t * .15, .88 + t * .1, 1).multiplyScalar(.25 + Math.pow(R(), 4) * 1.1); }, 9, .9));
 
-  let drag = null, off = { yaw: 0, pitch: 0 };
+  // ---------- Planet builders
+  const atmoShader = (color, power, strength) => new THREE.ShaderMaterial({
+    uniforms: { c: { value: new THREE.Color(color) }, p: { value: power }, s: { value: strength } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+    fragmentShader: 'uniform vec3 c; uniform float p; uniform float s; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.-max(dot(vN,vV),0.), p); gl_FragColor = vec4(c*f*s, f*s); }',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide });
+  const nightShader = () => new THREE.ShaderMaterial({
+    uniforms: { map: { value: tex('earth-night.jpg') }, sunDir: { value: SUN_DIR } },
+    vertexShader: 'varying vec2 vU; varying vec3 vW; void main(){ vU = uv; vW = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: 'uniform sampler2D map; uniform vec3 sunDir; varying vec2 vU; varying vec3 vW; void main(){ float d = dot(vW, sunDir); float m = smoothstep(.05,-.25,d); vec3 n = texture2D(map,vU).rgb; gl_FragColor = vec4(n*vec3(1.,.82,.55)*m*1.4, 1.); }',
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  function makeEarth(r, detail = 64) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ map: tex('earth-day.jpg'), roughness: .7, metalness: 0, color: 0xffffff });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(r, detail, detail * .75), mat); g.add(body);
+    const night = new THREE.Mesh(new THREE.SphereGeometry(r * 1.001, detail, detail * .75), nightShader()); g.add(night);
+    const clouds = new THREE.Mesh(new THREE.SphereGeometry(r * 1.012, detail, detail * .75), new THREE.MeshStandardMaterial({ color: 0xffffff, alphaMap: tex('earth-clouds.jpg', false), transparent: true, opacity: .85, depthWrite: false, roughness: 1 }));
+    g.add(clouds);
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(r * 1.04, detail, detail * .75), atmoShader(0x4fc3ff, 3.2, 1.15)));
+    g.userData = { spin: [body, night], clouds }; g.rotation.z = .41; return g;
+  }
+  function makeMoon(r, psr = false) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 48), new THREE.MeshStandardMaterial({ map: tex('moon.jpg'), bumpMap: tex('moon-bump.jpg', false), bumpScale: .035 * r, roughness: .95, metalness: 0 }));
+    g.add(body);
+    if (psr) { // darker, permanently shadowed region around the south pole (illustrative extent)
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(r * 1.003, 64, 12, 0, Math.PI * 2, Math.PI * .855, Math.PI * .145), new THREE.MeshBasicMaterial({ color: 0x05070c, transparent: true, opacity: .72, depthWrite: false }));
+      g.add(cap);
+    }
+    g.userData = { spin: [body] }; return g;
+  }
+  function latLon(lat, lon, r) { const phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180; return V(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); }
+  function makeMars(r, jezero = false) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(r, 64, 48), new THREE.MeshStandardMaterial({ map: tex('mars.jpg'), bumpMap: tex('mars-bump.jpg', false), bumpScale: .03 * r, roughness: .93, metalness: 0 }));
+    g.add(body); g.add(new THREE.Mesh(new THREE.SphereGeometry(r * 1.025, 48, 36), atmoShader(0xffa070, 4, .6)));
+    if (jezero) { // simplified landmark: crater rim and fan-shaped delta at Jezero (18.4 N, 77.5 E). Not map-accurate geometry.
+      const p = latLon(18.4, 77.5, r * 1.004), mark = new THREE.Group(); mark.position.copy(p); mark.lookAt(p.clone().multiplyScalar(2));
+      mark.add(new THREE.Mesh(new THREE.RingGeometry(r * .055, r * .066, 48), new THREE.MeshBasicMaterial({ color: 0xffb45c, transparent: true, opacity: .95, side: THREE.DoubleSide })));
+      const fan = new THREE.Mesh(new THREE.CircleGeometry(r * .03, 24, Math.PI * .85, Math.PI * .5), new THREE.MeshBasicMaterial({ color: 0x9fe0ea, transparent: true, opacity: .8, side: THREE.DoubleSide }));
+      fan.position.set(-r * .022, 0, .001); mark.add(fan);
+      const halo = sprite(glow, 0xffb45c, r * .4, .5); mark.add(halo);
+      g.add(mark); g.userData.jezero = p;
+    }
+    g.userData.spin = [body]; return g;
+  }
+
+  // ---------- Apophis-like asteroid (illustrative; the true shape is only known roughly from radar)
+  function hash(x, y, z, s) { const v = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + s * 19.3) * 43758.5453; return v - Math.floor(v); }
+  function noise3(x, y, z, s) { const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), f = t => t * t * (3 - 2 * t), u = f(x - xi), v = f(y - yi), w = f(z - zi); let r = 0;
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) for (let c = 0; c < 2; c++) r += (a ? u : 1 - u) * (b ? v : 1 - v) * (c ? w : 1 - w) * hash(xi + a, yi + b, zi + c, s); return r; }
+  function fbm(x, y, z, s, o = 4) { let a = .5, f = 1, t = 0; for (let i = 0; i < o; i++) { t += a * noise3(x * f, y * f, z * f, s); a *= .5; f *= 2; } return t; }
+  const craterList = (s, n, size) => Array.from({ length: n }, (_, i) => { const x = hash(i, 1, 2, s) * 2 - 1, y = hash(i, 3, 4, s) * 2 - 1, z = hash(i, 5, 6, s) * 2 - 1, l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l, size * (.3 + hash(i, 7, 8, s))]; });
+  const CR = [craterList(9, 8, .34), craterList(19, 26, .12), craterList(23, 60, .05)];
+  function crater(vx, vy, vz, list) { let d = 0; for (const [cx, cy, cz, r] of list) { const dd = (vx - cx) ** 2 + (vy - cy) ** 2 + (vz - cz) ** 2; if (dd < r * r) { const x = Math.sqrt(dd) / r; d += (x < .8 ? -.6 * (1 - x * x / .64) : .5 * (1 - (x - .8) / .2)) * r * .25; } } return d; }
+  let rockGeo = null;
+  function asteroidGeo() {
+    if (rockGeo) return rockGeo;
+    const src = new THREE.IcosahedronGeometry(1, 40).attributes.position, map = new Map(), verts = [], idx = [];
+    for (let i = 0; i < src.count; i++) { const x = src.getX(i), y = src.getY(i), z = src.getZ(i), key = Math.round(x * 1e4) + ',' + Math.round(y * 1e4) + ',' + Math.round(z * 1e4);
+      let k = map.get(key); if (k === undefined) { k = verts.length / 3; map.set(key, k); verts.push(x, y, z); } idx.push(k); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); geo.setIndex(idx);
+    const pa = geo.attributes.position, cols = new Float32Array(pa.count * 3);
+    const dark = new THREE.Color(0x4f4a44), brown = new THREE.Color(0x6e5e4e), grey = new THREE.Color(0x8a847b), c = new THREE.Color();
+    for (let i = 0; i < pa.count; i++) {
+      let x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i); const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+      const n = fbm(x * 2.2, y * 2.2, z * 2.2, 3), mid = fbm(x * 7, y * 7, z * 7, 5, 3), fine = fbm(x * 20, y * 20, z * 20, 8, 2);
+      const ridge = 1 - Math.abs(fbm(x * 11, y * 11, z * 11, 12, 3) * 2 - 1);
+      const lobe = Math.exp(-((x - .55) ** 2) * 4) * 1.1 + Math.exp(-((x + .6) ** 2) * 4) * .85, neck = Math.exp(-(x * x) * 12) * .09;
+      const c1 = crater(x, y, z, CR[0]), c2 = crater(x, y, z, CR[1]), c3 = crater(x, y, z, CR[2]);
+      const h = 1 + (n - .5) * .36 + (mid - .5) * .09 + (fine - .5) * .02 + Math.pow(ridge, 6) * .04 + c1 * .9 + c2 * .65 + c3 * .4 + lobe * .14 - neck;
+      let X = x * h * 1.48, Y = y * h * .8, Z = z * h * .88; Y += .07 * X * X - .05; Z += .04 * Math.sin(X * 2.2);
+      pa.setXYZ(i, X, Y, Z);
+      c.copy(dark).lerp(brown, THREE.MathUtils.smoothstep(mid, .38, .62)).lerp(grey, THREE.MathUtils.smoothstep(fine, .45, .7) * .55);
+      c.multiplyScalar(.42 * THREE.MathUtils.clamp(.85 + n * .35 + (c1 + c2) * 3.2, .5, 1.3)); cols.set([c.r, c.g, c.b], i * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
+    return (rockGeo = geo);
+  }
+  function makeAsteroid(s) { const m = new THREE.Mesh(asteroidGeo(), new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xa69d92, roughness: .97, metalness: .02 })); m.scale.setScalar(s); return m; }
+
+  // ---------- Spacecraft kit (illustrative concept models, not NASA flight hardware)
+  const foil = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#c99a3c'; g.fillRect(0, 0, w, h); const R = rand(3);
+    for (let i = 0; i < 140; i++) { g.strokeStyle = `rgba(${R() > .5 ? '255,236,170' : '110,70,20'},${.15 + R() * .3})`; g.lineWidth = 1 + R() * 3; g.beginPath(); g.moveTo(R() * w, R() * h); g.lineTo(R() * w, R() * h); g.stroke(); } });
+  const cells = canvasTex(256, 512, (g, w, h) => { g.fillStyle = '#0b1f4a'; g.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 32) for (let x = 0; x < w; x += 32) { g.fillStyle = (x / 32 + y / 32) % 2 ? '#123a7a' : '#0f2f66'; g.fillRect(x + 1.5, y + 1.5, 29, 29); }
+    g.strokeStyle = '#7fa6d8'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2); g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.stroke(); });
+  const M = {
+    foil: new THREE.MeshStandardMaterial({ map: foil, roughness: .35, metalness: .85 }),
+    white: new THREE.MeshStandardMaterial({ color: 0xe9edf2, roughness: .45, metalness: .25 }),
+    dark: new THREE.MeshStandardMaterial({ color: 0x1b2433, roughness: .5, metalness: .7 }),
+    steel: new THREE.MeshStandardMaterial({ color: 0x9aa3ad, roughness: .3, metalness: .9 }),
+    cells: new THREE.MeshStandardMaterial({ map: cells, roughness: .25, metalness: .55, emissive: 0x061633 }),
+    lens: new THREE.MeshStandardMaterial({ color: 0x0c1a2a, roughness: .05, metalness: .9, emissive: 0x0a3a4a }),
+  };
+  const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+  const cyl = (r1, r2, h, m, seg = 24) => new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), m);
+  function dish(r, depth, m = M.white) { const pts = []; for (let i = 0; i <= 16; i++) { const x = i / 16 * r; pts.push(new THREE.Vector2(x, depth * (x / r) ** 2)); } const d = new THREE.Mesh(new THREE.LatheGeometry(pts, 40), new THREE.MeshStandardMaterial({ color: 0xeef1f5, roughness: .35, metalness: .3, side: THREE.DoubleSide })); const g = new THREE.Group(); g.add(d); const feed = cyl(.02 * r * 3, .02 * r * 3, depth * 1.6, M.steel, 8); feed.position.y = depth * .8; g.add(feed); return g; }
+  function wing(len, wid, panels = 3) { // solar array on a yoke; extends along +z
+    const g = new THREE.Group(); const yoke = cyl(.025, .025, .45, M.steel, 8); yoke.rotation.x = Math.PI / 2; yoke.position.z = .22; g.add(yoke);
+    const pl = len / panels; for (let i = 0; i < panels; i++) { const p = box(wid, .035, pl * .96, M.cells); p.position.z = .45 + pl * (i + .5); g.add(p); } return g;
+  }
+  function makeCraft(kind) {
+    const g = new THREE.Group(), A = {}; // A: anchor points for callouts
+    if (kind === 'apex') { // OSIRIS-APEX-inspired: box bus, two straight wings, top dish, sampling arm
+      g.add(box(1.1, 1.1, 1.1, M.foil));
+      [1, -1].forEach(s => { const w = wing(2.2, .75, 2); w.rotation.y = s > 0 ? 0 : Math.PI; w.position.z = s * .5; g.add(w); });
+      const d = dish(.6, .16); d.position.y = .58; g.add(d);
+      const arm = cyl(.03, .03, 1.1, M.steel, 8); arm.rotation.z = Math.PI / 2.6; arm.position.set(.75, -.55, 0); g.add(arm);
+      const head = cyl(.1, .14, .12, M.steel); head.position.set(1.18, -.98, 0); g.add(head);
+      const cam = cyl(.11, .13, .3, M.dark); cam.rotation.z = Math.PI / 2; cam.position.set(.66, .22, .2); g.add(cam);
+    } else if (kind === 'lro') { // LRO-inspired: tall bus, one large wing on a boom, dish on a boom, instrument deck facing down
+      g.add(box(.9, 1.3, .9, M.foil)); const deck = box(.95, .18, .95, M.white); deck.position.y = -.74; g.add(deck);
+      for (let i = 0; i < 4; i++) { const ins = cyl(.09, .09, .22, i % 2 ? M.dark : M.white, 16); ins.position.set(-.25 + (i % 2) * .5, -.92, -.22 + (i > 1) * .44); g.add(ins); }
+      const w = wing(2.6, 1.3, 2); w.position.set(0, .3, .45); w.rotation.x = -.15; g.add(w);
+      const boom = cyl(.025, .025, 1.1, M.steel, 8); boom.rotation.z = Math.PI / 2; boom.position.set(-.95, .45, 0); g.add(boom);
+      const d = dish(.38, .1); d.rotation.z = Math.PI / 2; d.position.set(-1.5, .45, 0); g.add(d);
+    } else if (kind === 'eos') { // Earth-observation satellite: long bus, single long wing, sensor cluster facing Earth
+      g.add(box(2.2, .8, .8, M.foil)); const front = box(.5, .6, .6, M.white); front.position.x = 1.3; g.add(front);
+      for (let i = 0; i < 3; i++) { const s = box(.28, .2, .28, i === 1 ? M.dark : M.white); s.position.set(-.6 + i * .6, -.52, 0); g.add(s); }
+      const lens = cyl(.08, .08, .08, M.lens, 16); lens.position.set(0, -.66, 0); g.add(lens);
+      const w = wing(3.2, .95, 4); w.rotation.y = Math.PI / 2; w.position.set(-1.1, 0, 0); g.add(w);
+      const d = dish(.22, .06); d.position.set(.6, .48, .25); g.add(d);
+    } else if (kind === 'mro') { // MRO-inspired: large dish, two wings, camera on the nadir side
+      g.add(box(.9, 1.1, .9, M.foil)); const d = dish(1.15, .32); d.rotation.x = Math.PI; d.position.y = 1.0; d.rotation.z = .2; g.add(d);
+      const mast = cyl(.03, .03, .45, M.steel, 8); mast.position.y = .66; g.add(mast);
+      [1, -1].forEach(s => { const w = wing(1.6, .95, 2); w.rotation.y = s > 0 ? 0 : Math.PI; w.position.z = s * .45; w.rotation.x = .25 * s; g.add(w); });
+      const cam = cyl(.2, .2, .55, M.white); cam.position.set(.1, -.8, 0); g.add(cam); const l = cyl(.15, .15, .03, M.lens); l.position.set(.1, -1.08, 0); g.add(l);
+    } else { // NEXUS concept orbiter for the spacecraft section
+      const bus = box(1.5, 1.05, 1.05, M.foil); g.add(bus);
+      const top = box(1.52, .06, 1.07, M.white); top.position.y = .55; g.add(top);
+      const scope = cyl(.3, .36, .85, M.white); scope.rotation.z = Math.PI / 2; scope.position.set(1.15, .15, 0); g.add(scope);
+      const lens = cyl(.25, .25, .04, M.lens); lens.rotation.z = Math.PI / 2; lens.position.set(1.59, .15, 0); g.add(lens);
+      const spec = box(.34, .3, .34, M.dark); spec.position.set(.95, -.32, .3); g.add(spec);
+      const rec = box(.5, .3, .42, M.dark); rec.position.set(-.25, -.68, .15); g.add(rec);
+      const led = box(.06, .06, .02, new THREE.MeshBasicMaterial({ color: 0x36c8e8 })); led.position.set(-.05, -.68, .37); g.add(led); A.led = led;
+      const batt = box(.3, .26, .3, M.steel); batt.position.set(-.55, -.65, -.25); g.add(batt);
+      const mast = cyl(.035, .035, .55, M.steel, 8); mast.position.set(-.3, .85, 0); g.add(mast);
+      const d = dish(.62, .17); d.position.set(-.3, 1.1, 0); d.rotation.z = -.35; g.add(d);
+      [1, -1].forEach(s => { const w = wing(2.9, .8, 3); w.rotation.y = s > 0 ? 0 : Math.PI; w.position.z = s * .52; g.add(w); });
+      for (let i = 0; i < 4; i++) { const t = cyl(.04, .07, .12, M.steel, 10); t.position.set(-.76, .38 - (i > 1) * .76, .38 - (i % 2) * .76); t.rotation.z = Math.PI / 2; g.add(t); }
+      Object.assign(A, { instruments: V(1.62, .15, 0), recorder: V(-.25, -.84, .15), antenna: V(-.42, 1.32, 0), solar: V(0, 0, 1.7) });
+    }
+    g.userData.anchors = A; return g;
+  }
+
+  // ---------- Stations
+  const stations = {}; const STEP = 900;
+  function station(key, x, y = 0) { const g = new THREE.Group(); g.position.set(x, y, 0); scene.add(g); stations[key] = g; g.userData.anim = []; return g; }
+  const anim = (st, f) => st.userData.anim.push(f);
+  function orbitTube(r, color, opacity, tilt = 0) { const o = ring(r, color, opacity); o.rotation.x = tilt; return o; }
+
+  // HERO: Earth focal (right of centre), Moon nearby, Mars behind, asteroid away from the Moon, satellite in front
+  const hero = station('hero', 0);
+  { const e = makeEarth(4.2); e.position.set(4.6, -.3, 0); hero.add(e);
+    const m = makeMoon(1.05); m.position.set(10.6, 3.1, -3); hero.add(m);
+    const ma = makeMars(2.2); ma.position.set(16, -1.6, -24); hero.add(ma);
+    const ast = makeAsteroid(.55); ast.position.set(2.4, 5.6, 2); hero.add(ast);
+    const sat = makeCraft('concept'); sat.scale.setScalar(.42); sat.position.set(9.6, -3.7, 6.5); sat.rotation.set(.3, -.9, .12); hero.add(sat);
+    const o1 = orbitTube(6.4, 0x36c8e8, .28, Math.PI / 2 - .32); o1.position.copy(e.position); o1.rotation.z = .25; hero.add(o1);
+    const o2 = ring(9.5, 0xffb45c, .16, 0, true); o2.position.copy(e.position); o2.rotation.set(Math.PI / 2 - .18, 0, -.1); hero.add(o2);
+    anim(hero, t => { e.userData.spin.forEach(s => s.rotation.y = t * .03); e.userData.clouds.rotation.y = t * .036; m.userData.spin[0].rotation.y = t * .01; ma.userData.spin[0].rotation.y = t * .02;
+      ast.rotation.set(t * .09, t * .13, .3); sat.position.y = -3.7 + Math.sin(t * .8) * .08; sat.rotation.y = -.9 + Math.sin(t * .3) * .12; });
+    hero.userData.parts = { earth: e };
+  }
+
+  // MISSIONS: one complete scene per mission
+  function missionStation(key, x, build) { const st = station(key, x); build(st); return st; }
+  const MS = {};
+  MS.astra = missionStation('astra', STEP, st => {
+    const ast = makeAsteroid(1.8); st.add(ast);
+    const e = makeEarth(1.5, 48); e.position.set(9, -3.2, -26); st.add(e);
+    const c = makeCraft('apex'); c.scale.setScalar(.55); st.add(c);
+    const path = ring(5.2, 0x4aa8ff, .35, 0, true); path.rotation.x = Math.PI / 2 - .5; st.add(path);
+    st.userData.craft = c; st.userData.path = path; st.userData.target = ast;
+    anim(st, t => { ast.rotation.set(.2 + t * .05, t * .08, .15); e.userData.spin.forEach(s => s.rotation.y = t * .03); });
+  });
+  MS.lunaris = missionStation('lunaris', STEP * 2, st => {
+    const m = makeMoon(3.4, true); m.rotation.x = -.55; st.add(m);
+    const c = makeCraft('lro'); c.scale.setScalar(.42); st.add(c);
+    const path = ring(5.0, 0x9fe0ea, .35, 0, true); path.rotation.set(.2, 0, Math.PI / 2 - .2); st.add(path);
+    st.userData.craft = c; st.userData.path = path; st.userData.target = m;
+    anim(st, t => { m.userData.spin[0].rotation.y = t * .015; });
+  });
+  MS.earth = missionStation('earth', STEP * 3, st => {
+    const e = makeEarth(3.4); st.add(e);
+    const haze = new THREE.Mesh(new THREE.SphereGeometry(3.4 * 1.075, 64, 48), atmoShader(0xa78bfa, 2.2, .55)); st.add(haze); // aerosol / haze cue
+    const c = makeCraft('eos'); c.scale.setScalar(.3); st.add(c);
+    const path = ring(4.6, 0xa78bfa, .4, 0, true); path.rotation.x = Math.PI / 2 - .35; path.rotation.z = .3; st.add(path);
+    st.userData.craft = c; st.userData.path = path; st.userData.target = e;
+    anim(st, t => { e.userData.spin.forEach(s => s.rotation.y = t * .03); e.userData.clouds.rotation.y = t * .04; });
+  });
+  MS.mars = missionStation('mars', STEP * 4, st => {
+    const m = makeMars(3.4, true); st.add(m);
+    // turn Mars so Jezero faces the camera side
+    const j = m.userData.jezero.clone().normalize(), want = V(-.35, .25, 1).normalize(); m.quaternion.setFromUnitVectors(j, want);
+    const c = makeCraft('mro'); c.scale.setScalar(.36); st.add(c);
+    const path = ring(4.9, 0xd0674c, .38, 0, true); path.rotation.x = Math.PI / 2 - .45; path.rotation.z = -.25; st.add(path);
+    st.userData.craft = c; st.userData.path = path; st.userData.target = m;
+  });
+  // craft flying its mission orbit (slide 2) or the chosen game orbit (slide 4)
+  const gameOrbit = { mission: 'astra', radii: [], active: 1 };
+  Object.entries(MS).forEach(([k, st]) => anim(st, t => {
+    const c = st.userData.craft; let r, rot;
+    if (view.slide === 3) { const gr = st.userData.gameRings; if (!gr) return; const R = gr.children[gameOrbit.active]; r = R.userData.r; rot = gr.rotation; }
+    else { r = st.userData.path.userData.r; rot = st.userData.path.rotation; }
+    const a = t * .16 + 2.1; const p = V(Math.cos(a) * r, 0, Math.sin(a) * r).applyEuler(rot); c.position.copy(p);
+    c.lookAt(st.userData.target.getWorldPosition(V(0, 0, 0))); c.rotateX(-Math.PI / 2);
+  }));
+  // Game orbit choices: two complete paths per mission (not to scale)
+  const ORB = { astra: [3.9, 5.7], lunaris: [4.3, 5.8], earth: [4.2, 5.6], mars: [4.3, 5.8] };
+  Object.entries(MS).forEach(([k, st]) => {
+    const g = new THREE.Group(); ORB[k].forEach(r => { const l = ring(r, 0x36c8e8, .5); l.userData.r = r; g.add(l); });
+    g.rotation.x = Math.PI / 2 - .42; g.rotation.z = .12; g.visible = false; st.add(g); st.userData.gameRings = g;
+  });
+
+  // SPACECRAFT: concept orbiter alone, with a distant Earth off to the side
+  const craftSt = station('craft', STEP * 5);
+  const hero3 = makeCraft('concept'); craftSt.add(hero3); hero3.rotation.set(.18, -.62, .05);
+  { const e = makeEarth(6, 48); e.position.set(-30, -14, -60); craftSt.add(e); }
+  anim(craftSt, t => { hero3.rotation.y = -.62 + Math.sin(t * .25) * .18 + view.yaw * .6; hero3.position.y = Math.sin(t * .7) * .05; hero3.userData.anchors.led.visible = Math.sin(t * 6) > 0; });
+
+  // SCIENCE: six chapter scenes
+  const CH = [];
+  function chapter(i, build) { const st = station('ch' + i, STEP * (6 + i)); build(st); CH[i] = st; }
+  const col = (h, s, l) => new THREE.Color().setHSL(h, s, l);
+  chapter(0, st => { // Nebula: layered gas and dust with a protostar inside a dense knot
+    const R = rand(11), g = new THREE.Group(); g.scale.setScalar(.72); st.add(g);
+    for (let i = 0; i < 150; i++) { const u = R(), v = R(), w = R(); const p = V((u - .5) * 16, (v - .5) * 7 + Math.sin(u * 6) * 1.2, (w - .5) * 8);
+      const hue = R() < .55 ? .52 + R() * .06 : (R() < .6 ? .9 + R() * .06 : .07); const s = sprite(puffTex, col(hue, .7, .5), 2.5 + R() * 4.5, .14 + R() * .18); s.position.copy(p); s.material.rotation = R() * 6; g.add(s); }
+    for (let i = 0; i < 45; i++) { const p = V((R() - .5) * 12, (R() - .5) * 2.4 + 0.2, 1.5 + R() * 3); const s = sprite(puffTex, 0x02030a, 2 + R() * 3.5, .55 + R() * .3, false); s.position.copy(p); g.add(s); } // dust lanes in front
+    for (let i = 0; i < 26; i++) { const a = i / 26; const p = V(-6 + a * 11, Math.sin(a * 9) * 1.4 + 1.2, -1 + Math.cos(a * 5)); const s = sprite(glow, 0xffc890, .7 + R() * .6, .35); s.position.copy(p); g.add(s); } // bright filament
+    const core = sprite(glow, 0xfff1d6, 2.2, 1); core.position.set(1.6, .4, .6); g.add(core);
+    const coreHalo = sprite(glow, 0xffb45c, 6, .45); coreHalo.position.copy(core.position); g.add(coreHalo);
+    const knot = sprite(puffTex, 0xff9a6a, 4.5, .4); knot.position.set(1.6, .4, .2); g.add(knot);
+    g.add(pointsCloud(400, (i, p, c) => { p.set((Math.random() - .5) * 18, (Math.random() - .5) * 9, (Math.random() - .5) * 8); c.setRGB(1, .95, .9).multiplyScalar(.4 + Math.random() * .6); }, .09));
+    anim(st, t => { g.rotation.y = Math.sin(t * .05) * .25; core.scale.setScalar(2.1 + Math.sin(t * 2.2) * .15); });
+  });
+  chapter(1, st => { // Star life: separate stages, one shown at a time
+    const stages = [];
+    const proto = new THREE.Group(); { const R = rand(5); for (let i = 0; i < 70; i++) { const s = sprite(puffTex, col(R() < .5 ? .05 : .55, .6, .4), 2 + R() * 3, .1); s.position.set((R() - .5) * 7, (R() - .5) * 4, (R() - .5) * 4); proto.add(s); }
+      proto.add(sprite(glow, 0xffe2b8, 1.5, .9)); const disk = new THREE.Mesh(new THREE.RingGeometry(.4, 1.6, 64), new THREE.MeshBasicMaterial({ color: 0xff9a5a, transparent: true, opacity: .45, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); disk.rotation.x = Math.PI / 2.3; proto.add(disk);
+      [1, -1].forEach(s => { const j = new THREE.Mesh(new THREE.ConeGeometry(.18, 3.6, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x9fe0ea, transparent: true, opacity: .14, blending: THREE.AdditiveBlending, depthWrite: false })); j.position.y = s * 1.9; j.rotation.z = s > 0 ? Math.PI : 0; j.rotation.x = .15; proto.add(j); }); }
+    const starTex = (a, b) => canvasTex(512, 256, (g, w, h) => { g.fillStyle = a; g.fillRect(0, 0, w, h); const R = rand(9); for (let i = 0; i < 260; i++) { const x = R() * w, y = R() * h, r = 6 + R() * 22, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, R() > .5 ? b : 'rgba(0,0,0,.12)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); } });
+    const ms = new THREE.Group(); { ms.add(new THREE.Mesh(new THREE.SphereGeometry(1.4, 48, 32), new THREE.MeshBasicMaterial({ map: starTex('#fff3c8', 'rgba(255,255,255,.5)') }))); ms.add(sprite(glow, 0xffe6a0, 7, .75)); ms.add(sprite(glow, 0xffffff, 3.6, .6)); }
+    const rg = new THREE.Group(); { rg.add(new THREE.Mesh(new THREE.SphereGeometry(3.4, 48, 32), new THREE.MeshBasicMaterial({ map: starTex('#d9502a', 'rgba(255,160,80,.35)') }))); rg.add(sprite(glow, 0xff6a3a, 13, .55)); }
+    const wd = new THREE.Group(); { wd.add(sprite(glow, 0xd8ecff, 1.1, 1)); wd.add(new THREE.Mesh(new THREE.SphereGeometry(.12, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+      const R = rand(21); for (let i = 0; i < 90; i++) { const a = R() * Math.PI * 2, r = 2.6 + (R() - .5) * .7, h = (R() - .5) * 1.6; const s = sprite(puffTex, i % 3 ? 0x36c8e8 : 0xff6aa8, 1.2 + R(), .22); s.position.set(Math.cos(a) * r, h, Math.sin(a) * r * .55); wd.add(s); } wd.rotation.x = .5; }
+    const sn = new THREE.Group(); { const R = rand(33); sn.add(pointsCloud(2600, (i, p, c) => { const th = R() * Math.PI * 2, ph = Math.acos(2 * R() - 1), n = fbm(Math.cos(th) * 2, Math.sin(th) * 2, Math.cos(ph) * 2, 4); const r = 3.2 + (n - .5) * 1.6 + (R() - .5) * .3;
+        p.set(r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)); c.copy(n > .5 ? new THREE.Color(0xff8a4a) : new THREE.Color(0x6ad8ff)).multiplyScalar(.6 + R() * .5); }, .16, .85)); sn.add(sprite(glow, 0xbfe6ff, 1.1, 1)); }
+    [proto, ms, rg, wd, sn].forEach(s => { s.visible = false; st.add(s); stages.push(s); });
+    st.userData.stages = stages; stages[0].visible = true;
+    anim(st, t => { stages.forEach(s => s.rotation.y += reduced ? 0 : .002); });
+  });
+  chapter(2, st => { // Planet formation: young star, flared disk with rings and gaps, protoplanets
+    const g = new THREE.Group(); g.rotation.set(.42, 0, -.12); g.scale.setScalar(.68); st.add(g);
+    g.add(sprite(glow, 0xfff0c8, 3.2, 1)); g.add(sprite(glow, 0xffb45c, 8, .35));
+    const gaps = [2.7, 4.6], R = rand(17);
+    g.add(pointsCloud(16000, (i, p, c) => { let r; do { r = 1 + Math.pow(R(), .8) * 7.5; } while (gaps.some(gp => Math.abs(r - gp) < .28 && R() > .06)); const a = R() * Math.PI * 2, h = (R() - .5) * .06 * r * r * .25;
+      const band = .7 + .3 * Math.sin(r * 5.3); p.set(Math.cos(a) * r, h, Math.sin(a) * r); c.setRGB(1, .72 - r * .045, .45 - r * .045).multiplyScalar(band * (.4 + R() * .45)); }, .26, .75));
+    const planets = gaps.map((r, i) => { const pl = new THREE.Mesh(new THREE.SphereGeometry(.22 - i * .05, 24, 16), new THREE.MeshStandardMaterial({ color: i ? 0x8a6a52 : 0xb07a5a, roughness: .9 })); pl.userData = { r, a: i * 2.4 }; g.add(pl); return pl; });
+    const clumps = []; for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(.06 + R() * .07, 0), new THREE.MeshStandardMaterial({ color: 0x7a6656, roughness: 1 })); m.userData = { r: 3.2 + R() * 3.6, a: R() * 6.28 }; g.add(m); clumps.push(m); }
+    anim(st, t => { g.children[2].rotation.y = t * .05; [...planets, ...clumps].forEach(p => { const a = p.userData.a + t * .4 / Math.pow(p.userData.r, 1.5); p.position.set(Math.cos(a) * p.userData.r, 0, Math.sin(a) * p.userData.r); }); });
+  });
+  chapter(3, st => { // Black hole: shadow, inclined hot disk, lensed far side, photon ring and a warped background
+    const diskTex = canvasTex(512, 512, (g) => { const r = g.createRadialGradient(256, 256, 70, 256, 256, 256); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.12, 'rgba(255,236,190,1)'); r.addColorStop(.35, 'rgba(255,150,60,.85)'); r.addColorStop(.7, 'rgba(160,50,20,.35)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 512, 512);
+      const R = rand(4); g.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 60; i++) { g.strokeStyle = `rgba(0,0,0,${.15 + R() * .25})`; g.lineWidth = 1 + R() * 3; g.beginPath(); g.arc(256, 256, 80 + R() * 170, R() * 6, R() * 6 + 1.5); g.stroke(); } });
+    const dm = () => new THREE.MeshBasicMaterial({ map: diskTex, transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+    const disk = new THREE.Mesh(new THREE.RingGeometry(1.5, 6.5, 160, 4), dm()); disk.rotation.x = Math.PI / 2 - .2; st.add(disk);
+    const back = new THREE.Group(); st.add(back);
+    const arcTop = new THREE.Mesh(new THREE.RingGeometry(1.25, 2.6, 128, 2, 0, Math.PI), dm()); back.add(arcTop); // lensed image of the far side of the disk
+    const arcBot = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.6, 128, 2, Math.PI, Math.PI), dm()); arcBot.material.opacity = .5; back.add(arcBot);
+    const photon = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.17, 128), new THREE.MeshBasicMaterial({ color: 0xffe2b0, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false })); back.add(photon);
+    st.add(new THREE.Mesh(new THREE.SphereGeometry(1.05, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 })));
+    // background stars pushed outward around the shadow (lensing), drawn on a plane behind
+    const R = rand(8), E = 2.4; const bg = pointsCloud(1400, (i, p, c) => { let x = (R() - .5) * 60, y = (R() - .5) * 34; const b = Math.hypot(x, y) || .01, b2 = (b + Math.sqrt(b * b + 4 * E * E)) / 2; x *= b2 / b; y *= b2 / b; p.set(x, y, 0); c.setRGB(.9, .93, 1).multiplyScalar(.35 + R() * .8); }, .22);
+    back.add(bg); bg.position.z = -30;
+    st.userData.billboard = back;
+    anim(st, t => { disk.rotation.z = t * .12; back.quaternion.copy(camera.quaternion); });
+  });
+  chapter(4, st => { // Gravitational lensing: foreground cluster, distant galaxy behind, bent light paths and arcs
+    const R = rand(13), lens = new THREE.Group(); st.add(lens);
+    lens.add(sprite(glow, 0xffe2a8, 5, .9)); lens.add(sprite(glow, 0xffb45c, 12, .3));
+    for (let i = 0; i < 12; i++) { const s = sprite(glow, i % 3 ? 0xffd9a0 : 0xffc070, .9 + R() * 1.6, .6); s.position.set((R() - .5) * 5, (R() - .5) * 3.5, (R() - .5) * 2); s.scale.x *= 1.4; lens.add(s); }
+    const src = new THREE.Group(); src.position.set(.7, .4, -40); st.add(src); // distant source galaxy
+    src.add(pointsCloud(900, (i, p, c) => { const arm = i % 2, r = R() * 3, a = r * 1.6 + arm * Math.PI + (R() - .5) * .5; p.set(Math.cos(a) * r, Math.sin(a) * r * .7, 0); c.setRGB(.55, .75, 1).multiplyScalar(.6 + R() * .5); }, .22));
+    src.add(sprite(glow, 0xbfe0ff, 2.6, .8));
+    const RE = 4.1; const arcs = new THREE.Group(); st.add(arcs);
+    [[.5, 1.1], [2.3, .7], [3.9, .5], [5.0, .35]].forEach(([a0, len]) => { for (let k = 0; k < 40; k++) { const a = a0 + (k / 39 - .5) * len, w = Math.sin(k / 39 * Math.PI); const s = sprite(glow, 0x5fb0ff, .3 + w * .4, .12 + w * .3); s.position.set(Math.cos(a) * RE, Math.sin(a) * RE * .92, .3); arcs.add(s); } });
+    const cam = V(0, 0, 40); // light paths: source -> bend near the lens -> towards the viewer
+    [[.5, 0x7fc8ff], [3.6, 0x7fc8ff], [2.1, 0x4aa8ff]].forEach(([a, c]) => { const bend = V(Math.cos(a) * RE, Math.sin(a) * RE * .92, 0);
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([src.position.clone(), bend, cam]), new THREE.LineDashedMaterial({ color: c, transparent: true, opacity: .45, dashSize: .6, gapSize: .45 })); l.computeLineDistances(); st.add(l); });
+    anim(st, t => { arcs.children.forEach((s, i) => s.material.opacity = (.22 + .18 * Math.sin(t * 1.2 + i * .15))); });
+  });
+  chapter(5, st => { // Universe tour: nested scales, one at a time (sizes and distances compressed, not to scale)
+    const S = [];
+    const s0 = new THREE.Group(); { const e = makeEarth(1.6, 48); s0.add(e); const m = makeMoon(.45); m.position.set(4.6, .6, -1); s0.add(m); const o = ring(4.7, 0x9fe0ea, .3, 0, true); o.rotation.x = .12; s0.add(o); s0.userData.spin = e; }
+    const s1 = new THREE.Group(); { s1.add(sprite(glow, 0xfff0c8, 2.2, 1)); s1.add(sprite(glow, 0xffb45c, 5, .4)); const cols = [0x9a8f86, 0xe0c08a, 0x4f8fe0, 0xd0674c, 0xd9b48a, 0xe6d3a0, 0x9fe0ea, 0x4a6fe0];
+      cols.forEach((c, i) => { const r = 1.3 + i * .85; const o = ring(r, 0x36c8e8, .22); o.rotation.x = .35; s1.add(o); const p = new THREE.Mesh(new THREE.SphereGeometry(.08 + (i > 3 ? .1 : .04), 16, 12), new THREE.MeshBasicMaterial({ color: c })); const a = i * 1.7; p.position.set(Math.cos(a) * r, 0, Math.sin(a) * r).applyEuler(o.rotation); s1.add(p); }); }
+    const s2 = new THREE.Group(); { const a = sprite(glow, 0xfff0c8, 1.2, 1); a.position.x = -5; s2.add(a); const b = sprite(glow, 0xffd8a0, 1.4, 1); b.position.set(5, .6, -1); s2.add(b); const c2 = sprite(glow, 0xff8a6a, .5, 1); c2.position.set(5.5, .2, -1); s2.add(c2);
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a.position, b.position]), new THREE.LineDashedMaterial({ color: 0xffb45c, transparent: true, opacity: .6, dashSize: .3, gapSize: .2 })); l.computeLineDistances(); s2.add(l); }
+    const galaxy = (n, r, tw, hue) => pointsCloud(n, (i, p, c) => { const arm = i % 2, d = Math.pow(Math.random(), 1.6) * r, a = d * tw + arm * Math.PI + (Math.random() - .5) * .6; p.set(Math.cos(a) * d, (Math.random() - .5) * .12 * r * (1 - d / r), Math.sin(a) * d); c.copy(col(hue + (d / r) * .5, .6, .65 - d / r * .25)); }, .16 * r / 6 + .05, .9);
+    const s3 = new THREE.Group(); { const gx = galaxy(9000, 6, 1.1, .08); s3.add(gx); s3.add(sprite(glow, 0xffe0b0, 2.4, .7)); const sunDot = sprite(glow, 0xffb45c, .5, 1); sunDot.position.set(3.6, 0, 1.2); s3.add(sunDot); s3.rotation.x = 1.0; }
+    const s4 = new THREE.Group(); { const mw = galaxy(2500, 1.6, 1.3, .08); mw.position.set(-3.2, 0, 0); mw.rotation.x = .5; s4.add(mw); const an = galaxy(3000, 2.2, 1.1, .6); an.position.set(3.4, .8, -1); an.rotation.set(1.1, 0, .5); s4.add(an); const m33 = galaxy(900, .8, 1.5, .55); m33.position.set(1.4, -1.6, 1); s4.add(m33);
+      for (let i = 0; i < 30; i++) { const d = sprite(glow, 0xcfe0ff, .2 + Math.random() * .2, .7); d.position.set((Math.random() - .5) * 11, (Math.random() - .5) * 5, (Math.random() - .5) * 4); s4.add(d); } }
+    const s5 = new THREE.Group(); { s5.add(pointsCloud(9000, (i, p, c) => { const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1), r = Math.pow(Math.random(), .33) * 5.6; const n = fbm(Math.cos(th) * 3 * r / 5, Math.sin(th) * 3 * r / 5, Math.cos(ph) * 3, 2);
+        p.set(r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)); c.copy(col(.6 + n * .3, .55, .45 + Math.max(0, n - .45) * 1.4)); }, .15, .95));
+      s5.add(new THREE.Mesh(new THREE.SphereGeometry(6, 64, 48), atmoShader(0xffb45c, 3.5, .7))); const here = sprite(glow, 0x9fe0ea, .6, 1); s5.add(here); s5.children.forEach(c => c.scale.multiplyScalar(.72)); s5.children[0].geometry.scale(1,1,1); }
+    [s0, s1, s2, s3, s4, s5].forEach(g => { g.visible = false; st.add(g); S.push(g); }); S[0].visible = true; st.userData.stages = S;
+    anim(st, t => { S[0].userData.spin.userData.spin.forEach(s => s.rotation.y = t * .05); S[1].rotation.y = t * .05; S[3].rotation.y = t * .03; S[5].rotation.y = t * .02; });
+  });
+
+  // ---------- Views: where the camera sits for each slide or selection.
+  // fx = where the subject should sit across the screen (0 left, 1 right), so cards never cover it.
+  const VIEWS = {
+    hero: { st: 'hero', cam: V(3.2, 1.0, 25), look: V(6.2, .4, 0), fx: .66 },
+    impact: { st: 'hero', cam: V(-2, 4.5, 30), look: V(6, -.5, -2), fx: .55 },
+    astra: { st: 'astra', cam: V(2, 2.6, 15), look: V(0, 0, 0), fx: .7 },
+    lunaris: { st: 'lunaris', cam: V(3, 1.2, 15.5), look: V(0, -.4, 0), fx: .7 },
+    earth: { st: 'earth', cam: V(3, 2.4, 15), look: V(0, 0, 0), fx: .7 },
+    mars: { st: 'mars', cam: V(3, 2, 15), look: V(0, 0, 0), fx: .7 },
+    craft: { st: 'craft', cam: V(1.2, 1.4, 8.8), look: V(.2, .15, 0), fx: .5 },
+  };
+  ['astra', 'lunaris', 'earth', 'mars'].forEach(k => VIEWS['g_' + k] = { st: k, cam: V(1.5, 6.5, 19.5), look: V(0, -.6, 0), fx: .5 });
+  CH.forEach((_, i) => VIEWS['ch' + i] = { st: 'ch' + i, cam: i === 3 ? V(0, 1.3, 15) : i === 4 ? V(0, 0, 16) : V(0, 2.2, 16), look: V(0, 0, 0), fx: .64 });
+  const view = { key: 'hero', slide: 0, fx: .5, yaw: 0, pitch: 0 };
+  const camPos = V(0, 0, 0), camLook = V(0, 0, 0); let fxNow = .5;
+  function setView(key, instant) {
+    const v = VIEWS[key]; if (!v) return; const st = stations[v.st]; const far = !stations[VIEWS[view.key].st] || st !== stations[VIEWS[view.key].st];
+    view.key = key; view.fx = v.fx;
+    if (instant || far) { camPos.copy(v.cam).add(st.position); camLook.copy(v.look).add(st.position); fxNow = v.fx; camera.position.copy(camPos); canvas.classList.remove('warp'); void canvas.offsetWidth; canvas.classList.add('warp'); }
+    Object.values(stations).forEach(s => s.visible = s === st);
+  }
+
+  let drag = null;
   canvas.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; });
   addEventListener('pointerup', () => { drag = null; });
-  addEventListener('pointermove', e => {
-    if (!drag) return;
-    off.yaw = Math.max(-.65, Math.min(.65, off.yaw + (e.clientX - drag[0]) * .0045));
-    off.pitch = Math.max(-.4, Math.min(.4, off.pitch + (e.clientY - drag[1]) * .0035));
-    drag = [e.clientX, e.clientY];
-  });
+  addEventListener('pointermove', e => { if (!drag) return; view.yaw = Math.max(-.6, Math.min(.6, view.yaw + (e.clientX - drag[0]) * .004)); view.pitch = Math.max(-.35, Math.min(.35, view.pitch + (e.clientY - drag[1]) * .003)); drag = [e.clientX, e.clientY]; });
 
-  function resize() {
-    const r = canvas.getBoundingClientRect(); if (!r.width) return;
-    renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
-  }
+  let W = 1, H = 1;
+  function resize() { const r = canvas.getBoundingClientRect(); if (!r.width) return; W = r.width; H = r.height; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
   addEventListener('resize', resize); new ResizeObserver(resize).observe(canvas); resize();
 
-  let current = 0, activeSub = 0; const clock = new THREE.Clock(); const pin = document.getElementById('sc-callout-pin');
-  const anchors = [V(1.33, .18, 0), V(-.2, -.62, .3), V(-.2, 1.2, 0), V(-.1, 0, 1.95)];
-  const tmp = new THREE.Vector3();
-  let visible = true; document.addEventListener('visibilitychange', () => { visible = !document.hidden; });
+  // ---------- Screen overlay for orbit labels (game) and spacecraft callouts
+  const overlay = document.createElement('div'); overlay.id = 'scene-overlay'; canvas.parentElement.insertBefore(overlay, canvas.nextSibling);
+  overlay.innerHTML = '<svg id="callout-lines"></svg>';
+  const lines = overlay.querySelector('svg');
+  const project = (p) => { const q = p.clone().project(camera); return [(q.x * .5 + .5) * W, (-q.y * .5 + .5) * H, q.z < 1]; };
+  const SUBS = [['instruments', '01 · Science instruments', 1, -1], ['recorder', '02 · Recorder and flight computer', 1, 1], ['antenna', '03 · Radio and high-gain antenna', -1, -1], ['solar', '04 · Solar arrays and battery', -1, 1]];
+  const callouts = SUBS.map(([k, label], i) => { const d = document.createElement('div'); d.className = 'callout'; d.textContent = label; d.onclick = () => window.focusSubsystem && window.focusSubsystem(i, document.querySelectorAll('.subsystem-list .glass-card')[i]); overlay.append(d); return d; });
+  const orbitLabels = [0, 1].map(() => { const d = document.createElement('div'); d.className = 'orbit-label'; overlay.append(d); return d; });
+  let activeSub = 0;
 
-  function animate() {
-    requestAnimationFrame(animate);
-    if (!visible) return;
-    const t = reduced ? 0 : clock.getElapsedTime();
-    nebulaGroup.rotation.z = t * .002; stars.rotation.y = t * .0055; dust.rotation.y = -t * .009; dust.position.y = Math.sin(t * .22) * .35;
-    for (const s of twinkle) s.material.opacity = .25 + .72 * (.5 + .5 * Math.sin(t * s.userData.speed + s.userData.phase));
-    moon.mesh.rotation.y = t * .028; mars.mesh.rotation.y = t * .036; earth.mesh.rotation.y = t * .06;
-    apophis.rotation.x = t * .14; apophis.rotation.y = t * .19;
-    craft.position.y = 1.35 + Math.sin(t * 1.1) * .14; craft.rotation.y = Math.sin(t * .35) * .22 + off.yaw * .5; craft.rotation.z = Math.cos(t * .45) * .06;
-    solar.rotation.x = Math.sin(t * .4) * .18; led.visible = Math.sin(t * 6) > 0;
-    const a = t * .35; const ob = V(Math.cos(a) * 5.3, 0, Math.sin(a) * 5.3).applyEuler(haloOrbit.rotation).add(earth.g.position);
-    haloSat.position.copy(ob); haloSat.lookAt(earth.g.position);
-    lunarArc.material.opacity = .32 + .16 * Math.sin(t * 2.1); marsArc.material.opacity = .28 + .16 * Math.sin(t * 1.6 + 1.2); neaArc.material.opacity = .28 + .16 * Math.sin(t * 2.4 + 2.4);
-    const want = targetPos.clone(); want.x += Math.sin(off.yaw) * 6.5; want.y += off.pitch * 5.5;
-    camera.position.lerp(want, reduced ? 1 : .045); curLook.lerp(targetLook, reduced ? 1 : .055); camera.lookAt(curLook);
-    if (current === 2) {
-      tmp.copy(anchors[activeSub]); craft.localToWorld(tmp); tmp.project(camera);
-      const r = canvas.getBoundingClientRect();
-      pin.style.left = (tmp.x * .5 + .5) * r.width + 'px'; pin.style.top = (-tmp.y * .5 + .5) * r.height + 'px'; pin.classList.add('visible');
-    } else pin.classList.remove('visible');
+  const clock = new THREE.Clock(); let visible = true; document.addEventListener('visibilitychange', () => { visible = !document.hidden; });
+  function animate() { requestAnimationFrame(animate); if (visible) frame(false); }
+  function frame(snap) {
+    const t = reduced ? 0 : clock.getElapsedTime(); const k = (reduced || snap) ? 1 : 0;
+    const v = VIEWS[view.key], st = stations[v.st];
+    st.userData.anim.forEach(f => f(t));
+    const want = v.cam.clone().add(st.position); const sph = new THREE.Spherical().setFromVector3(v.cam.clone().sub(v.look)); sph.theta += view.yaw * .9; sph.phi = Math.max(.2, Math.min(Math.PI - .2, sph.phi - view.pitch * .8));
+    want.copy(v.look).add(new THREE.Vector3().setFromSpherical(sph)).add(st.position);
+    camPos.lerp(want, k || .05); camLook.lerp(v.look.clone().add(st.position), k || .06); fxNow += (view.fx - fxNow) * (k || .06);
+    camera.position.copy(camPos); camera.lookAt(camLook); camera.setViewOffset(W, H, (.5 - fxNow) * W, 0, W, H);
+    sky.position.copy(camera.position);
+    // spacecraft callouts
+    const showCall = view.slide === 2; let svg = '';
+    callouts.forEach((d, i) => { d.style.display = showCall ? '' : 'none'; if (!showCall) return;
+      const [k, , sx, sy] = SUBS[i]; const a = hero3.userData.anchors[k].clone(); hero3.localToWorld(a); const [x, y] = project(a);
+      const lx = Math.max(W * (sx < 0 ? .5 : .33), Math.min(W * (sx > 0 ? .6 : .74), x + sx * W * .07)), ly = Math.max(H * .3, Math.min(H * .82, y + sy * H * .09)); d.style.left = lx + 'px'; d.style.top = ly + 'px'; d.style.transform = `translate(${sx > 0 ? '0' : '-100%'}, -50%)`;
+      d.classList.toggle('on', i === activeSub);
+      svg += `<line x1="${x}" y1="${y}" x2="${lx}" y2="${ly}" class="${i === activeSub ? 'on' : ''}"/><circle cx="${x}" cy="${y}" r="${i === activeSub ? 4.5 : 3}" class="${i === activeSub ? 'on' : ''}"/>`; });
+    // orbit option labels on the game slide
+    const showOrb = view.slide === 3 && MS[gameOrbit.mission];
+    orbitLabels.forEach((d, i) => { d.style.display = showOrb ? '' : 'none'; if (!showOrb) return;
+      const gr = MS[gameOrbit.mission].userData.gameRings, r = gr.children[i].userData.r; let best = null;
+      for (let a = 0; a < 6.28; a += .13) { const p = V(Math.cos(a) * r, 0, Math.sin(a) * r).applyEuler(gr.rotation).add(MS[gameOrbit.mission].position); const q = project(p); if (q[0] > W * .33 && q[0] < W * .62 && q[1] < H * .8 && (!best || q[1] > best[1])) best = q; }
+      if (!best) { d.style.display = 'none'; return; } const [x, y] = best; d.style.left = x + 'px'; d.style.top = y + 'px'; d.classList.toggle('on', i === gameOrbit.active);
+      if (i === gameOrbit.active) svg += `<circle cx="${x}" cy="${y}" r="3.5" class="on"/>`; });
+    lines.innerHTML = svg;
     renderer.render(scene, camera);
   }
-  animate();
+  setView('hero', true); animate();
 
   // ---------- Slides
   const slides = document.querySelectorAll('.slide'), dots = document.querySelectorAll('.dot-btn'), tag = document.getElementById('slide-telemetry-tag');
+  let current = 0, missionKey = 'astra', chapterIdx = 0;
+  const slideView = i => [() => 'hero', () => missionKey, () => 'craft', () => 'g_' + gameOrbit.mission, () => 'ch' + chapterIdx, () => 'impact'][i]();
   function goToSlide(i) {
     if (i < 0 || i >= slides.length) return;
-    current = i; off = { yaw: 0, pitch: 0 };
+    current = i; view.slide = i; view.yaw = 0; view.pitch = 0;
     slides.forEach((s, j) => s.classList.toggle('active', j === i)); dots.forEach((d, j) => d.classList.toggle('active', j === i));
     tag.textContent = slides[i].dataset.tag;
     document.getElementById('btn-prev').disabled = i === 0; document.getElementById('btn-next').disabled = i === slides.length - 1;
-    targetPos.copy(slideCams[i].pos); targetLook.copy(slideCams[i].look);
+    Object.values(MS).forEach(st => { st.userData.gameRings.visible = i === 3; st.userData.path.visible = i !== 3; });
+    setView(slideView(i));
     try { history.replaceState(null, '', '#slide-' + (i + 1)); } catch (e) {}
   }
   addEventListener('keydown', e => {
@@ -194,36 +465,33 @@
 
   // Slide 2: missions (text matches js/data.js on the site)
   const missions = {
-    astra: { code: 'SELECTED · MISSION 01', metric: '99942 APOPHIS', title: 'ASTRA · Asteroid Apophis encounter',
+    astra: { code: 'SELECTED · MISSION 01', metric: '99942 APOPHIS', title: 'ASTRA · Asteroid Apophis encounter', view: 'astra',
       detail: 'A 340 metre asteroid will pass about 32,000 km from Earth on 13 April 2029, close enough to see without a telescope. OSIRIS-APEX arrives just after the pass.',
-      ref: 'Science reference: NASA OSIRIS-APEX at asteroid 99942 Apophis', pos: V(-4.2, 4.8, 15.5), look: V(-1.5, 4.6, 5.5) },
-    lunaris: { code: 'SELECTED · MISSION 02', metric: 'LUNAR POLAR ORBITER', title: 'LUNARIS · Reading the coldest craters',
+      ref: 'Science reference: NASA OSIRIS-APEX at asteroid 99942 Apophis. Spacecraft shown is an illustrative, OSIRIS-APEX-inspired model.' },
+    lunaris: { code: 'SELECTED · MISSION 02', metric: 'LUNAR POLAR ORBITER', title: 'LUNARIS · Reading the coldest craters', view: 'lunaris',
       detail: 'Mapping the Moon from orbit, modelled on NASA’s LRO, in orbit since 2009. The darkest craters reach about 35 K. Water ice has been searched for but not confirmed.',
-      ref: 'Science reference: NASA Lunar Reconnaissance Orbiter (LRO)', pos: V(12.2, 4.8, .5), look: V(17.5, 4.2, -10.5) },
-    halo: { code: 'SELECTED · MISSION 03', metric: '705 KM SUN-SYNCHRONOUS', title: 'HALO · Watching Earth’s atmosphere',
+      ref: 'Science reference: NASA Lunar Reconnaissance Orbiter (LRO). Darkened south pole and orbiter are illustrative.' },
+    halo: { code: 'SELECTED · MISSION 03', metric: '705 KM SUN-SYNCHRONOUS', title: 'HALO · Watching Earth’s atmosphere', view: 'earth',
       detail: 'Four layers of air, watched from 705 km up. Aerosols, gases and clouds as seen by NASA’s Terra, Aqua and Aura. MODIS sees the whole Earth every one to two days.',
-      ref: 'Science reference: NASA Terra, Aqua and Aura, plus NASA POWER', pos: V(2.5, 3.6, 20.5), look: V(7.5, -.8, 2.5) },
-    jezero: { code: 'SELECTED · MISSION 04', metric: 'JEZERO CRATER', title: 'JEZERO ECHO · An ancient lake from orbit',
+      ref: 'Science reference: NASA Terra, Aqua and Aura, plus NASA POWER. Satellite and haze layer are illustrative.' },
+    jezero: { code: 'SELECTED · MISSION 04', metric: 'JEZERO CRATER', title: 'JEZERO ECHO · An ancient lake from orbit', view: 'mars',
       detail: 'An orbiter modelled on NASA’s MRO studies Jezero crater. HiRISE reaches up to 25 cm per pixel, and the orbiter relays rover data back to Earth.',
-      ref: 'Science reference: NASA Mars Reconnaissance Orbiter (MRO)', pos: V(20.5, -1.2, -13.5), look: V(27.5, -2.5, -26) },
+      ref: 'Science reference: NASA Mars Reconnaissance Orbiter (MRO). Jezero marker is a simplified landmark; orbiter is MRO-inspired.' },
   };
   function selectMission(key, el) {
     document.querySelectorAll('.missions-grid .glass-card').forEach(c => c.classList.remove('selected')); el.classList.add('selected');
     const d = missions[key];
     document.getElementById('mf-code').textContent = d.code; document.getElementById('mf-metric').textContent = d.metric;
     document.getElementById('mf-title').textContent = d.title; document.getElementById('mf-detail').textContent = d.detail;
-    document.getElementById('mf-verified').textContent = d.ref; targetPos.copy(d.pos); targetLook.copy(d.look);
+    document.getElementById('mf-verified').textContent = d.ref; missionKey = d.view; setView(d.view);
   }
 
   // Slide 3: spacecraft systems
   const subLabels = ['01 · SCIENCE INSTRUMENTS', '02 · RECORDER AND FLIGHT COMPUTER', '03 · RADIO AND HIGH-GAIN ANTENNA', '04 · SOLAR ARRAYS AND BATTERY'];
-  const subCams = [V(3.6, 2.2, 13.4), V(2.2, .3, 13.6), V(1.8, 2.9, 13.5), V(.4, 2, 14.5)];
   function focusSubsystem(i, el) {
-    document.querySelectorAll('.subsystem-list .glass-card').forEach(c => c.classList.remove('selected')); el.classList.add('selected');
-    activeSub = i; document.getElementById('sub-callout-pill').textContent = 'HIGHLIGHTED: ' + subLabels[i];
-    document.getElementById('sc-pin-label').textContent = subLabels[i]; targetPos.copy(subCams[i]); targetLook.set(2.2, 1.35, 10.2);
+    document.querySelectorAll('.subsystem-list .glass-card').forEach(c => c.classList.remove('selected')); if (el) el.classList.add('selected');
+    activeSub = i; const pill = document.getElementById('sub-callout-pill'); if (pill) pill.textContent = 'HIGHLIGHTED: ' + subLabels[i];
   }
-
   // Slide 4: NEXUS//04 choices. Values copied from js/game-data.js.
   const GAME = {
     astra: { name: 'ASTRA', world: 'Apophis', budget: 1200, tagline: 'Watch an asteroid change as Earth pulls on it.', orbits: [['near', '5 km standoff'], ['far', '20 km standoff']], cam: 'astra' },
@@ -250,7 +518,7 @@
     cfg[step] = val; if (step === 'mission') Object.assign(cfg, REC[val]);
     el.parentElement.querySelectorAll('.cfg-pill').forEach(p => p.classList.remove('active')); el.classList.add('active');
     document.querySelectorAll('.game-card').forEach(c => c.classList.remove('focused-card')); el.closest('.game-card').classList.add('focused-card');
-    if (step === 'mission') { orbitPills(); syncPills(); const m = missions[GAME[val].cam]; targetPos.copy(m.pos); targetLook.copy(m.look); }
+    if (step === 'mission') { orbitPills(); syncPills(); }
     summary();
   }
   function summary() {
@@ -263,7 +531,14 @@
     document.getElementById('sim-s3-val').textContent = cfg.solar === 'L' ? 'LARGE SOLAR' : 'SMALL SOLAR';
     document.getElementById('sim-s4-val').textContent = cfg.radio === 'L' ? 'LARGE RADIO' : 'SMALL RADIO';
     document.getElementById('cfg-play').href = 'play.html?mission=' + cfg.mission;
-    viz();
+    sync3D(); viz();
+  }
+  // 3D: show the chosen mission's target, both orbit paths (not to scale) and highlight the chosen one
+  function sync3D() {
+    const opts = GAME[cfg.mission].orbits, inner = cfg.mission === 'earth' ? [1, 0] : [0, 1]; // ring 0 is the inner (lower) path
+    gameOrbit.mission = cfg.mission; gameOrbit.active = inner.indexOf(cfg.orbit);
+    orbitLabels.forEach((d, i) => { d.textContent = (i ? 'OUTER · ' : 'INNER · ') + opts[inner[i]][1]; });
+    if (current === 3) setView('g_' + cfg.mission);
   }
   // Live numbers from the game's own model (js/sim.js + js/game-data.js)
   const INFO = {
@@ -290,30 +565,17 @@
     c.orbit = GAME[cfg.mission].orbits[cfg.orbit][0]; c.solar = cfg.solar; c.radio = cfg.radio;
     const d = sim.derive(m, c, 'cadet');
     // 01 mission
-    document.getElementById('gviz-0').innerHTML = `<img class="gviz-orb" src="textures/orbs/${info[0]}.webp" alt="${m.world}">
-      <div class="gviz-txt"><div class="gviz-k">${m.world} · modelled on ${info[1]}</div><b>${info[2]}</b><br>${info[3]}<br><span style="color:rgba(234,242,250,.5)">${m.objectives.length} science objectives · ${m.instruments.length} instruments to choose from</span></div>`;
+    document.getElementById('gviz-0').innerHTML = `<div class="gviz-txt"><div class="gviz-k">${m.world} · modelled on ${info[1]}</div><b>${info[2]}</b><br>${info[3]}</div>`;
     // 02 orbit diagram
-    const R = m.body.radiusKm, a = d.a || (R + (c.orbit === 'near' ? 5 : 20));
-    const ro = 48, rb = Math.max(7, ro * R / a), half = (d.eclipseFrac || 0) * Math.PI;
-    const arc = half ? `<path d="M${60 + ro * Math.cos(-half)} ${60 + ro * Math.sin(-half)} A${ro} ${ro} 0 0 1 ${60 + ro * Math.cos(half)} ${60 + ro * Math.sin(half)}" stroke="#a78bfa" stroke-width="4" fill="none" stroke-linecap="round"/>` : '';
-    const col = { astra: '#a08a74', lunaris: '#b8bcc4', earth: '#3f7fd8', mars: '#d0674c' }[cfg.mission];
-    document.getElementById('gviz-1').innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true">
-      <rect x="60" y="${60 - rb}" width="60" height="${rb * 2}" fill="rgba(10,6,30,.75)"/>
-      <circle cx="60" cy="60" r="${ro}" stroke="rgba(54,200,232,.45)" stroke-dasharray="3 3" fill="none"/>${arc}
-      <circle cx="60" cy="60" r="${rb}" fill="${col}"/><path d="M60 ${60 - rb} A${rb} ${rb} 0 0 1 60 ${60 + rb}Z" fill="rgba(0,0,0,.55)"/>
-      <circle cx="${60 + ro * Math.cos(-2.3)}" cy="${60 + ro * Math.sin(-2.3)}" r="4" fill="#ffb45c"/>
-      <text x="4" y="12" fill="#ffb45c" font-size="8" font-family="IBM Plex Mono,monospace">SUN ←</text></svg>
-      <div class="gviz-stats">
-        <span class="gviz-k">Period</span><span class="gviz-k">${d.eclipseMin ? 'In shadow' : 'Shadow'}</span>
-        <span class="gviz-big">${fmt(d.periodMin)} min</span><span class="gviz-big" style="color:${d.eclipseMin ? '#c4b0ff' : '#7fe6b0'}">${d.eclipseMin ? fmt(d.eclipseMin) + ' min' : 'none'}</span>
-        <span class="gviz-k" style="margin-top:6px">Target pass</span><span class="gviz-k" style="margin-top:6px">Ground contact</span>
-        <span class="gviz-big">${fmt(d.passMin)} min</span><span class="gviz-big">${fmt(d.contactMin)} min</span>
+    document.getElementById('gviz-1').innerHTML = `<div class="gviz-stats">
+        <span class="gviz-k">Period</span><span class="gviz-k">${d.eclipseMin ? 'In shadow' : 'Shadow'}</span><span class="gviz-k">Pass</span><span class="gviz-k">Contact</span>
+        <span class="gviz-big">${fmt(d.periodMin)}<small> min</small></span><span class="gviz-big" style="color:${d.eclipseMin ? '#c4b0ff' : '#7fe6b0'}">${d.eclipseMin ? fmt(d.eclipseMin) + '<small> min</small>' : 'none'}</span><span class="gviz-big">${fmt(d.passMin)}<small> min</small></span><span class="gviz-big">${fmt(d.contactMin)}<small> min</small></span>
       </div>`;
     // 03 power
     document.getElementById('gviz-2').innerHTML = `<div class="gviz-meters">
       ${meter('ARRAYS IN SUNLIGHT', d.solarW, d.sunLoad, 'W', 0, 'Arrays carry every load at once.', 'Arrays cannot run everything together.')}
       ${d.eclipseWh ? meter('BATTERY IN SHADOW', d.battWh, d.eclipseWh, 'Wh', 0, 'Battery lasts through each eclipse.', 'Battery runs flat in every eclipse.') : '<div class="meter-note ok">No eclipse on this orbit, so the battery only covers faults.</div>'}
-      ${cfg.mission === 'mars' ? '<div class="meter-note">Mars is 1.52 AU from the Sun: arrays give 43% of their Earth output.</div>' : ''}</div>`;
+      </div>`;
     // 04 radio
     document.getElementById('gviz-3').innerHTML = `<div class="gviz-meters">
       ${meter('SENT HOME PER CONTACT', d.perContactGbit, d.perPassGbit, 'Gbit', 0, 'Every pass of data gets home.', 'Data piles up faster than it can be sent home.', 1)}
@@ -335,24 +597,40 @@
   }
   orbitPills(); syncPills(); summary();
 
-  // Slide 5: Cosmic Explorer chapters
+
+  // Slide 5: Cosmic Explorer chapters, each with its own 3D model (illustrative)
   const chapters = [
-    ['nebula', 'Inside a Nebula', 'How clouds of gas and dust collapse into new stars.'],
-    ['stars', 'A Star Through Time', 'From ignition to red giant, white dwarf or supernova.'],
-    ['planets', 'Worlds From Dust', 'How dust in a young disk grows into planets.'],
-    ['black-holes', 'A Closer Look at a Black Hole', 'Event horizons, glowing disks, jets and the first pictures.'],
-    ['lensing', 'Light Bent by Gravity', 'How mass bends light into rings, arcs and multiple images.'],
-    ['universe', 'A Journey Across Cosmic Scales', 'From Earth out to the oldest light we can see.'],
+    ['nebula', 'Inside a Nebula', 'How clouds of gas and dust collapse into new stars.', 'A cloud of gas and dust with dark dust lanes. A protostar glows inside the densest knot.'],
+    ['stars', 'A Star Through Time', 'From ignition to red giant, white dwarf or supernova.', 'One stage at a time. A star’s mass decides its ending: Sun-like stars become white dwarfs, massive stars explode.'],
+    ['planets', 'Worlds From Dust', 'How dust in a young disk grows into planets.', 'A young star inside a flared disk. Growing protoplanets clear gaps as they orbit.'],
+    ['black-holes', 'A Closer Look at a Black Hole', 'Event horizons, glowing disks, jets and the first pictures.', 'A dark shadow, a hot tilted disk, and the far side of the disk bent up and over by gravity. Stars behind are pushed outward.'],
+    ['lensing', 'Light Bent by Gravity', 'How mass bends light into rings, arcs and multiple images.', 'A foreground galaxy cluster bends light from a more distant galaxy into blue arcs. Dashed lines show the bent paths.'],
+    ['universe', 'A Journey Across Cosmic Scales', 'From Earth out to the oldest light we can see.', 'Step outward one scale at a time. Sizes and distances are compressed.'],
   ];
+  const SUBSTAGES = {
+    1: ['Protostar', 'Main sequence', 'Red giant', 'Sun-like end: white dwarf', 'Massive-star end: supernova remnant'],
+    5: ['Earth and Moon', 'Solar System', 'Nearest star', 'Milky Way', 'Local Group', 'Observable universe'],
+  };
+  function showStage(i, j) {
+    const st = CH[i]; if (!st || !st.userData.stages) return;
+    st.userData.stages.forEach((g, k) => { g.visible = k === j; if (k === j && !reduced) { g.scale.setScalar(i === 5 ? 2.2 : .6); g.userData.grow = true; } });
+    document.querySelectorAll('#stage-tags .stage-tag').forEach((b, k) => b.classList.toggle('active', k === j));
+  }
+  // ease newly shown stages into place
+  CH.forEach(st => anim(st, () => (st.userData.stages || []).forEach(g => { if (g.userData.grow) { g.scale.lerp(V(1, 1, 1), .07); if (Math.abs(g.scale.x - 1) < .01) { g.scale.setScalar(1); g.userData.grow = false; } } })));
   function selectDomain(i, el) {
-    document.querySelectorAll('.domain-tag').forEach(t => t.classList.remove('active')); el.classList.add('active');
-    const [id, t, d] = chapters[i]; const r = document.getElementById('domain-readout');
-    r.innerHTML = '<strong></strong> <span></span> <a style="color:var(--cyan)">Play Nova’s quest ↗</a>';
+    document.querySelectorAll('.domain-tag').forEach(t => t.classList.remove('active')); if (el) el.classList.add('active');
+    chapterIdx = i; const [id, t, d, model] = chapters[i]; const r = document.getElementById('domain-readout');
+    r.innerHTML = '<strong></strong> <span></span> <a style="color:var(--cyan)">Play Nova’s quest ↗</a><em class="model-note"></em>';
     r.querySelector('strong').textContent = t + ':'; r.querySelector('span').textContent = d;
     r.querySelector('a').href = 'nova.html' + (id === 'nebula' ? '' : '?quest=' + id);
+    r.querySelector('.model-note').textContent = 'Model: ' + model + ' Illustrative, not to scale.';
+    const box = document.getElementById('stage-tags'); box.textContent = '';
+    (SUBSTAGES[i] || []).forEach((label, j) => { const b = document.createElement('button'); b.className = 'stage-tag'; b.textContent = label; b.onclick = () => showStage(i, j); box.append(b); });
+    box.hidden = !SUBSTAGES[i]; if (SUBSTAGES[i]) showStage(i, 0);
+    if (current === 4) setView('ch' + i);
   }
   selectDomain(0, document.querySelector('.domain-tag'));
-
   // Edit mode, recenter, toast
   const btnEdit = document.getElementById('btn-edit-mode');
   btnEdit.addEventListener('click', () => {
@@ -361,7 +639,7 @@
     btnEdit.textContent = on ? 'EDIT TEXT: ON' : 'EDIT TEXT: OFF'; btnEdit.classList.toggle('active', on);
     toast(on ? 'Click any heading or card text to change it. Changes last until you reload.' : 'Editing off.');
   });
-  document.getElementById('btn-orbit-toggle').addEventListener('click', () => { off = { yaw: 0, pitch: 0 }; toast('View recentred. Drag the space background to look around.'); });
+  document.getElementById('btn-orbit-toggle').addEventListener('click', () => { view.yaw = 0; view.pitch = 0; toast('View recentred. Drag the space background to look around.'); });
   let toastTimer;
   function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4200); }
 
@@ -375,8 +653,8 @@
     toast('Building the PowerPoint file…');
     try { await loadPptx(); } catch (e) { toast('Could not load the PowerPoint builder. Check your internet connection and try again.'); return; }
     const shots = [];
-    for (let i = 0; i < 6; i++) { camera.position.copy(slideCams[i].pos); camera.lookAt(slideCams[i].look); renderer.render(scene, camera); shots.push(canvas.toDataURL('image/jpeg', .88)); }
-    const pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_WIDE'; pptx.author = 'Team ASTRA NEXUS'; pptx.title = 'ASTRA NEXUS briefing';
+    const keep = current; for (let i = 0; i < 6; i++) { goToSlide(i); frame(true); frame(true); shots.push(canvas.toDataURL('image/jpeg', .88)); } goToSlide(keep);
+    const pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_WIDE'; pptx.author = 'Team NEXUS'; pptx.title = 'NEXUS briefing';
     const C = { navy: '050B18', mid: '0B1730', cos: '122B4A', cyan: '36C8E8', white: 'EAF2FA', amber: 'FFB45C' };
     const box = (s, x, y, w, h, line) => s.addShape(pptx.ShapeType.roundRect, { x, y, w, h, rectRadius: .08, fill: { color: C.mid, transparency: 16 }, line: { color: line || C.cyan, width: 1 } });
     const t = (s, text, o) => s.addText(text, Object.assign({ fontFace: 'Arial', color: C.white, fontSize: 11 }, o));
@@ -384,7 +662,7 @@
     function frame(s, i, tagText, title) {
       s.background = { color: C.navy }; s.addImage({ data: shots[i], x: 0, y: 0, w: 13.333, h: 7.5 });
       s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 7.5, fill: { color: C.navy, transparency: 38 } });
-      t(s, 'ASTRA NEXUS', { x: .5, y: .28, w: 2.4, h: .35, fontSize: 13, bold: true });
+      t(s, 'NEXUS', { x: .5, y: .28, w: 2.4, h: .35, fontSize: 13, bold: true });
       t(s, tagText, { x: 2.6, y: .28, w: 6, h: .35, fontFace: 'Courier New', fontSize: 10, color: C.cyan });
       nav.forEach((l, n) => t(s, l, { x: 3.1 + n * 1.2, y: 7.02, w: 1.14, h: .28, align: 'center', fontFace: 'Courier New', fontSize: 8, color: n === i ? C.navy : C.white, fill: { color: n === i ? C.cyan : C.mid }, hyperlink: { slide: n + 1 } }));
       if (title) t(s, title, { x: .55, y: .95, w: 11, h: .55, fontSize: 28, bold: true });
@@ -451,9 +729,8 @@
     });
     box(s6, .55, 4.95, 12.2, 1.35, C.amber);
     t(s6, txt('[data-slide="5"] .closing-quote p'), { x: .8, y: 5.12, w: 11.7, h: 1, fontSize: 15, italic: true });
-    goToSlide(current);
-    await pptx.writeFile({ fileName: 'ASTRA_NEXUS_Briefing.pptx' });
-    toast('Downloaded ASTRA_NEXUS_Briefing.pptx (6 editable slides).');
+    await pptx.writeFile({ fileName: 'NEXUS_Briefing.pptx' });
+    toast('Downloaded NEXUS_Briefing.pptx (6 editable slides).');
   }
   document.getElementById('btn-export-pptx').addEventListener('click', exportToPPTX);
 
