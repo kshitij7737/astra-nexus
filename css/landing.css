@@ -161,7 +161,7 @@
 .lx-ch h2 { font-size: clamp(28px, 3vw, 46px); }
 
 /* eight-planet labels */
-.lx-plabels { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .6s; }
+.lx-plabels { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .6s; }
 .lx-plabels.on { opacity: 1; }
 .lx-plabels span { position: absolute; left: 0; top: 0; font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: rgba(242,239,233,.8); white-space: nowrap; text-shadow: 0 1px 6px #000; }
 /* handoff + dashboard */
@@ -286,3 +286,4 @@ body.lx-pick { cursor: pointer; }
 #lx-sky canvas { opacity: 0; transition: opacity .8s ease; }
 .lx-ready #lx-sky canvas { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { #lx-sky canvas { transition: none; } }
+.lx-hero { overflow-x: clip; }
