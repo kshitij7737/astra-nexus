@@ -142,7 +142,7 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
   }
   function solarPullback(){
     const names=Object.keys(maps);
-    const zoom=1.31-n*.65;
+    const zoom=1.38-n*.72+Math.sin(time*.32)*.065;
     g.save();g.scale(zoom,zoom);g.translate(0,-.10+n*.08);
     star(0,-.1,.25,gold);glow(0,-.1,.84,gold,.22);
     const orbit={Mercury:[.31,.026],Venus:[.40,.044],Earth:[.53,.146],Mars:[.67,.039],
@@ -160,7 +160,7 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
     const image=texture('carina','cosmic/carina.webp',onLoad);
     if(image){
       g.save();
-      const zoom=1.35+n*1.45+Math.sin(time*.19)*.12;
+      const zoom=1.32+n*1.54+Math.sin(time*.26)*.22;
       g.globalAlpha=.66;
       g.globalCompositeOperation='screen';
       g.filter='hue-rotate(24deg) saturate(0.85)';
@@ -230,6 +230,71 @@ export function drawCinema(canvas,chapter,part,n,time,yaw,pitch,onLoad){
       if(n>=.88){glow(0,0,.28,blue,.58);dot(0,0,.091,'#03060e');ring(0,0,.102,blue);}
     }
   }
+  function accretionFlyby(){
+    const jetsOn=part===18, warped=part===20||part===21;
+    const tilt=part===17?-.46+n*.85:-.38;
+    const flatten=part===17?.19+n*.61:warped?.31:.43;
+    const horizon=.17+n*.16;
+    const outer=.96+n*.20;
+    const silver=warped||part===17;
+    const near=silver?'#e9efff':'#ff7153', far=silver?'#b8cdff':'#50bcff';
+    g.save();g.rotate(tilt);
+    glow(0,0,outer,far,.25);
+    for(let i=0;i<47;i++){
+      const q=horizon*1.36+(outer-horizon*1.36)*i/47;
+      const phase=(i*.37+time*.47)%tau;
+      for(const side of [-1,1]){
+        const points=Array.from({length:38},(_,j)=>{
+          const a=phase+j*.091+side*Math.PI*.5;
+          const r=q+.011*Math.sin(a*9+i+time*2);
+          return [Math.cos(a)*r,Math.sin(a)*r*flatten];
+        });
+        path(points,(side>0?near:far)+(i%3?'48':'88'),i%4?.005:.012);
+      }
+    }
+    if(warped){
+      const bent=Array.from({length:52},(_,i)=>{
+        const a=Math.PI+i*Math.PI/51;
+        return [Math.cos(a)*horizon*1.24,Math.sin(a)*horizon*1.29];
+      });
+      path(bent,far+'66',.071);path(bent,white,.017);
+    }
+    glow(0,0,horizon*1.52,far,.48);
+    dot(0,0,horizon,'#020409');
+    ring(0,0,horizon*1.03,silver?'#f2f4ff':near);
+    if(part===21)ring(0,0,horizon*.66,blue+'da');
+    if(jetsOn){
+      for(const sign of [-1,1]){
+        for(let i=0;i<38;i++){
+          const q=(rand()+time*.38)%1,length=.28+n*.71;
+          const x=(rand()-.5)*(.025+q*.21),y=sign*(.10+q*length);
+          glow(x,y,.03+q*.023,i%3?blue:white,(1-q)*.65);
+        }
+        path([[0,sign*horizon],[0,sign*(.31+n*.68)]],far+'aa',.014);
+      }
+    }
+    g.restore();
+  }
+  function galacticSweep(){
+    const size=.97+n*.55;
+    g.save();g.translate(.14-n*.32,.06);g.rotate(-.43+Math.sin(time*.15)*.16);
+    glow(0,0,size*.85,blue,.24);
+    glow(0,0,size*.46,gold,.68);
+    for(let i=0;i<1200;i++){
+      const arm=i%4,q=rand()**.72;
+      const angle=arm*tau/4+q*5.65+(rand()-.5)*(.3+q*.47)+time*.04;
+      const x=Math.cos(angle)*q*size,y=Math.sin(angle)*q*size*(.39+n*.33);
+      const color=q<.23?'#ffd2a4':i%13===0?'#ed9472':i%7===0?'#e5f3ff':'#76bfff';
+      dot(x,y,.001+rand()*.006,color+(i%4?'86':'cc'));
+    }
+    if(part===10){
+      ring(0,0,size*.59,mint+'66',.39+n*.33);
+      glow(Math.cos(n*tau)*size*.59,Math.sin(n*tau)*size*.59*(.39+n*.33),.063,gold,.82);
+    }
+    g.restore();
+  }
+  if(chapter==='black-holes'&&[15,16,17,18,20,21].includes(part)){accretionFlyby();return;}
+  if(chapter==='universe'&&[8,9,10].includes(part)){galacticSweep();return;}
   if(chapter==='nebula'&&[0,7,8,10,12,22].includes(part)){nebulaFlythrough();return;}
   if((chapter==='universe'&&part===3)||(chapter==='planets'&&part===20)){solarPullback();return;}
   if(chapter==='lensing'&&[4,5,6,12,19,20].includes(part)){lensJourney();return;}

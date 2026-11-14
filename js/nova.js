@@ -1,7 +1,7 @@
 import { acts, parts as nebulaParts } from './nova-data.js';
 import { chapters, initialSettings } from './cosmic-data.js?v=4';
-import { drawCinema } from './nova-cinema.js?v=13';
-import { series, questLink } from './nova-series.js?v=13';
+import { drawCinema } from './nova-cinema.js?v=14';
+import { series, questLink } from './nova-series.js?v=14';
 
 const requested=new URLSearchParams(location.search).get('quest');
 const questIndex=Math.max(0,series.findIndex(([id])=>id===requested));
@@ -73,7 +73,7 @@ function go(index) {
   credit.textContent=nebula?'Backdrop: NASA, ESA, CSA, STScI · color adapted':'Planet texture credits · sizes and distances illustrative';
   $('move').textContent=quest?(label==='View'?'Drag the scene or use the View dial.':action):action;
   $('dial-name').textContent=label||labels[part];
-  $('dial-value').textContent='0%';
+  dialReadout(0);
   $('dial').value=0;
   $('part').value=part;
   $('prev').disabled=part===0;
@@ -138,10 +138,20 @@ parts.forEach(([title],i)=>$('part').add(new Option((i+1)+' · '+title,i)));
 $('part').onchange=e=>go(+e.target.value);
 $('prev').onclick=()=>go(part-1);
 $('next').onclick=()=>go(part+1);
+function dialReadout(value){
+  const label=parts[part][4];
+  let readout=value+'%';
+  if(!quest&&part===9)readout=['Hydrogen','Oxygen','Sulfur'][Math.min(2,Math.floor(value/34))];
+  if(questId==='black-holes'&&label==='Mass'&&[11,20].includes(part)){
+    const mass=Math.round(3+value*.37);
+    readout=mass+' solar masses · ~'+Math.round(mass*2.95)+' km horizon radius';
+  }
+  $('dial-value').textContent=readout;
+}
 $('dial').oninput=e=>{
   const value=+e.target.value;
   dial.value=value/100;
-  $('dial-value').textContent=!quest&&part===9?['Hydrogen','Oxygen','Sulfur'][Math.min(2,Math.floor(value/34))]:value+'%';
+  dialReadout(value);
   const earned=thresholds.filter(n=>value>=n).length;
   if(earned>(progress[part]||0)){progress[part]=earned;save();refreshStars();}
   redraw=true;
