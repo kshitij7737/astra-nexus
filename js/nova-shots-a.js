@@ -54,19 +54,49 @@ export function protostar(k, o = {}) {
   return { st, disk, haze };
 }
 function sunLike(k, o = {}) { return k.star({ r: o.r ?? 1, color: o.color ?? 0xffc04a, glow: o.glow ?? 0xff9a3a, spikes: o.spikes ?? .3, pos: o.pos, gran: o.gran, spots: o.spots }); }
+export function milkyBand(k, o = {}) { // Milky Way band across the sky, like the solar-system reel.
+  const cols = [0xfff0dc, 0xd8e0ff, 0xffd8b0, 0xc8b8e8];
+  const tilt = o.tilt ?? .5;
+  const place = (R, spread) => { const a = R() * TAU, lat = gauss(R) * spread; const x = Math.cos(a) * Math.cos(lat), y = Math.sin(lat), z = Math.sin(a) * Math.cos(lat); return [x, y * Math.cos(tilt) - z * Math.sin(tilt), y * Math.sin(tilt) + z * Math.cos(tilt)]; };
+  k.make(o.n ?? 9000, (i, R) => { const [x, y, z] = place(R, .09); return [x * 800, y * 800, z * 800, cols[i % 4], 1.2 + R() * 1.2, .25 + R() * .45]; }, { fixed: true, seed: 61, follow: true, soft: 5 });
+  k.make(320, (i, R) => { const [x, y, z] = place(R, .07); return [x * 700, y * 700, z * 700, i % 5 ? 0x8a7a98 : 0x5a4a5a, 90 + R() * 120, .06]; }, { seed: 62, follow: true, defines: { GAS: 1 } });
+}
 export function solarSystem(k, o = {}) {
-  const sun = sunLike(k, { r: .55, spikes: .45 });
-  const pl = [[1.2, .07, 'rocky', 0x9a8a80, 0xc8b8a8], [1.7, .12, 'rocky', 0xd9a65a, 0xf3d9a0], [2.3, .13, 'earth', 0, 0], [2.9, .09, 'rocky', 0xa04a2a, 0xe08050],
-    [4.4, .38, 'gas', 0xc8a070, 0xf0dcc0], [5.8, .32, 'gas', 0xd9c08a, 0xf5e8c0, 0xe8d8a8], [7.1, .22, 'gas', 0x7fd8e8, 0xb8f0f5], [8.2, .21, 'gas', 0x3f6ae0, 0x7fa0ff]];
-  const bodies = pl.map(([r, s, type, a, b, ring], i) => {
-    k.orbit(r, i < 4 ? 0x9ad0ff : 0xc0a8ff, .28);
-    const p = k.planet({ r: s, type, a, b, rim: type === 'earth' ? 0x7fc0ff : b || 0xffffff, seed: i * 1.7, ring });
+  const sun = sunLike(k, { r: .55, spikes: .45, gran: 9, spots: .25 });
+  const pl = [[1.2, .1, 'mercury.jpg'], [1.7, .17, 'venus.jpg'], [2.3, .19, 'earth-day.jpg'], [2.9, .13, 'mars.jpg'],
+    [4.4, .5, 'planets/jupiter.jpg'], [5.8, .42, 'planets/saturn.jpg', 0xffffff], [7.1, .3, 'planets/uranus.jpg'], [8.2, .29, 'planets/neptune.jpg']];
+  const bodies = pl.map(([r, s, map, ring], i) => {
+    k.orbit(r, i < 4 ? 0x9ad0ff : 0xc0a8ff, .22);
+    const p = k.planet({ r: s, map: map.includes('/') || map.startsWith('earth') || map.startsWith('mars') ? map : 'planets/' + map, rim: i === 2 ? 0x7fc0ff : 0xffffff, seed: i * 1.7, ring, amb: .04 });
+    if (ring) p.mesh.children[0]?.rotation.set(-Math.PI / 2 + .45, 0, 0);
     return { ...p, r, w: .9 / Math.pow(r, 1.5), ph: i * 1.9 };
   });
   const belt = k.disk({ rin: 3.4, rout: 3.9, n: 2500, thick: .03, spin: .25, size: .03, color: () => 0xb8a890, seed: 51 });
   const kuiper = k.disk({ rin: 9, rout: 11, n: 2600, thick: .08, spin: .05, size: .04, color: () => P.ice, seed: 52, bright: .6 });
-  k.on((t) => { for (const b of bodies) { const a = b.ph + t * b.w * (o.speed ?? .6); b.mesh.position.set(Math.cos(a) * b.r, 0, Math.sin(a) * b.r); } });
+  k.on((t) => { for (const b of bodies) { const a = b.ph + t * b.w * (o.speed ?? .6); b.mesh.position.set(Math.cos(a) * b.r, 0, Math.sin(a) * b.r); b.mesh.rotation.y = t * .3; } });
+  if (o.band !== false) milkyBand(k);
   return { sun, bodies, belt, kuiper };
+}
+// Two neutron stars spiral in, collide, flash, throw a magenta ring and orange jets, leave a blue remnant.
+export function merger(k, o = {}) {
+  const g = k.group(o.parent);
+  const A = k.star({ r: .28, color: 0xd8f4ff, glow: 0x7fe0ff, spikes: .6, parent: g }), B = k.star({ r: .28, color: 0xd8f4ff, glow: 0x7fe0ff, spikes: .6, parent: g });
+  const trails = [0, 1].map(j => { const pts = []; for (let i = 0; i <= 200; i++) { const t = i / 200, r = 2.4 * (1 - t * .9), a = t * 14 + j * Math.PI; pts.push(V(Math.cos(a) * r, 0, Math.sin(a) * r)); } return k.ray(pts, P.cyan, { n: 900, size: .1, speed: .35, bright: .7, parent: g }); });
+  const flash = k.glow([0, 0, 0], 9, 0xffffff, 0); g.add(flash);
+  const ring = k.shell({ r: 1, n: 5000, flat: .04, thick: .03, colors: [P.pink, P.purple, 0xff7ae0], lumpy: .2, parent: g, bright: 2 });
+  const jet = k.jet({ n: 3000, color: P.orange, len: 4, w: .1, parent: g, size: .14 });
+  const rem = k.cloud({ n: 3000, r: .9, colors: [0x9fd8ff, 0xd8f0ff, P.purple], seed: 71, parent: g, turb: .08, gas: 40 });
+  const h = { g, set(p) { // p: 0 inspiral -> 1 remnant
+    const ins = Math.min(1, p / .6), sep = 2.4 * Math.pow(1 - ins, .7) + .02, a = Math.pow(ins, 2.2) * 40;
+    A.g.position.set(Math.cos(a) * sep / 2, 0, Math.sin(a) * sep / 2); B.g.position.set(-Math.cos(a) * sep / 2, 0, -Math.sin(a) * sep / 2);
+    const post = Math.max(0, (p - .6) / .4); A.fade(post > 0 ? 0 : 1); B.fade(post > 0 ? 0 : 1);
+    trails.forEach(t => t.u.uAlpha.value = post > 0 ? 0 : .3 + ins * .7);
+    flash.material.opacity = post > 0 ? Math.max(0, 1 - post * 2.2) : 0; flash.scale.setScalar(4 + post * 14);
+    ring.u.uAlpha.value = post > 0 ? 1 - post * .6 : 0; ring.u.uExpand.value = .3 + post * 3.4;
+    jet.u.uAlpha.value = post > .05 ? .9 : 0; jet.u.uJetLen.value = .5 + post * 4;
+    rem.u.uAlpha.value = post > .1 ? Math.min(1, post * 2) : 0; rem.u.uExpand.value = .2 + post * .9;
+    k.shake = post > 0 && post < .12 ? .06 : 0; } };
+  h.set(0); return h;
 }
 // Pairs of systems crossfaded by the dial: f(n) -> index weight.
 function fadePair(a, b, n) { a.u.uAlpha.value = 1 - n; b.u.uAlpha.value = n; }
@@ -85,9 +115,9 @@ function rocks(k, n, spread, o = {}) {
 // ===================== NEBULA =====================
 const nebula = [
   k => { // A cloud in the dark
-    const c = k.cloud({ n: 16000, r: 4.2, seed: 3, blobs: [[0, 0, 0, 1], [1.8, .4, -1, .7], [-2, -.3, .8, .6]] });
+    const c = k.cloud({ n: 16000, r: 4.2, seed: 3, gas: 300, blobs: [[0, 0, 0, 1], [1.8, .4, -1, .7], [-2, -.3, .8, .6]] });
     k.nebulaSky(); k.cam({ d: 9, el: 10, drift: .04 });
-    k.on((t, n) => { c.u.uAlpha.value = .55 + n * .9; c.u.uTurb.value = .03 + n * .05; });
+    k.on((t, n) => { c.u.uAlpha.value = .4 + n * .6; c.u.uTurb.value = .03 + n * .05; });
   },
   k => { // How thin is thin
     const air = k.make(3200, (i, R) => [-.6 + (R() - .5) * 2.4, (R() - .5) * 2.4, (R() - .5) * 2.4, P.cyan, .06, .9], { seed: 4 });
@@ -200,13 +230,17 @@ const nebula = [
     k.cam({ d: 12, el: 15, drift: .04 });
     k.on((t, n) => { w.u.uExpand.value = 1 + n * .5; w.obj.scale.set(1 + n * .6, 1 - n * .3, 1); });
   },
-  k => { // Shocks and winds
-    k.star({ r: .3, color: 0xcfe0ff, glow: 0x8fb0ff, spikes: .9 });
-    const c = k.cloud({ n: 9000, r: 4, seed: 19, bright: .5 });
-    const sh = k.shell({ r: 1, n: 9000, thick: .04, colors: [P.cyan, 0xffffff, P.pink], lumpy: .6 });
-    let ph = 0;
-    k.cam({ d: 10, el: 16, drift: .035 });
-    k.on((t, n, dt) => { ph = (ph + dt * (.08 + n * .4)) % 1; sh.u.uExpand.value = .3 + ph * 3.4; sh.u.uAlpha.value = (1 - ph) * (.5 + n); c.u.uTurb.value = .03 + n * .08; });
+  k => { // Shocks and winds: blue wind streams sweeping over a glowing red ridge of gas
+    const ridge = k.make(16000, (i, R) => { const x = (R() - .5) * 14, z = (R() - .5) * 4; const crest = -x * .3 + Math.sin(x * 1.3 + z) * .25;
+      const top = R() < .45; const y = top ? crest + gauss(R) * .06 : crest - Math.abs(gauss(R)) * 2.2;
+      return [x, y, z, top ? (i % 3 ? P.red : 0xff8a5a) : (i % 2 ? 0x8a3a6a : 0x4a3a8a), top ? .07 : .13, top ? .8 : .45]; }, { seed: 20, u: { uTurb: .03, uTwinkle: .6 } });
+    k.gas({ n: 160, r: 6, blobs: [[0, -1.2, 0, 1]], colors: [0x2a3a6a, 0x4a2a5a], flat: .3, bright: .8 });
+    const streams = []; const R = rng(9);
+    for (let i = 0; i < 26; i++) { const z = (R() - .5) * 3, y0 = 2.6 + R() * 1.4, lift = .2 + R() * 1.4;
+      const pts = []; for (let j = 0; j <= 30; j++) { const x = mix(-7, 7, j / 30); pts.push(V(x, -x * .35 + lift + Math.sin(x * .5 + i) * .15 + (1 - j / 30) * (y0 - 2.6) * .4, z)); }
+      streams.push(k.ray(pts, i % 4 ? 0x52c8ff : 0xbff0ff, { n: 500, size: .06, speed: .25 + R() * .3, bright: .9 })); }
+    k.cam({ d: 10, el: 6, drift: 0, az: 12, target: [.8, -.2, 0] });
+    k.on((t, n) => { streams.forEach(s2 => { s2.u.uSpeed.value = .1 + n * .8; s2.u.uAlpha.value = .4 + n * .8; }); });
   },
   k => { // A tug of war
     const c = k.cloud({ n: 9000, r: 1.6, seed: 20, colors: [P.purple, P.pink, P.cyan] });
@@ -440,8 +474,8 @@ const stars = [
     k.on((t, n) => { beam.obj.rotation.y = t * 3; ns.fade(1 - n * .6); bh.du.uAlpha.value = .3 + n; bh.setR(.3 + n * .4); });
   },
   k => { // Forging elements
-    k.star({ r: 1, color: 0xffc04a, spikes: .4, pos: [0, 0, -3] });
-    k.cloud({ n: 6000, r: 6, seed: 50, bright: .3 });
+    const mg = merger(k); let ph = 0;
+    k.on((t, n, dt) => { ph = (ph + dt * .09) % 1.15; mg.set(Math.min(1, ph)); });
     const E = [['Big Bang', '#52e4ff', [1, 2]], ['Fusion in stars', '#ffd45a', [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]], ['Supernova', '#ff5fae', [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]], ['Neutron star merger', '#a070ff', [47, 56, 78, 79, 92, 54, 74, 82, 80, 50, 53, 55]]];
     const cols = [1, 18, 1, 2, 13, 14, 15, 16, 17, 18, 1, 2, 13, 14, 15, 16, 17, 18];
     k.cam({ d: 9, el: 8, drift: .02 });

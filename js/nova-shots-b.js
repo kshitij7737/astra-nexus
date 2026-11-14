@@ -1,6 +1,6 @@
 // Story shots for Black Holes, Gravitational Lensing and the Universe Tour.
 import { V, P, TAU, rgb, rng, gauss, mix, ease } from './nova-gl.js';
-import { panel, timeline, readout, curve, solarSystem } from './nova-shots-a.js';
+import { panel, timeline, readout, curve, solarSystem, milkyBand, merger } from './nova-shots-a.js';
 
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const step = (n, k) => Math.min(k - 1, Math.floor(n * k));
@@ -125,7 +125,7 @@ const blackHoles = [
     k.on((t, n) => { const m = mix(5, 50, n); bh.setR(.35 + n * .6); lab.set(Math.round(m) + ' Suns · ' + Math.round(m * 6) + ' km across'); });
   },
   k => { // Growing bigger
-    const bh = k.bh({ r: .5, out: 3.2 });
+    const bh = k.bh({ r: .5, out: 3.6, streakN: 2000, warp: .35 });
     const st = k.star({ r: 1.1, pos: [5, 0, 0], color: 0x9fc0ff, glow: 0x8fb0ff });
     const pts = []; for (let i = 0; i <= 80; i++) { const t = i / 80; const r = mix(4, 1.2, t); const a = t * 4.2; pts.push(V(Math.cos(a) * r + (1 - t) * 1, 0, -Math.sin(a) * r)); }
     k.ray(pts, P.cyan, { n: 1600, size: .08, speed: .5, bright: 1 });
@@ -177,7 +177,7 @@ const blackHoles = [
     k.on((t, n, dt) => { ph = (ph + dt * .12) % 1; const r = mix(6, 1, ease(ph)); obj.obj.position.set(r, 0, 0); const s = 1 + Math.pow(ph, 3) * 10 * (.3 + n * 1.4); obj.obj.scale.set(s, 1 / Math.sqrt(s), 1 / Math.sqrt(s)); obj.u.uAlpha.value = ph > .93 ? (1 - ph) * 14 : 1; });
   },
   k => { // The gas disk
-    const bh = k.bh({ r: .7, out: 5, heat: .2 });
+    const bh = k.bh({ r: .7, out: 5.5, heat: .2, disk: .35, streakN: 2600, streakA: 0xffffff, streakB: 0x8a96c0, warp: .15, streaks: 1.2 });
     k.cam({ d: 8, el: 18, drift: .03 });
     k.on((t, n) => { bh.du.uSpin.value = .2 + n * 2.2; });
   },
@@ -194,23 +194,19 @@ const blackHoles = [
   },
   k => { // Jets (reel style: spikes, swirl, blue beams)
     k.nebulaSky({ colors: [P.purple, P.blue, P.pink, P.cyan], bright: 1.4 });
-    const bh = k.bh({ r: .45, out: 4.5, heat: .9, dop: .5 });
+    const bh = k.bh({ r: .45, out: 5, heat: .9, dop: .5, streakN: 2400, streakA: 0xffffff, streakB: 0x9fb0d8, warp: .4, streaks: .35, disk: .7 });
     const jet = k.jet({ n: 6000, color: 0x9fd8ff, len: 6, w: .05, size: .1 });
     const sp = k.spikes([0, 0, 0], 26, 0xfff0e0, .8);
     const core = k.glow([0, 0, 0], 2.4, 0xffe0c0, .9);
     k.cam({ d: 10, el: 14, drift: .05 });
     k.on((t, n) => { jet.u.uJet.value = .2 + n * .9; jet.u.uJetLen.value = 2 + n * 7; jet.u.uAlpha.value = .25 + n * 1.1; sp.material.opacity = .3 + n * .6; sp.material.rotation = t * .02; core.material.opacity = .4 + n * .6; });
   },
-  k => { // Gravitational waves
-    const w = k.well({ N: 80, L: 10, mass: 0, op: .55, a: 0x2a3a9a, b: 0x52e4ff });
-    w.u.uM.value[0].set(0, 0, 1.4, .6); w.u.uM.value[1].set(0, 0, 1.4, .6);
-    const A = k.bh({ r: .25, out: 1.2, disk: .5 }), B = k.bh({ r: .25, out: 1.2, disk: .5 });
-    const flash = k.glow([0, 0, 0], 5, 0xffffff, 0);
-    k.cam({ d: 12, el: 30, drift: .03 });
-    k.on((t, n) => { const r = mix(2.2, .05, ease(n)); const a = t * (1 + 6 * Math.pow(n, 2)) * 1.2;
-      const x = Math.cos(a) * r, z = Math.sin(a) * r; w.u.uM.value[0].set(x, z, 1.4, .6); w.u.uM.value[1].set(-x, -z, 1.4, .6);
-      A.g.position.set(x, w.depthAt(x, z) + .3, z); B.g.position.set(-x, w.depthAt(-x, -z) + .3, -z);
-      w.u.uRipple.value = .15 + n * .5; w.u.uRippleK.value = 1.2 + n * 2; flash.material.opacity = n > .95 ? (n - .95) * 20 : 0; });
+  k => { // Gravitational waves: neutron-star style merger over a rippling grid
+    const w = k.well({ N: 80, L: 10, mass: 0, op: .45, a: 0x2a3a9a, b: 0x52e4ff, y: -1.6 });
+    const mg = merger(k);
+    const lab = k.label('', [0, -2.6, 0], 'big');
+    k.cam({ d: 10, el: 24, drift: .03 });
+    k.on((t, n) => { mg.set(n); w.u.uRipple.value = .1 + n * .6; w.u.uRippleK.value = 1.2 + n * 2.5; lab.set(n < .6 ? 'Spiralling closer' : n < .7 ? 'Collision!' : 'Ripples race outward'); });
   },
   k => { // Light goes around
     const bh = k.bh({ r: .8, disk: 0, halo: .7, photon: 3 });
@@ -284,15 +280,22 @@ const lensing = [
     k.cam({ d: 7, el: 0, drift: 0 });
     k.on((t, n) => seen.forEach((s, i) => { const [x, y] = S[i]; const f = 1 + n * .25; s.position.set(x * f, y * f, 0); }));
   },
-  k => { // A cosmic lens
-    const src = k.galaxy({ r: .8, n: 4000, armColor: 0x6fa0ff, core: 0xffffff }); src.obj.position.set(-7, 0, 0); src.obj.rotation.z = Math.PI / 2;
-    lensGalaxy(k, [0, 0, 0], 1.2);
-    k.planet({ r: .3, type: 'earth', pos: [7, 0, 0], sun: [7, 5, 5] });
-    for (const s of [1, -1]) for (const z of [0]) k.ray(bend(V(-7, 0, 0), V(1, s * .2, 0), [{ p: V(), m: .17 }]), P.cyan, { n: 600, size: .07 });
-    for (const s of [1, -1]) k.ray(bend(V(-7, 0, 0), V(1, 0, s * .2), [{ p: V(), m: .17 }]), P.purple, { n: 600, size: .07 });
-    k.label('Distant galaxy', [-7, -1.4, 0], 'cyan'); k.label('Lens galaxy', [0, -1.6, 0], 'yellow'); k.label('Us', [7, -.7, 0], 'pink');
-    k.cam({ d: 13, el: 16, drift: 0, az: 20 });
-    k.on((t, n) => { k.camCfg.az = mix(20, 85, n); });
+  k => { // A cosmic lens (galaxy on the space grid, light paths to Earth, telescope view)
+    const w = k.well({ N: 60, L: 8, mass: 1.6, soft: 1.3, op: .45, a: 0x2a2a7a, b: 0x8a7aff });
+    const lens = k.galaxy({ r: 1.9, n: 14000, arms: 2, twist: 2.2 }); lens.obj.position.y = w.depthAt(0, 0) + .25;
+    const src = k.galaxy({ r: .5, n: 2500, armColor: 0x9fc0ff, core: 0xffffff, seed: 8 }); src.obj.position.set(0, .4, -7); src.obj.rotation.x = .9;
+    k.planet({ r: .3, map: 'earth-day.jpg', rim: 0x6fb0ff, pos: [0, .3, 6], sun: [4, 6, 10] });
+    for (const sx of [1, -1]) {
+      k.ray([V(0, .4, -7), V(sx * 1.7, .5, -3), V(sx * 2.3, .5, 0), V(sx * 1.4, .4, 3.4), V(0, .3, 6)], 0xffffff, { n: 900, size: .08, speed: .3, bright: 1.1 });
+      const img = V(sx * 3.9, .4, -7); k.glow(img, .9, P.yellow, .8);
+      const dash = []; for (let i = 0; i < 40; i++) { const t = i / 40; if (i % 2) continue; dash.push(V(0, .3, 6).lerp(img, t), V(0, .3, 6).lerp(img, t + .025)); }
+      for (let i = 0; i < dash.length; i += 2) k.line([dash[i], dash[i + 1]], P.yellow, .7);
+      k.label('Observed image', img.clone().add(V(0, .6, 0)), 'yellow');
+    }
+    k.label('Distant galaxy', [0, 1.1, -7], 'cyan'); k.label('Lens galaxy', [0, -.4, 1.4], 'small'); k.label('Earth', [0, -.4, 6], 'small');
+    k.cam({ d: 11.5, el: 38, drift: 0, az: 0, target: [0, 0, -1] });
+    k.hud((g, wd, h) => lensView(g, wd, h, .05, .7, 'Telescope view'));
+    k.on((t, n) => { k.camCfg.az = mix(-20, 40, n); lens.obj.rotation.y = t * .05; });
   },
   k => { // Lining up
     lensGalaxy(k, [0, 0, 0], 1);
@@ -451,15 +454,15 @@ function logMap(k) { // The circular logarithmic map of the universe, Earth and 
 }
 const universe = [
   k => { // You are here
-    const e = k.planet({ r: 1, type: 'earth', sun: [8, 3, 10], amb: .04 });
+    const e = k.planet({ r: 1, map: 'earth-day.jpg', rim: 0x6fb0ff, sun: [4, 3, 12], amb: .05 }); milkyBand(k);
     k.glow([0, 0, 0], 3, 0x6fb0ff, .35);
     k.label('You are here', [0, 1.5, 0], 'big');
     k.cam({ d: 3.6, el: 10, drift: .03 });
     k.on((t, n) => { e.mesh.rotation.y = t * .15; k.zoom = mix(1, 4, ease(n)); });
   },
   k => { // The Moon
-    const e = k.planet({ r: .6, type: 'earth', pos: [-4, 0, 0], sun: [0, 3, 20] });
-    const m = k.planet({ r: .17, type: 'rocky', a: 0x6a6a6a, b: 0xc8c8c8, rim: 0x777777, pos: [4, 0, 0], sun: [0, 3, 20] });
+    const e = k.planet({ r: .6, map: 'earth-day.jpg', rim: 0x6fb0ff, pos: [-4, 0, 0], sun: [0, 3, 20] });
+    const m = k.planet({ r: .17, map: 'moon.jpg', rim: 0x333333, pos: [4, 0, 0], sun: [0, 3, 20] });
     const ray = k.ray([V(-3.3, 0, 0), V(3.8, 0, 0)], P.yellow, { n: 600, size: .05, bright: .3 });
     const pulse = k.glow([-3.3, 0, 0], .6, 0xffffff, 1); const lab = k.label('', () => pulse.position.clone().add(V(0, .5, 0)), 'yellow');
     k.label('Moon', [4, -.5, 0], 'small');
@@ -469,7 +472,7 @@ const universe = [
   k => { // The Sun
     const sun = k.star({ r: 1.2, color: 0xffc04a, spikes: .4 });
     k.orbit(6, P.cyan, .4);
-    const e = k.planet({ r: .12, type: 'earth', pos: [6, 0, 0] });
+    const e = k.planet({ r: .12, map: 'earth-day.jpg', rim: 0x6fb0ff, pos: [6, 0, 0] });
     const pulse = k.glow([1.2, 0, 0], .5, 0xffffff, 1); const lab = k.label('', () => pulse.position.clone().add(V(0, .4, 0)), 'yellow');
     let x = 0; k.cam({ d: 12, el: 20, drift: .02 });
     k.on((t, n, dt) => { x = (x + dt * .12) % 1; pulse.position.x = mix(1.2, 6, x); lab.set(Math.floor(x * 500 / 60) + ' min ' + Math.round(x * 500 % 60) + ' s'); k.zoom = mix(1, .45, ease(n)); k.camCfg.target.x = mix(0, 4, ease(n)); });

@@ -28,9 +28,9 @@ float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*n3(p);p=p*2.03+vec3(
 const POINT_V = `
 attribute float aSize; attribute vec3 aColor; attribute vec4 aSeed;
 uniform vec3 uTint; uniform float uTime,uPix,uSpin,uSpinPow,uInfall,uExpand,uTurb,uAlpha,uTwinkle,uJet,uJetLen,uJetW,uSpeed,uFlat,uSizeK;
-varying vec3 vC; varying float vA;
+varying vec3 vC; varying float vA; varying float vRot;
 void main(){
-  vec3 p=position; float a=1.;
+  vec3 p=position; float a=1.; vRot=aSeed.y*6.2831+uTime*.03*(aSeed.z-.5);
 #ifdef INFALL
   float ph=fract(aSeed.x+uTime*uInfall);
   float k=pow(1.-ph,1.25); p.xz*=k; p.y*=k*k;
@@ -63,11 +63,17 @@ void main(){
   vC=aColor*uTint; vA=a*uAlpha*tw;
 }`;
 const POINT_F = `
-varying vec3 vC; varying float vA; uniform float uSoft;
+varying vec3 vC; varying float vA; varying float vRot; uniform float uSoft; uniform sampler2D uTex;
 void main(){
   vec2 q=gl_PointCoord-.5; float d=dot(q,q)*4.;
+#ifdef GAS
+  float cr=cos(vRot),sr=sin(vRot); vec2 uv=mat2(cr,-sr,sr,cr)*q+.5;
+  float a=texture2D(uTex,uv).a*(1.-smoothstep(.6,1.,d));
+  a*=vA;
+#else
   float a=exp(-d*uSoft)+.18*exp(-d*uSoft*.22);
   a*=vA*(1.-smoothstep(.85,1.,d));
+#endif
   if(a<.004)discard;
 #ifdef DARK
   gl_FragColor=vec4(vC,a);
@@ -92,11 +98,11 @@ void main(){
   gl_FragColor=vec4(c,uAlpha);
 }`;
 
-const PLANET_V = `uniform vec3 uSunW; varying vec3 vN,vP,vV,vL;
-void main(){vN=normalize(normalMatrix*normal);vP=position;vec4 mv=modelViewMatrix*vec4(position,1.);vV=-mv.xyz;
+const PLANET_V = `uniform vec3 uSunW; varying vec3 vN,vP,vV,vL; varying vec2 vUv;
+void main(){vUv=uv;vN=normalize(normalMatrix*normal);vP=position;vec4 mv=modelViewMatrix*vec4(position,1.);vV=-mv.xyz;
 vL=normalize((viewMatrix*vec4(uSunW,1.)).xyz-mv.xyz);gl_Position=projectionMatrix*mv;}`;
 const PLANET_F = NOISE + `
-uniform vec3 uA,uB,uC; uniform float uType,uTime,uSeed,uAmb,uAlpha; varying vec3 vN,vP,vV,vL;
+uniform vec3 uA,uB,uC; uniform float uType,uTime,uSeed,uAmb,uAlpha,uHasMap; uniform sampler2D uMap; varying vec3 vN,vP,vV,vL; varying vec2 vUv;
 void main(){
   vec3 n=normalize(vN); vec3 p=normalize(vP)+uSeed;
   float lit=clamp(dot(n,normalize(vL))*1.15+.08,0.,1.);
@@ -110,6 +116,7 @@ void main(){
     col=mix(col,vec3(.95),smoothstep(.78,.86,abs(normalize(vP).y)));
     float cl=smoothstep(.55,.72,fbm(p*4.+vec3(uTime*.015,0.,0.))); col=mix(col,vec3(1.),cl*.85); }
   else { float f=fbm(p*4.+vec3(0.,uTime*.05,0.)); col=mix(uA,uB,smoothstep(.35,.7,f)); col+=uC*pow(smoothstep(.55,.75,f),2.)*1.5; lit=max(lit,.55); }
+  if(uHasMap>.5) col=texture2D(uMap,vUv).rgb*1.35;
   col*=uAmb+lit*(1.-uAmb);
   col+=uC*pow(1.-mu,3.)*(.25+lit)*.9;
   gl_FragColor=vec4(col,uAlpha);
@@ -173,6 +180,17 @@ void main(){
   vec3 c = gl_FrontFacing ? uColor*(.5+.6*pow(mu,.6))*(.8+.4*g) : uColor*(.9+.3*g);
   gl_FragColor=vec4(c,1.);
 }`;
+const STREAK_V = `
+attribute float aB; attribute float aR; uniform float uTime,uSpin,uWarp,uInfall; varying float vB;
+void main(){
+  vec3 p=position; float r=aR;
+  float ang=uTime*uSpin*pow(max(r,.2),-1.5);
+  float c=cos(ang),s=sin(ang); p.xz=mat2(c,-s,s,c)*p.xz;
+  float th=atan(p.z,p.x); p.y+=uWarp*r*.18*sin(th*2.+uTime*.2);
+  vB=aB; gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);
+}`;
+const STREAK_F = `uniform vec3 uA,uB; uniform float uAlpha; varying float vB;
+void main(){ vec3 c=mix(uB,uA,vB); gl_FragColor=vec4(c,vB*uAlpha); }`;
 const CMB_F = NOISE + `
 uniform float uTime,uC,uAlpha; varying vec3 vN,vP,vV;
 void main(){ vec3 q=normalize(vP); float f=fbm(q*9.)*.55+fbm(q*24.)*.45; float d=(f-.5)*uC*2.4;
@@ -184,6 +202,12 @@ function canvasTex(size, draw) {
   const c = document.createElement('canvas'); c.width = c.height = size;
   draw(c.getContext('2d'), size);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const texCache = {};
+const loader = new THREE.TextureLoader();
+function loadTex(name) {
+  if (!texCache[name]) { const t = loader.load('textures/' + name); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; texCache[name] = t; }
+  return texCache[name];
 }
 let TEX = null;
 function textures() {
@@ -218,7 +242,16 @@ function textures() {
     const c = g.createRadialGradient(0, 0, 0, 0, 0, 9); c.addColorStop(0, 'rgba(255,245,225,.95)'); c.addColorStop(1, 'rgba(255,240,220,0)');
     g.fillStyle = c; g.fillRect(-12, -12, 24, 24);
   }));
-  return TEX = { glow, spikes, galaxies };
+  const puff = canvasTex(128, (g, s2) => {
+    const R = rng(12); g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 70; i++) { const a = R() * TAU, r = Math.pow(R(), .7) * s2 * .3; const x = s2 / 2 + Math.cos(a) * r, y = s2 / 2 + Math.sin(a) * r, rr = s2 * (.05 + R() * .14);
+      const gr = g.createRadialGradient(x, y, 0, x, y, rr); gr.addColorStop(0, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, s2, s2); }
+  });
+  const ringTex = canvasTex(256, (g, s2) => {
+    const R = rng(3); for (let x = 0; x < s2; x++) { const t = x / s2; const a = (t < .08 ? 0 : .35 + R() * .5) * (t > .55 && t < .6 ? .15 : 1) * (1 - Math.pow(t, 6));
+      g.fillStyle = `rgba(${220 - t * 40},${200 - t * 50},${170 - t * 60},${a})`; g.fillRect(x, 0, 1, s2); }
+  });
+  return TEX = { glow, spikes, galaxies, puff, ringTex };
 }
 
 export function createNova(host, labelsEl, hudCanvas) {
@@ -276,7 +309,7 @@ export function createNova(host, labelsEl, hudCanvas) {
       geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
       if (!seed) { seed = new Float32Array(n * 4); const R = rng(n * 13 + 7); for (let i = 0; i < seed.length; i++) seed[i] = R(); }
       geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
-      const uniforms = { uTime: G.uTime, uPix: G.uPix, uSpin: { value: 0 }, uSpinPow: { value: 1.5 }, uInfall: { value: 0 }, uExpand: { value: 1 }, uTurb: { value: 0 }, uAlpha: { value: 1 }, uTwinkle: { value: 0 }, uJet: { value: 0 }, uJetLen: { value: 3 }, uJetW: { value: .1 }, uSpeed: { value: .3 }, uFlat: { value: 1 }, uSizeK: { value: 1 }, uSoft: { value: soft }, uTint: { value: new THREE.Vector3(1, 1, 1) } };
+      const uniforms = { uTime: G.uTime, uPix: G.uPix, uSpin: { value: 0 }, uSpinPow: { value: 1.5 }, uInfall: { value: 0 }, uExpand: { value: 1 }, uTurb: { value: 0 }, uAlpha: { value: 1 }, uTwinkle: { value: 0 }, uJet: { value: 0 }, uJetLen: { value: 3 }, uJetW: { value: .1 }, uSpeed: { value: .3 }, uFlat: { value: 1 }, uSizeK: { value: 1 }, uSoft: { value: soft }, uTex: { value: textures().puff }, uTint: { value: new THREE.Vector3(1, 1, 1) } };
       for (const key in u) uniforms[key] = { value: u[key] };
       const h = { obj: null, u: uniforms, geo, tint(hex, t = 1) { const c = rgb(hex); uniforms.uTint.value.set(mix(1, c[0] * 1.6, t), mix(1, c[1] * 1.6, t), mix(1, c[2] * 1.6, t)); } };
       const d = { ...defines }; if (fixed) d.FIXED = 1; if (blend === 'dark') d.DARK = 1;
@@ -342,12 +375,14 @@ export function createNova(host, labelsEl, hudCanvas) {
     k.planet = (o = {}) => {
       const types = { rocky: 0, gas: 1, earth: 2, lava: 3 };
       const u = { uA: { value: new THREE.Vector3(...rgb(o.a ?? 0x8a6a50)) }, uB: { value: new THREE.Vector3(...rgb(o.b ?? 0xd8c0a0)) }, uC: { value: new THREE.Vector3(...rgb(o.rim ?? 0x6fb0ff)) },
-        uType: { value: types[o.type || 'rocky'] }, uTime: G.uTime, uSeed: { value: o.seed ?? 0 }, uSunW: { value: o.sun ? (o.sun instanceof THREE.Vector3 ? o.sun : V(...o.sun)) : V(0, 0, 0) }, uAmb: { value: o.amb ?? .06 }, uAlpha: { value: 1 } };
+        uType: { value: types[o.type || 'rocky'] }, uTime: G.uTime, uSeed: { value: o.seed ?? 0 }, uHasMap: { value: o.map ? 1 : 0 }, uMap: { value: o.map ? loadTex(o.map) : null }, uSunW: { value: o.sun ? (o.sun instanceof THREE.Vector3 ? o.sun : V(...o.sun)) : V(0, 0, 0) }, uAmb: { value: o.amb ?? .06 }, uAlpha: { value: 1 } };
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.ShaderMaterial({ uniforms: u, vertexShader: PLANET_V, fragmentShader: PLANET_F, transparent: true }));
       mesh.scale.setScalar(o.r ?? 1); if (o.pos) mesh.position.copy(o.pos instanceof THREE.Vector3 ? o.pos : V(...o.pos));
       k.add(mesh, o.parent || scene);
       if (o.ring) {
-        const rg = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.3, 96), new THREE.MeshBasicMaterial({ color: o.ring, transparent: true, opacity: .45, side: THREE.DoubleSide, depthWrite: false }));
+        const rgeo = new THREE.RingGeometry(1.3, 2.3, 128, 1); const pa = rgeo.attributes.position, uva = rgeo.attributes.uv;
+        for (let i = 0; i < pa.count; i++) { const r = Math.hypot(pa.getX(i), pa.getY(i)); uva.setXY(i, (r - 1.3) / 1, .5); }
+        const rg = new THREE.Mesh(rgeo, new THREE.MeshBasicMaterial({ map: textures().ringTex, color: o.ring, transparent: true, opacity: .95, side: THREE.DoubleSide, depthWrite: false }));
         rg.rotation.x = -Math.PI / 2 + .35; mesh.add(rg); track(rg);
       }
       return { mesh, u };
@@ -438,15 +473,17 @@ export function createNova(host, labelsEl, hudCanvas) {
       const du = { uTime: G.uTime, uIn: { value: rs * 1.6 }, uOut: { value: rs * (o.out ?? 5.5) }, uHeat: { value: o.heat ?? .5 }, uDop: { value: o.dop ?? .45 }, uAlpha: { value: o.disk ?? 1 }, uSpin: { value: o.spin ?? 1 }, uCam: { value: V(1, 0, 0) } };
       const disk = new THREE.Mesh(new THREE.RingGeometry(rs * 1.5, rs * (o.out ?? 5.5), 160, 4), new THREE.ShaderMaterial({ uniforms: du, vertexShader: DISK_V, fragmentShader: DISK_F, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       disk.rotation.x = -Math.PI / 2; g.add(disk); track(disk);
+      const vx = k.vortex({ rin: rs * 1.65, rout: rs * (o.out ?? 5.5) * .95, parent: g, spin: 1, warp: o.warp ?? .3, n: o.streakN ?? 1100, a: o.streakA ?? 0xfff4e6, b: o.streakB ?? 0xff8a3c, bright: .8, seed: 19 });
       const hu = { uTime: G.uTime, uIn: { value: rs * 1.08 }, uW: { value: rs * .9 }, uAlpha: { value: o.halo ?? 1 }, uPhoton: { value: o.photon ?? 1 } };
       const halo = new THREE.Mesh(new THREE.PlaneGeometry(rs * 6, rs * 6), new THREE.ShaderMaterial({ uniforms: hu, vertexShader: DISK_V, fragmentShader: HALO_F, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
       g.add(halo); track(halo);
-      const h = { g, shadow, disk, halo, du, hu, rs, tilt: o.tilt ?? 0,
-        setR(r) { h.rs = r; shadow.scale.setScalar(r); du.uIn.value = r * 1.6; disk.scale.setScalar(r / rs); hu.uIn.value = r * 1.08; hu.uW.value = r * .9; halo.scale.setScalar(r / rs); } };
+      const h = { g, shadow, disk, halo, du, hu, rs, vx, tilt: o.tilt ?? 0,
+        setR(r) { h.rs = r; shadow.scale.setScalar(r); du.uIn.value = r * 1.6; disk.scale.setScalar(r / rs); vx.mesh.scale.setScalar(r / rs); hu.uIn.value = r * 1.08; hu.uW.value = r * .9; halo.scale.setScalar(r / rs); } };
       disk.rotation.z = 0; g.rotation.z = h.tilt;
       k.on(() => {
         g.getWorldQuaternion(halo.quaternion).invert().multiply(camera.quaternion);
         const lp = disk.worldToLocal(camera.position.clone()).normalize(); du.uCam.value.copy(lp);
+        vx.u.uAlpha.value = (o.streaks ?? .9) * Math.min(1, du.uAlpha.value); vx.u.uSpin.value = du.uSpin.value * .8;
       });
       return h;
     };
@@ -456,18 +493,50 @@ export function createNova(host, labelsEl, hudCanvas) {
       k.add(m, o.parent || scene); return { mesh: m, u };
     };
     // Procedural generators.
-    k.cloud = (o = {}) => {
+    k.cloud = (o = {}) => { let h;
       const blobs = o.blobs || [[0, 0, 0, 1]]; const cols = o.colors || [P.purple, P.cyan, P.pink, P.blue]; const r0 = o.r ?? 3;
       const R0 = rng(o.seed || 5); const fil = []; const norm = Math.min(1, 8000 / (o.n ?? 9000));
       for (let f = 0; f < (o.filaments ?? 5); f++) fil.push([R0() * TAU, R0() * TAU, R0() * 3]);
-      return k.make(o.n ?? 9000, (i, R) => {
+      h = k.make(o.n ?? 9000, (i, R) => {
         const b = blobs[i % blobs.length]; const big = R() < (o.big ?? .08);
         let x = gauss(R) * r0 * b[3] * .55, y = gauss(R) * r0 * b[3] * .38 * (o.flat ?? 1), z = gauss(R) * r0 * b[3] * .55;
         if (R() < .45) { const F = fil[i % fil.length]; const s = (R() - .5) * 2 * r0 * b[3]; x = Math.cos(F[0]) * s + gauss(R) * .12 * r0; y = Math.sin(F[1]) * s * .4 * (o.flat ?? 1) + Math.sin(s * 1.3 + F[2]) * .3 + gauss(R) * .1 * r0; z = Math.sin(F[0]) * s + gauss(R) * .12 * r0; }
         const c = cols[(i * 7 + Math.floor(Math.abs(y + x) * 2)) % cols.length];
         const core = .3 + .7 * ease(Math.hypot(x, y, z) / (r0 * b[3] * .5));
-        return [x + b[0], y + b[1], z + b[2], c, big ? r0 * (.35 + R() * .45) : r0 * (.012 + R() * .03), (big ? .03 * (o.haze ?? 1) : (.16 + R() * .34) * (o.bright ?? 1)) * core * norm];
+        return [x + b[0], y + b[1], z + b[2], c, big ? r0 * (.35 + R() * .45) : r0 * (.012 + R() * .03), (big ? .03 * (o.haze ?? 1) : (.12 + R() * .26) * (o.bright ?? 1)) * core * norm];
       }, { seed: o.seed || 5, u: { uTurb: o.turb ?? .03, uSpin: o.spin ?? 0, uSpinPow: .2, uTwinkle: .15 }, defines: o.infall ? { INFALL: 1 } : {}, blend: o.blend, parent: o.parent, soft: o.soft ?? 4.2 });
+      if (!o.infall && o.gas !== 0) {
+        const gas = k.gas({ n: o.gas ?? Math.round((o.n ?? 9000) / 45), r: r0, blobs, colors: o.blend === 'dark' ? [0x040309] : cols, flat: o.flat, seed: o.seed, blend: o.blend, parent: o.parent, bright: o.blend === 'dark' ? 6 : (o.bright ?? 1) * .9 });
+        const set = h.u.uAlpha, tint = h.tint;
+        h.gas = gas; h.tint = (hex, t) => { tint(hex, t); gas.tint(hex, t); };
+        k.on(() => { gas.u.uAlpha.value = set.value; gas.u.uExpand.value = h.u.uExpand.value; gas.obj.position.copy(h.obj.position); gas.obj.scale.copy(h.obj.scale); gas.u.uFlat.value = h.u.uFlat.value; });
+      }
+      return h;
+    };
+    // Volumetric gas: big soft noise-textured puffs.
+    k.gas = (o = {}) => {
+      const blobs = o.blobs || [[0, 0, 0, 1]]; const cols = o.colors || [P.purple, P.blue, P.pink]; const r0 = o.r ?? 3;
+      return k.make(o.n ?? 260, (i, R) => { const b = blobs[i % blobs.length];
+        return [b[0] + gauss(R) * r0 * b[3] * .5, b[1] + gauss(R) * r0 * b[3] * .32 * (o.flat ?? 1), b[2] + gauss(R) * r0 * b[3] * .5, cols[i % cols.length], r0 * (o.size ?? 1) * (.5 + R() * .9), (o.bright ?? 1) * (.035 + R() * .045)]; },
+        { seed: (o.seed || 5) + 400, defines: { GAS: 1 }, blend: o.blend, parent: o.parent, u: { uTurb: .02, uSpin: o.spin ?? 0, uSpinPow: .2 } });
+    };
+    // Swirling streaks (accretion vortex / disk filaments).
+    k.vortex = (o = {}) => {
+      const rin = o.rin ?? 1.2, rout = o.rout ?? 5, N = o.n ?? 900, seg = 14; const R = rng(o.seed || 8);
+      const pos = [], aB = [], aR = [];
+      for (let i = 0; i < N; i++) {
+        const r = rin + Math.pow(R(), o.conc ?? 1.4) * (rout - rin), a0 = R() * TAU, len = (.25 + R() * .9) * (1.2 - (r - rin) / (rout - rin) * .5), y = gauss(R) * (o.thick ?? .04) * r;
+        const br = (o.bright ?? 1) * (.35 + R() * .65) * (1 - (r - rin) / (rout - rin) * .6);
+        for (let j = 0; j < seg; j++) for (const jj of [j, j + 1]) {
+          const t = jj / seg, a = a0 + t * len, rr = r * (1 - t * (o.spiral ?? .06));
+          pos.push(Math.cos(a) * rr, y, Math.sin(a) * rr); aB.push(br * Math.sin(t * Math.PI)); aR.push(r);
+        }
+      }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aB', new THREE.Float32BufferAttribute(aB, 1)); geo.setAttribute('aR', new THREE.Float32BufferAttribute(aR, 1));
+      const u = { uTime: G.uTime, uSpin: { value: o.spin ?? 1 }, uWarp: { value: o.warp ?? 0 }, uInfall: { value: 0 }, uAlpha: { value: o.op ?? 1 },
+        uA: { value: new THREE.Vector3(...rgb(o.a ?? 0xfff2e0)) }, uB: { value: new THREE.Vector3(...rgb(o.b ?? 0xff8a3c)) } };
+      const mesh = new THREE.LineSegments(geo, new THREE.ShaderMaterial({ uniforms: u, vertexShader: STREAK_V, fragmentShader: STREAK_F, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      mesh.frustumCulled = false; k.add(mesh, o.parent || scene); return { mesh, u };
     };
     k.disk = (o = {}) => {
       const rin = o.rin ?? .5, rout = o.rout ?? 5; const gaps = o.gaps || [];
