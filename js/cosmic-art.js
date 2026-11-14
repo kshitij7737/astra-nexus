@@ -541,18 +541,85 @@ function lensing(group, beat, state, lite) {
   }
 }
 
+function nova(group, beat, state, lite) {
+  const rng=random(80+beat), count=lite?550:1400;
+  const warm=['#7957e3','#6bdad8','#f8b37f'], palettes={
+    5:['#24183f','#473756','#735575'],6:['#8f48ad','#ff996e','#ffddb6'],
+    7:['#325dd7','#6fa5ff','#b2e8ff'],8:['#902e5a','#fe7655','#ffc875'],
+    9:['#b65366','#59cabc','#d79e79'],10:['#8f4635','#e7894e','#ffc477'],
+    11:['#2c746a','#4ac4aa','#b0f4a7'],16:['#304b83','#509bdf','#b3dafa'],
+  };
+  const palette=palettes[beat]||warm;
+  const points=[];
+  const gaussian=()=>(rng()+rng()+rng()-1.5);
+  for(let i=0;i<count;i++){
+    let x=gaussian()*5.8,y=gaussian()*3.6,z=gaussian()*3.2;
+    const a=rng()*TAU, r=.25+rng()*2.8;
+    if(beat===1){x=gaussian()*1.7+(i<count*.93?-1.65:1.65);y=gaussian()*1.5;z=gaussian()*1.5;}
+    if(beat===2){x=(rng()-.5)*6;y=gaussian()*.075;z=gaussian()*.075;}
+    if(beat===3){x=(i%3-1)*2+Math.cos(a)*r*.32;y=Math.sin(a)*r*.42;z=gaussian()*.33;}
+    if(beat===12){x=(i%3-1)*1.9+gaussian()*.65;y=(rng()-.5)*(2.2+i%3*.35);z=gaussian()*.65;}
+    if(beat===13){x=(rng()-.5)*6;y=Math.sin(x*1.8+i%3)*.55+gaussian()*.25;z=(i%3-1)*.67+gaussian()*.45;}
+    if([14,22,23].includes(beat)){x=Math.cos(a)*r;y=Math.sin(a)*r*.73;z=gaussian()*.55;}
+    if(beat>=17&&beat<=21){x=r*Math.cos(a);z=r*Math.sin(a);y=gaussian()*(beat>=19?.35:1.6);}
+    points.push([x,y,z,palette[i%3],.2+rng()*.8]);
+  }
+  const field=pointField(points,beat===4?4:3.5);
+  let filter=-1;
+  group.add(field);
+  if(beat===1){
+    for(const x of [-1.65,1.65]){
+      const cube=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(1.8,1.8,1.8)),new T.LineBasicMaterial({color:'#8899bc',transparent:true,opacity:.45}));
+      cube.position.x=x;group.add(cube);
+    }
+  }
+  const core=new T.Group();
+  if(beat===2)core.add(star(.13,'#d8efff'));
+  if(beat===3)for(const x of [-2,0,2]){const atom=star(.16,x===0?'#e7bdff':'#b8e9ff');atom.position.x=x;core.add(atom);}
+  if(beat===4)core.add(rock(.7,'#ac7967',39));
+  if([6,7,8,14,17,18,19,20,21,23].includes(beat))core.add(star(beat===14?.18:.43,beat===8?'#c7e6ff':'#ffce8f'));
+  if(beat>=19&&beat<=21) core.add(disk(.52,2.9,'#ffce8f','#7764db',.82));
+  if(beat===20)jets(core,2.8);
+  if(beat===15)core.add(arrows());
+  if(beat===22)for(const [x,y,z] of [[-.55,.36,0],[.5,-.2,-.3],[.2,.64,-.4]]){const sun=star(.21,'#d3e8ff');sun.position.set(x,y,z);core.add(sun);}
+  group.add(core);
+  return time=>{
+    const dial=state.novaDial.value, t=state.novaDial.still?0:time;
+    field.rotation.y=t*(.06+([18,19,23].includes(beat)?dial*.6:0))+dial*.25;
+    if(beat===23)field.rotation.z=dial*TAU;
+    field.scale.setScalar([15,16,17,18].includes(beat)?1.15-dial*.64:.87+dial*.27);
+    if(beat===13)field.scale.x=.8+dial*.65;
+    if(beat===4)field.geometry.setDrawRange(0,Math.round(count*(.12+dial*.88)));
+    const selectedFilter=Math.min(2,Math.floor(dial*3));
+    if(beat===9&&filter!==selectedFilter){
+      filter=selectedFilter;
+      const color=new T.Color(palette[filter]);
+      const attribute=field.geometry.getAttribute('color');
+      for(let i=0;i<attribute.count;i++)attribute.setXYZ(i,color.r,color.g,color.b);
+      attribute.needsUpdate=true;
+    }
+    if(beat===0)field.material.uniforms.size.value=2.2+dial*3;
+    field.visible=beat!==5||dial>.08;
+    core.scale.setScalar(beat===21?.25+dial*.9:.78+dial*.42);
+    core.visible=(beat!==21||dial>.27)&&(beat!==6||dial>.4);
+    if(beat===2)core.position.x=-3+6*dial;
+    if(beat===3)group.scale.setScalar(.65+dial*.65);
+    if(beat===10||beat===11)field.rotation.x=dial*.46;
+  };
+}
+
 function universe(group, beat, state, lite, texture) {
   if(beat===0){
-    const earth=sphere(1.58,'#467faa',{map:texture('earth-day.jpg'),bumpMap:texture('earth-bump.jpg'),bumpScale:.022});
+    const earth=sphere(1.58,'#467faa',{map:texture(lite?'sm/earth-day.jpg':'earth-day.jpg'),bumpMap:texture(lite?'sm/earth-bump.jpg':'earth-bump.jpg'),bumpScale:.022,emissive:'#ffc47e',emissiveMap:texture(lite?'sm/earth-night.jpg':'earth-night.jpg'),emissiveIntensity:.28});
     earth.material.color.set('#ffffff');earth.rotation.set(.12,-1.1,.09);
-    const clouds=sphere(1.60,'#ffffff',{alphaMap:texture('earth-clouds.jpg'),transparent:true,opacity:.53,depthWrite:false});
+    const clouds=sphere(1.60,'#ffffff',{alphaMap:texture(lite?'sm/earth-clouds.jpg':'earth-clouds.jpg'),transparent:true,opacity:.53,depthWrite:false});
     clouds.rotation.copy(earth.rotation);
     const limb=new T.Mesh(new T.SphereGeometry(1.64,48,28),new T.ShaderMaterial({
       transparent:true,depthWrite:false,blending:T.AdditiveBlending,
       vertexShader:`varying vec3 n,v;void main(){vec4 p=modelViewMatrix*vec4(position,1.);n=normalMatrix*normal;v=-p.xyz;gl_Position=projectionMatrix*p;}`,
       fragmentShader:`varying vec3 n,v;void main(){float f=pow(1.-max(0.,dot(normalize(n),normalize(v))),4.);gl_FragColor=vec4(.22,.61,1.,f*.62);}`,
     }));
-    const moon=sphere(.43,'#eeeeee',{map:texture('moon.jpg'),bumpMap:texture('moon-bump.jpg'),bumpScale:.024});moon.position.set(3.65,.28,-.32);
+    const moon=sphere(.43,'#eeeeee',{map:texture(lite?'sm/moon.jpg':'moon.jpg'),bumpMap:texture(lite?'sm/moon-bump.jpg':'moon-bump.jpg'),bumpScale:.024});moon.position.set(3.65,.28,-.32);
     earth.position.x=clouds.position.x=limb.position.x=-.65;
     group.add(earth,clouds,limb,moon);
     if(state.scale) group.add(line([V(-.65,-1.75,0),V(3.65,-1.75,0)],'#a7e8dc',.68));
@@ -560,6 +627,7 @@ function universe(group, beat, state, lite, texture) {
   }
   if(beat===1){
     group.add(star(.69,'#ffd584'));
+    const pulse=glow('#ffd0a6',.2,.8);group.add(pulse);
     const maps=['planets/mercury.jpg','planets/venus.jpg','sm/earth-day.jpg','sm/mars.jpg',
       'planets/jupiter.jpg','planets/saturn.jpg','planets/uranus.jpg','planets/neptune.jpg'];
     const bodies=maps.map((map,i)=>{
@@ -568,10 +636,14 @@ function universe(group, beat, state, lite, texture) {
       if(i===5) body.add(disk(radius*1.2,radius*1.9,'#e7d6b7','#bd9c82',.74));
       group.add(body,ring(track,'#7d9bb9',.28));return [body,track];
     });
-    return t=>bodies.forEach(([body,r],i)=>{const a=i*.82+t*.11/(i+1);body.position.set(r*Math.cos(a),0,r*Math.sin(a));});
+    return t=>{
+      bodies.forEach(([body,r],i)=>{const a=i*.82+t*.11/(i+1);body.position.set(r*Math.cos(a),0,r*Math.sin(a));});
+      pulse.visible=state.scale&&!state.still;
+      pulse.position.copy(bodies[2][0].position).multiplyScalar((t%4)/4);
+    };
   }
   if(beat===2){
-    for(const [x,y,z,c,r] of [[-2,0,0,'#ffd785',.34],[1.6,.12,0,'#ff8d71',.17],[2.3,1.4,-2,'#e7c693',.29],[2,-1,-1.2,'#fff1cf',.24],[-3,1.65,-4,'#b6d5ff',.35]]){
+    for(const [x,y,z,c,r] of [[-2,0,0,'#ffd785',.34],[1.6,.12,0,'#ff8d71',.17],[2.3,1.4,-2,'#e7c693',.29],[2,-1,-1.2,'#fff1cf',.24],[-3,1.65,-4,'#b6d5ff',.35],[2.52,1.46,-2.16,'#ffb58b',.19]]){
       const s=star(r,c);s.position.set(x,y,z);group.add(s);
     }
     if(state.scale) group.add(line([V(-2,-.8,0),V(1.6,-.8,0)],'#84dce5',.8));
@@ -584,6 +656,9 @@ function universe(group, beat, state, lite, texture) {
       milky.position.set(-2.6,0,.5);
       const m31=galaxy(3,.61,'#a6b9ff',lite);m31.position.set(2.9,.5,-.6);m31.rotation.set(.37,.7,-.43);group.add(m31);
       const m33=galaxy(7,.2,'#b4d9f5',true);m33.position.set(1.9,-1.4,1.6);group.add(m33);
+      for(const [x,y,z] of [[-2.2,1.1,-.7],[-3.4,-.65,1.5],[2.3,1.4,-1.6],[3.8,-.7,.45]]){
+        const dwarf=glow('#9fb7fa',.38,.46);dwarf.position.set(x,y,z);group.add(dwarf);
+      }
     }
   }else{
     const rng=random(50), points=[], nodes=[];
@@ -597,13 +672,13 @@ function universe(group, beat, state, lite, texture) {
       }
     }
     group.add(pointField(points,2.3));
-    const horizon=sphere(5.6,'#88e3d1',{wireframe:true,transparent:true,opacity:.09,depthWrite:false});
+    const horizon=glow('#5089aa',6.8,.16);horizon.position.z=-4;
     group.add(horizon);
     const here=glow('#ffad85',.42,.95);group.add(here);
   }
 }
 
-export function cameraPreset(id, beat, state, narrow) {
+export function cameraPreset(id, beat, state, narrow, time=0) {
   const x=narrow?0:2.6;
   let eye=V(3.4,3.2,12.5), target=V(-x,0,0);
   if(id==='nebula') eye=V(1.1,1.1,[15.2,10.1,12.5,10.2,8.1,14][beat]);
@@ -611,7 +686,10 @@ export function cameraPreset(id, beat, state, narrow) {
   if(id==='planets') eye=beat===2?V(2.1,1.6,7):V(4.1,6.6,12.8);
   if(id==='black-holes') eye=V(1.4,beat===4?2.3:4.1,beat===2?8.3:11.7);
   if(id==='lensing') eye=V(0,state.observer?.08:2.1,state.observer?6.7:13.5);
-  if(id==='universe') eye=V(2.1,[1.2,6.3,2.1,6,4.7,4.3][beat],[8.7,13.2,11,11.9,13.3,14.2][beat]);
+  if(id==='universe'){
+    eye=V(2.1,[1.2,6.3,2.1,6,4.7,4.3][beat],[8.7,13.2,11,11.9,13.3,14.2][beat]);
+    eye.applyAxisAngle(V(0,1,0),Math.sin(time*.16)*.11);
+  }
   if(id==='nebula'&&state.feature==='dust')target.x-=.48;
   if(id==='nebula'&&state.feature==='cavity')target.y+=.38;
   if(id==='planets'&&state.feature==='star')eye.multiplyScalar(.84);
@@ -650,7 +728,7 @@ export function createRenderer(host, lite, context, invalidate) {
   const size=new T.Vector2();
   scene.add(model);
   function setChapter(chapter, beat, state) {
-    scene.background=new T.Color('#040710').lerp(new T.Color(chapter.bg),.13);
+    scene.background=chapter.id==='universe'?new T.Color('#0a1726'):new T.Color('#040710').lerp(new T.Color(chapter.bg),.13);
     scene.remove(model);
     const disposed=new Set();
     model.traverse(o=>{
@@ -663,6 +741,7 @@ export function createRenderer(host, lite, context, invalidate) {
     else if(chapter.id==='planets') motion=planets(model,beat,state,lite);
     else if(chapter.id==='black-holes') motion=blackHole(model,beat,state);
     else if(chapter.id==='lensing') motion=lensing(model,beat,state,lite);
+    else if(chapter.id==='nova') motion=nova(model,beat,state,lite);
     else motion=universe(model,beat,state,lite,texture);
     moved=false;
   }

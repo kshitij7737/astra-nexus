@@ -1,9 +1,12 @@
+import { objectives, readObjectives, completeObjective } from './cosmic-progress.js';
 import { chapters, initialSettings, lensNames, lensState } from './cosmic-data.js?v=4';
 import { drawDiagram } from './cosmic-diagram.js?v=4';
-import { collisions, features, scales, sceneHotspots, sceneIds, summaries } from './cosmic-revision.js?v=5';
+import { collisions, features, scales, sceneHotspots, sceneIds, summaries } from './cosmic-revision.js?v=6';
 import { assetPath, assets, evidenceByScene } from './cosmic-evidence.js?v=5';
 import { imagePath, observationFor, observations } from './cosmic-gallery.js?v=3';
 
+let explorerAudio;
+let soundOn=false;
 const $ = id => document.getElementById(id);
 const viewport = $('viewport'), canvas = $('diagram');
 const prefersStill = matchMedia('(prefers-reduced-motion: reduce)');
@@ -19,6 +22,7 @@ let displayPreference = 'auto', activeDisplay = 'model', loadedObservation = nul
 let sceneBuild = 0, sceneAnimation, lastDraw = 0, viewerVisible = true, fadingObservation;
 let modelDirty = true, modelReady = false;
 const stage = document.querySelector('.cx-stage');
+const notes=$('universe-notes'), consolePanel=$('chapter-console'), evidencePanel=$('evidence');
 const handoff = $('scene-handoff');
 const clips = {
   nebula: [{file:'nebula', title:'Nebula evolution', time:'0:34'}],
@@ -58,7 +62,7 @@ function captureModel() {
 }
 function revealModel() {
   sceneAnimation = handoff.animate([{opacity:1}, {opacity:0}], {
-    duration:360, easing:'cubic-bezier(.2,.65,.3,1)',
+    duration:chapter.id==='universe'?980:360, easing:'cubic-bezier(.2,.65,.3,1)',
   });
   sceneAnimation.onfinish = clearHandoff;
 }
@@ -67,7 +71,7 @@ const missingImages = new Set();
 function syncDisplay() {
   const id = observationFor(chapter.id,beat,state);
   const available = id && !missingImages.has(id);
-  const show = available && (displayPreference==='telescope' || displayPreference==='auto' && !visual);
+  const show = available && (displayPreference==='telescope' || displayPreference==='auto' && !visual && chapter.id!=='universe');
   activeDisplay = show ? 'telescope' : 'model';
   $('observation').hidden = !show || !loadedObservation;
   if (!show) {
@@ -85,6 +89,7 @@ function syncDisplay() {
   $('show-model').parentElement.hidden=!available;
   $('show-model').textContent = visual ? '3D model' : 'Diagram';
   $('render-mode').hidden = show;
+  $('explorer-photo').hidden=show;
   $('render-mode').textContent = visual ? 'Illustrative 3D model' : 'Interactive diagram';
   $('free').hidden = show || !visual;
   $('motion').hidden = show;
@@ -279,10 +284,36 @@ const hubCards=chapters.map((item,i)=>{
   const a=link('',route(item.id));
   const arrow=el('span','→','cx-hub-arrow');
   arrow.setAttribute('aria-hidden','true');
-  a.append(el('span',String(i+1).padStart(2,'0'),'cx-eyebrow'),el('strong',item.title),el('span',item.intro,'cx-hub-intro'),arrow);
+  const intro=el('span',item.intro,'cx-hub-intro');
+  intro.append(el('span',null,'cx-objective-count'));
+  a.append(el('span',String(i+1).padStart(2,'0'),'cx-eyebrow'),el('strong',item.title),intro,arrow);
   return a;
 });
 $('hub-grid').append(...hubCards);
+$('continue-chapter').after(link('Play Nova’s Nebula Quest →','nova.html'));
+function renderObjectives() {
+  const progress=readObjectives();
+  const total=chapters.filter(c=>progress[c.id]?.length===objectives[c.id].length).length;
+  $('explorer-progress').textContent=total+' of '+chapters.length+' chapters complete';
+  chapters.forEach((c,i)=>{
+    hubCards[i].querySelector('.cx-objective-count').textContent=(progress[c.id]?.length||0)+' / '+objectives[c.id].length+' objectives';
+  });
+  $('chapter-objectives').textContent=objectives[chapter.id].map((name,i)=>
+    (progress[chapter.id]?.includes(i)?'✓ ':'○ ')+name).join('   ·   ');
+}
+function trackObjectives() {
+  const id=chapter.id;
+  const pairs={
+    nebula:[beat===4,state.infrared],
+    stars:[beat===5&&state.branch==='massive',beat===3&&state.cutaway],
+    planets:[beat===2&&state.collision==='stick',state.thermal],
+    'black-holes':[state.mass==='supermassive',beat===4&&state.trace],
+    lensing:[state.challenge&&state.alignment===0,state.lensLesson==='delay'&&state.pulse],
+    universe:[beat===5,state.compare],
+  };
+  pairs[id].forEach((done,i)=>{if(done)completeObjective(id,i);});
+  renderObjectives();
+}
 const menu = chapters.map((item,i)=>{
   const a=el('a');
   a.href='#'+item.id;
@@ -557,6 +588,7 @@ function showReading(){
   $('feature-marker').textContent=selected?.[1]||'';
   $('feature-marker').hidden=activeDisplay==='telescope'||!selected;
   $('reading').textContent=text;
+  trackObjectives();
   $('scale').hidden=activeDisplay==='telescope'||chapter.id!=='universe'||!state.scale;
   $('scale').textContent=chapter.id==='universe'?scales[beat][0]+' · '+scales[beat][1]:'';
 }
@@ -582,10 +614,12 @@ function renderLensLesson(l){
   const pulse=button('Pulse source',()=>{
     clearTimeout(pulseTimer);
     if(still){
+      completeObjective(chapter.id,1);renderObjectives();
       panel.lastElementChild.textContent='Illustrative sequence: Image A first, then Image B.';
       return;
     }
     state.pulse=true;
+    trackObjectives();
     state.observer=true;
     frozen=false;
     syncControls();rebuild();
@@ -627,6 +661,7 @@ function renderRelated() {
   const root=$('chapter-related'), summary=$('chapter-summary');
   root.replaceChildren();
   const id=chapter.id;
+  if(id==='nebula')root.append(link('Play Nova’s Nebula Quest →','nova.html'));
   if(id==='stars'&&beat===2)root.append(link('Explore how planets form →',route('planets',0)));
   if(id==='stars'&&beat===0)root.append(link('Recap the stellar nursery →',route('nebula',3)));
   if(id==='stars'&&beat>=4)root.append(link('Part 04 · Black-hole structure and evidence →',route('black-holes',0)));
@@ -668,6 +703,11 @@ function go(index, fromTour=false, keepFeature=false, transition=true){
     }
   }
   $('timeline').value=beat;
+  if(chapter.id==='universe'){
+    $('universe-scrub').value=beat;
+    $('universe-scrub').setAttribute('aria-valuetext',scales[beat][0]+' · '+scales[beat][1]);
+    $('universe-distance').textContent=scales[beat][1];
+  }
   $('timeline').setAttribute('aria-valuetext',chapter.beats[beat][0]);
   $('timeline-value').textContent=(beat+1)+' of '+chapter.beats.length;
   $('stage-previous').disabled=$('previous').disabled=beat===0;
@@ -682,9 +722,20 @@ function go(index, fromTour=false, keepFeature=false, transition=true){
   renderEvidence();
   rebuild(transition);
   lastScene=route(chapter.id,beat);
+  if(transition)sceneTone(280+beat*45);
 }
 function openChapter(item, start=0){
   chapter=item;
+  viewport.classList.toggle('cx-lens-drag',item.id==='lensing');
+  const universe=item.id==='universe';
+  document.body.classList.toggle('cx-universe',universe);
+  for(const id of ['universe-ruler','universe-distance','universe-details','universe-earth'])$(id).hidden=!universe;
+  if(universe){
+    $('universe-notes-content').append(consolePanel,evidencePanel);
+    $('science').closest('details').open=true;
+  }else{
+    $('chapter-view').querySelector('footer').before(consolePanel,evidencePanel);
+  }
   displayPreference='auto';
   clearTimeout(pulseTimer);
   state={...initialSettings,branch:branches.get(item.id)||initialSettings.branch};
@@ -729,6 +780,7 @@ function openChapter(item, start=0){
 }
 function navigate(){
   if(videoDialog.open) videoDialog.close();
+  if(notes.open)notes.close();
   const destination=currentRoute();
   const returning=progress.has(chapter.id)&&hubOpen&&!destination.hub&&destination.item===chapter&&destination.index===beat;
   hubOpen=destination.hub;
@@ -736,6 +788,7 @@ function navigate(){
   $('chapter-view').hidden=hubOpen;
   if(hubOpen){
     clearHandoff();
+    renderObjectives();
     setGuided(false);frozen=true;
     $('continue-chapter').href=lastScene;
     $('continue-chapter').textContent=progress.size?'Continue exploring →':'Start exploring →';
@@ -757,7 +810,7 @@ function navigate(){
 }
 function loop(now){
   frameId=requestAnimationFrame(loop);
-  if(document.hidden||hubOpen||videoDialog.open||$('help-dialog').open){previous=0;return;}
+  if(document.hidden||hubOpen||videoDialog.open||notes.open||$('help-dialog').open){previous=0;return;}
   if(guided&&now>=deadline){
     if(beat<chapter.beats.length-1)go(beat+1,true);
     else {setGuided(false);frozen=true;}
@@ -780,7 +833,7 @@ function renderModel(now) {
   if(!still&&!frozen)clock+=dt;
   const width=viewport.clientWidth,height=viewport.clientHeight;
   if(!width||!height)return;
-  const view=art.cameraPreset(chapter.id,beat,state,width<760);
+  const view=art.cameraPreset(chapter.id,beat,state,width<760,clock);
   if(free){
     const eye=view.eye;
     const r=eye.length()*zoom;
@@ -821,7 +874,7 @@ async function startRenderer(){
   try{
     context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
     if(!context)throw Error('WebGL unavailable');
-    art=await import('./cosmic-art.js?v=8');
+    art=await import('./cosmic-art.js?v=9');
     if(generation!==renderGeneration){context.getExtension('WEBGL_lose_context')?.loseContext();return;}
     const quality=$('quality').value;
     visual=art.createRenderer(viewport,quality==='lite'||quality==='auto'&&autoLite,context,()=>{viewChanged=true;});
@@ -881,7 +934,7 @@ $('replay').onclick=()=>{
   setGuided(false);clearTimeout(pulseTimer);state.pulse=false;frozen=false;rebuild();showReading();
 };
 $('help').onclick=()=>{setGuided(false);$('help-dialog').showModal();};
-for(const dialog of [$('help-dialog'),videoDialog]){
+for(const dialog of [$('help-dialog'),videoDialog,notes]){
   dialog.addEventListener('click',event=>{
     if(event.target!==dialog)return;
     const bounds=dialog.getBoundingClientRect();
@@ -894,12 +947,18 @@ for(const [id,delta] of [['zoom-in',-.1],['zoom-out',.1]]){
   $(id).onclick=()=>{zoom=clampZoom(zoom+delta);viewChanged=true;};
 }
 viewport.onpointerdown=e=>{
-  if(!free||e.button!==0)return;
-  pointer={id:e.pointerId,x:e.clientX,y:e.clientY};
+  const lensDrag=chapter.id==='lensing'&&!free;
+  if((!free&&!lensDrag)||e.button!==0)return;
+  pointer={id:e.pointerId,x:e.clientX,y:e.clientY,lensDrag,start:state.alignment};
   viewport.setPointerCapture(e.pointerId);
 };
 viewport.onpointermove=e=>{
   if(pointer?.id!==e.pointerId)return;
+  if(pointer.lensDrag){
+    const offset=pointer.start+Math.round((e.clientY-pointer.y)/2);
+    update('alignment',Math.max(0,Math.min(100,offset)));
+    return;
+  }
   yaw-=(e.clientX-pointer.x)*.008; pitch+=(e.clientY-pointer.y)*.008;
   pointer.x=e.clientX;pointer.y=e.clientY;viewChanged=true;
 };
@@ -938,3 +997,65 @@ window.addEventListener('pageshow',event=>{if(event.persisted){previous=0;frameI
 navigate();
 pressed($('motion'),still);pressed($('help-motion'),still);
 frameId=requestAnimationFrame(loop);
+
+$('universe-scrub').oninput=e=>go(+e.target.value);
+$('universe-details').onclick=()=>{setGuided(false);notes.showModal();};
+$('universe-earth').onclick=()=>go(0);
+window.addEventListener('pageshow',renderObjectives);
+document.addEventListener('keydown',event=>{
+  if(hubOpen||free||notes.open||videoDialog.open||$('help-dialog').open||event.target.closest('input,select,button,a,summary'))return;
+  if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();go(beat+(event.key==='ArrowRight'?1:-1));}
+});
+
+function sceneTone(frequency){
+  if(!soundOn||!explorerAudio||explorerAudio.state!=='running')return;
+  const t=explorerAudio.currentTime;
+  const oscillator=explorerAudio.createOscillator(),gain=explorerAudio.createGain();
+  oscillator.type='sine';
+  oscillator.frequency.setValueAtTime(frequency,t);
+  oscillator.frequency.exponentialRampToValueAtTime(frequency*.78,t+.2);
+  gain.gain.setValueAtTime(0,t);
+  gain.gain.linearRampToValueAtTime(.035,t+.035);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+.36);
+  oscillator.connect(gain).connect(explorerAudio.destination);
+  oscillator.start(t);oscillator.stop(t+.36);
+}
+$('explorer-sound').onclick=async()=>{
+  if(!soundOn){
+    try{
+      explorerAudio ||= new (window.AudioContext||window.webkitAudioContext)();
+      await explorerAudio.resume();
+    }catch{return;}
+  }
+  soundOn=!soundOn;
+  pressed($('explorer-sound'),soundOn);
+  $('explorer-sound').textContent=soundOn?'Sound on':'Sound off';
+  sceneTone(420);
+};
+$('explorer-photo').onclick=()=>{
+  if(!modelReady||activeDisplay!=='model')return;
+  const source=visual?.renderer.domElement||canvas;
+  if(!source.width||!source.height)return;
+  const photo=document.createElement('canvas');
+  photo.width=source.width;photo.height=source.height;
+  const ctx=photo.getContext('2d');
+  try{
+    if(visual)visual.capture(ctx);
+    else ctx.drawImage(canvas,0,0);
+  }catch{return;}
+  const size=Math.max(12,Math.round(photo.width*.018));
+  const band=size*4.5;
+  ctx.fillStyle='#070d19eb';ctx.fillRect(0,photo.height-band,photo.width,band);
+  ctx.fillStyle='#f3f5ff';ctx.font='600 '+size+'px system-ui';
+  ctx.fillText(chapter.beats[beat][0],size,photo.height-size*2.6,photo.width-size*2);
+  ctx.font=Math.max(10,Math.round(size*.76))+'px system-ui';
+  ctx.fillText('ASTRA NEXUS · Illustrative model · Asset credits: sources.html',size,photo.height-size,photo.width-size*2);
+  photo.toBlob(blob=>{
+    if(!blob)return;
+    const url=URL.createObjectURL(blob);
+    const save=link('',url);
+    save.download=chapter.id+'-'+sceneIds[chapter.id][beat]+'.png';
+    save.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+  });
+};

@@ -8,6 +8,7 @@
 <title>Cosmic Explorer · ASTRA NEXUS</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/cosmic.css?v=8">
+<link rel="stylesheet" href="css/cosmic-journey.css">
 <link rel="stylesheet" href="css/navigation.css?v=2">
 </head>
 <body>
@@ -20,6 +21,7 @@
   <section id="chapter-hub" class="cx-hub" hidden aria-labelledby="hub-title">
     <div><h1 id="hub-title">Cosmic Explorer</h1><p>Six guided journeys through the life of stars, the formation of planets and the scale of the universe.</p></div>
     <a class="cx-cta" id="continue-chapter" href="#nebula">Start exploring →</a>
+    <p id="explorer-progress" class="cx-hub-status"></p>
     <div class="cx-hub-grid" id="hub-grid"></div>
   </section>
   <div id="chapter-view">
@@ -41,6 +43,7 @@
       <p id="chapter-intro">Explore clouds of gas and dust and find where a star begins.</p>
       <div class="cx-current" id="stage-beat"></div>
       <p class="cx-duration" id="duration"></p>
+      <p class="cx-scale" id="universe-distance" hidden></p>
       <p class="cx-duration" id="stage-status" role="status"></p>
     </div>
     <div class="cx-modes" role="group" aria-label="Scene display">
@@ -50,6 +53,7 @@
     <div class="cx-scene-tag" id="render-mode">Interactive diagram</div>
     <div class="cx-model-labels" id="model-labels" hidden></div>
     <div class="cx-scale" id="scale" hidden></div>
+    <label class="cx-universe-ruler" id="universe-ruler" hidden><input id="universe-scrub" type="range" min="0" max="5" step="1" value="0" aria-label="Cosmic distance scale"></label>
     <div class="cx-model-labels cx-hotspot" id="feature-marker" hidden></div>
     <div id="scene-hotspots" class="cx-scene-hotspots" aria-label="Scene feature markers" hidden></div>
     <div class="cx-viewbar">
@@ -63,13 +67,17 @@
         <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
         <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
       </div>
+      <button id="explorer-sound" type="button" aria-pressed="false">Sound off</button>
+      <button id="explorer-photo" type="button">Save model image</button>
       <button id="labels" type="button" aria-pressed="false">Labels</button>
       <button id="motion" type="button" aria-pressed="false">Still mode</button>
       <button id="reset" type="button">Reset view</button>
       <button id="replay" type="button">Replay scene</button>
+      <button id="universe-details" type="button" aria-haspopup="dialog" hidden>Science &amp; sources</button>
+      <button id="universe-earth" type="button" hidden>Return to Earth</button>
     </div>
   </section>
-  <div class="cx-console">
+  <div class="cx-console" id="chapter-console">
     <section class="cx-story" aria-labelledby="beat-title">
       <div class="cx-eyebrow" id="beat-number"></div>
       <h2 id="beat-title"></h2>
@@ -84,6 +92,7 @@
       <section id="chapter-films" class="cx-films" hidden aria-labelledby="film-heading">
         <h3 id="film-heading">Chapter films</h3><div id="film-list"></div>
       </section>
+      <p id="chapter-objectives" class="cx-hub-status"></p>
       <div id="chapter-related" class="cx-related"></div>
       <div id="chapter-summary" class="cx-summary" hidden></div>
     </section>
@@ -112,6 +121,10 @@
   <footer class="cx-footer"><span>Models use illustrative colors, times and distances.</span><a id="next-chapter" href="#stars">Next chapter →</a></footer>
   </div>
 </main>
+<dialog id="universe-notes" class="cx-dialog cx-universe-notes" aria-labelledby="universe-notes-title">
+  <div class="cx-dialog-head"><h2 id="universe-notes-title">Cosmic scales · field notes</h2><form method="dialog"><button class="cx-dialog-x" aria-label="Close science notes">×</button></form></div>
+  <div id="universe-notes-content"></div>
+</dialog>
 <dialog id="help-dialog" class="cx-dialog" aria-labelledby="help-title">
   <div class="cx-dialog-head">
     <h2 id="help-title">Explorer controls</h2>
@@ -134,6 +147,6 @@
   <div id="media-content"></div><p id="media-caption"></p><div id="media-links"></div>
 </dialog>
 <noscript><p class="cx-noscript">Enable JavaScript to explore the six interactive chapters. <a href="https://science.nasa.gov/universe/">Explore NASA’s universe guide</a>.</p></noscript>
-<script type="module" src="js/cosmic.js?v=9"></script>
+<script type="module" src="js/cosmic.js?v=10"></script>
 </body>
 </html>

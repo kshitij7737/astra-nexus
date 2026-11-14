@@ -38,7 +38,7 @@
 <script type="module">import { SOURCES } from './js/data.js';
 import { observations } from './js/cosmic-gallery.js?v=3';
 import { assets, evidenceByScene } from './js/cosmic-evidence.js?v=5';
-import { claims, scales } from './js/cosmic-revision.js?v=5';
+import { claims, scales } from './js/cosmic-revision.js?v=6';
 const e=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 document.getElementById('sx-list').innerHTML=Object.values(SOURCES).sort((a,b)=>a.title.localeCompare(b.title)).map(s=>`<li><a href="${e(s.url)}" target="_blank" rel="noopener">${e(s.title)}</a><small>${e(new URL(s.url).hostname)}</small></li>`).join('');
 document.getElementById('sx-observations').innerHTML=Object.values(observations).map(o=>`<li><a href="${e(o.link)}" target="_blank" rel="noopener">${e(o.title)}</a><small>${e(o.instrument)} · ${e(o.credit)}</small></li>`).join('');

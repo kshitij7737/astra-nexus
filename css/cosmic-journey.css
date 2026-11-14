@@ -1,0 +1,62 @@
+.nova{--accent:#c5aaff}
+.nova-main{max-width:1500px;margin:auto}
+.nova-stage{position:relative;isolation:isolate;min-height:clamp(430px,66svh,740px);overflow:hidden;background:#0a1227}
+#nova-viewport,#nova-viewport canvas,#nova-diagram{position:absolute;inset:0;width:100%;height:100%}
+.nova-stage::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,#080b15 1%,#080b15da 29%,transparent 70%)}
+.nova-caption,.nova-mode{position:absolute;z-index:1;left:clamp(1rem,5vw,5rem)}
+.nova-caption{top:clamp(2rem,9vh,6rem);max-width:min(39rem,47%)}
+.nova-caption h1{font-size:clamp(2.2rem,5.6vw,5.4rem)}
+.nova-caption p:last-child{line-height:1.6;max-width:45ch;color:#e0e6f6}
+.nova-mode{bottom:1rem;display:flex;align-items:center;gap:.7rem;color:#bcc9e5;font-size:.82rem}
+.nova-flight{max-width:930px;margin:auto;padding:1.3rem clamp(1rem,5vw,4rem) 2.5rem;display:grid;gap:.8rem}
+.nova-flight p{line-height:1.5}
+#nova-visual,#nova-stars{color:var(--muted);font-size:.92rem}
+#nova-move{margin-top:.35rem}
+#nova-dial-value{float:right;color:var(--accent)}
+.nova-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem 1rem;border-top:1px solid var(--line)}
+.nova-actions a{color:var(--accent);margin-left:auto}
+.nova-part{display:flex;align-items:center;gap:.5rem;max-width:100%}
+.nova-part select{min-width:0;max-width:min(58vw,22rem)}
+.cx-universe .cx-stage{min-height:calc(100svh - 115px);background:#0a1726}
+.cx-universe .cx-stage::after{background:linear-gradient(90deg,#0a1726ee,#0a172680 32%,transparent 69%),linear-gradient(0deg,#0a1726e0,transparent 22%)}
+.cx-universe .cx-caption{max-width:min(38rem,45%);top:clamp(2.8rem,8vh,6rem)}
+.cx-universe .cx-caption h1{font-size:clamp(1.4rem,2.8vw,3rem);letter-spacing:-.035em}
+.cx-universe .cx-current{margin-top:1rem}
+.cx-universe .cx-scale{position:static;margin-top:1.4rem;border:0;font:650 clamp(1.6rem,4vw,4.2rem)/1 Archivo,system-ui;letter-spacing:-.04em;text-transform:none}
+.cx-universe .cx-viewport canvas{background:#0a1726}
+.cx-universe-ruler{position:absolute;z-index:3;right:clamp(.6rem,2.2vw,2.3rem);top:50%;transform:translateY(-50%);writing-mode:vertical-lr;direction:rtl;height:min(34vh,230px);display:flex;align-items:center;color:#a8f3ec}
+.cx-universe-ruler input{width:34px;height:100%;margin:0}
+.cx-universe-notes{max-height:85svh}
+.cx-universe-notes .cx-console{display:block;padding:.5rem 0}
+.cx-universe-notes .cx-story{display:none}
+.cx-universe-notes .cx-lab{border:0;padding:0}
+.cx-universe-notes .cx-evidence{padding:1rem 0 0}
+.cx-hub-status{color:var(--accent);font-size:.82rem;margin-top:.7rem}
+@media(max-width:760px){
+  .nova-stage{min-height:clamp(500px,75svh,690px)}
+  .nova-caption{top:1rem;max-width:85%}
+  .nova-caption h1{font-size:clamp(2rem,8vw,3.5rem)}
+  .nova-caption p:last-child{font-size:.94rem}
+  .nova-stage::after{background:linear-gradient(180deg,#080b15ed,#080b159e 27%,transparent 52%,transparent 82%,#080b15)}
+  .cx-universe .cx-stage{min-height:max(550px,calc(100svh - 145px))}
+  .cx-universe .cx-stage::after{background:linear-gradient(180deg,#0a1726ed,#0a172688 28%,transparent 57%,transparent 82%,#0a1726)}
+  .cx-universe .cx-caption{max-width:85%;top:3.3rem}
+  .cx-universe-ruler{height:160px;top:60%}
+}
+#nova-viewport{touch-action:pan-y;cursor:grab}
+#nova-diagram{pointer-events:none}
+
+#continue-chapter + a{display:inline-block;margin-left:1.3rem;color:var(--accent);text-underline-offset:.25em}
+.cx-objective-count{display:block;color:var(--accent);font-size:.76rem;margin-top:.2rem}
+.cx-universe #chapter-intro,.cx-universe #duration,.cx-universe #scale{display:none}
+.cx-universe #universe-distance{display:block}
+.cx-universe .cx-current span{display:block}
+.cx-universe .cx-viewbar{right:1rem;max-width:calc(100% - 2rem)}
+.cx-universe .cx-scene-tag{bottom:4.7rem;max-width:10rem;text-align:right}
+@media(max-width:760px){
+  .cx-universe .cx-scene-tag{top:.95rem;bottom:auto;text-align:left}
+  #continue-chapter + a{margin-left:.8rem}
+}
+.cx-lens-drag{cursor:ns-resize}
+.cx-universe-notes .cx-lab details{margin-top:1.2rem}
+.cx-universe #stage-beat b{font-size:1rem}

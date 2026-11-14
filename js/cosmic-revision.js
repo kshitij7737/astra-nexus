@@ -17,12 +17,12 @@ export const summaries = {
 };
 
 export const scales = [
-  ['Earth to Moon','384,400 km','Mean orbital distance, center to center.','https://science.nasa.gov/moon/facts/'],
+  ['Earth to Moon','384,400 km','Mean center-to-center distance. Light takes about 1.3 seconds one way.','https://science.nasa.gov/moon/facts/'],
   ['Astronomical unit','149,597,870.7 km','Exact IAU definition. Earth’s distance from the Sun varies during its orbit.','https://iau-a3.gitlab.io/res.html'],
-  ['Sun to Proxima Centauri','About 4.2 light-years','Approximate distance to the closest star beyond the Sun.','https://science.nasa.gov/asset/hubble/hubble-image-of-proxima-centauri/'],
+  ['Sun to Proxima Centauri','About 4.24 light-years','Distance to the closest star beyond the Sun. A light-year measures distance.','https://science.nasa.gov/asset/hubble/hubble-image-of-proxima-centauri/'],
   ['Milky Way stellar disk','About 100,000 light-years','Approximate disk diameter. Its diffuse halo extends farther.','https://science.nasa.gov/photojournal/amazing-andromeda-galaxy/'],
   ['Earth to Andromeda','About 2.5 million light-years','Approximate distance from Earth to the galaxy.','https://science.nasa.gov/asset/hubble/compass-and-scale-image-of-andromeda/'],
-  ['Observable horizon','Observer-centered guide','The illustration shows an observing limit. In an expanding universe, light travel time and present-day distance are different quantities.','https://science.nasa.gov/universe/galaxies/large-scale-structures/'],
+  ['Observable horizon','About 46.5 billion light-years','Approximate present-day radius of the observable universe. Space can extend beyond it. The filaments and voids are illustrative.','https://www.physics.unlv.edu/~jeffery/astro/ial/ial_029.html'],
 ];
 
 export const collisions = {
