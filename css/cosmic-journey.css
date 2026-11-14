@@ -60,3 +60,6 @@
 .cx-lens-drag{cursor:ns-resize}
 .cx-universe-notes .cx-lab details{margin-top:1.2rem}
 .cx-universe #stage-beat b{font-size:1rem}
+#nova-film-list video{display:block;width:100%;max-height:65svh;background:#080e20;margin-top:.75rem}
+#nova-film-list button{color:var(--accent);margin-right:.7rem}
+.nova-mode{flex-wrap:wrap;max-width:92%}

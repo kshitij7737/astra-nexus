@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0a1021">
 <title>Nova’s Nebula Quest · ASTRA NEXUS</title>
 <link rel="stylesheet" href="css/cosmic.css?v=10">
-<link rel="stylesheet" href="css/cosmic-journey.css">
+<link rel="stylesheet" href="css/cosmic-journey.css?v=12">
 <link rel="stylesheet" href="css/navigation.css?v=2">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 </head>
@@ -21,7 +21,7 @@
     <div id="nova-viewport"></div>
     <canvas id="nova-diagram" aria-hidden="true"></canvas>
     <div class="nova-caption"><p class="cx-eyebrow" id="nova-act"></p><h1 id="nova-title">Nova’s Nebula Quest</h1><p id="nova-story"></p></div>
-    <div class="nova-mode"><button id="nova-still" aria-pressed="false">Still mode</button><p id="nova-status">Illustrative model</p></div>
+    <div class="nova-mode"><button id="nova-render" type="button">3D view</button><button id="nova-still" aria-pressed="false">Still mode</button><p id="nova-status">Illustrative model</p></div>
   </section>
   <section class="nova-flight" aria-label="Nova flight controls">
     <div><p id="nova-visual"></p><p id="nova-move"></p></div>
@@ -34,8 +34,9 @@
       <a href="cosmic.html?v=11#stars" id="nova-star-life">Continue to Star Life →</a>
     </div>
     <details><summary>Science notes &amp; sources</summary><p>Nova is fictional. Models simplify size, time, density and color. The dials change the illustration.</p><p><a href="https://spaceplace.nasa.gov/nebula/en/">NASA nebula guide</a> · <a href="https://science.nasa.gov/asset/webb/webb-telescope-reveals-the-protostar-l1527-irs/">Webb’s view of a protostar</a> · <a href="cosmic.html?v=11#nebula">Original nebula scenes and film</a></p></details>
+    <details id="nova-films" hidden><summary>Watch the chapter films</summary><div id="nova-film-list"></div></details>
   </section>
 </main>
-<script type="module" src="js/nova.js?v=11"></script>
+<script type="module" src="js/nova.js?v=12"></script>
 </body>
 </html>

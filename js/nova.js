@@ -1,7 +1,7 @@
 import { acts, parts as nebulaParts } from './nova-data.js';
 import { chapters, initialSettings } from './cosmic-data.js?v=4';
-import { drawDiagram } from './cosmic-diagram.js?v=4';
-import { series, questLink } from './nova-series.js';
+import { drawCinema } from './nova-cinema.js';
+import { series, questLink } from './nova-series.js?v=12';
 
 const requested=new URLSearchParams(location.search).get('quest');
 const questIndex=Math.max(0,series.findIndex(([id])=>id===requested));
@@ -25,7 +25,7 @@ try { progress=JSON.parse(localStorage.getItem(key))||{}; } catch {}
 let part=0, visual, visible=true, redraw=true, raf=0, last=0, yaw=0, pitch=0, pointer=null;
 const chapter=quest?chapters.find(c=>c.id===questId):{id:'nova',bg:'#262950'};
 let state={novaDial:dial};
-let visualKey='';
+let visualKey='', animationTime=0, modeGeneration=0;
 function syncModel(){
   if(!quest){visual?.setChapter(chapter,part,state);return;}
   const n=dial.value, label=parts[part][4], scene=quest.scenes[part];
@@ -64,7 +64,7 @@ function go(index) {
   $('act').textContent=title+' · '+(quest?'':acts[act][1]+' · ')+(part+1)+' / '+parts.length;
   $('title').textContent=heading;
   $('story').textContent=story;
-  $('visual').textContent=quest?'Illustrative scene for this story part.':graphic;
+  $('visual').textContent=graphic;
   $('move').textContent=quest?(label==='View'?'Drag the scene or use the View dial.':action):action;
   $('dial-name').textContent=label||labels[part];
   $('dial-value').textContent='0%';
@@ -73,58 +73,24 @@ function go(index) {
   $('prev').disabled=part===0;
   $('next').disabled=part===parts.length-1;
   $('star-life').hidden=part!==parts.length-1;
-  dial.value=0; yaw=pitch=0;
+  dial.value=0; yaw=pitch=0; animationTime=0;
+  if(!dial.still&&canvas.animate)canvas.animate([{opacity:.32},{opacity:1}],{duration:340,easing:'ease-out'});
   visualKey='';syncModel();
   refreshStars();
   redraw=true;
 }
 
-function diagram() {
-  const w=viewport.clientWidth,h=viewport.clientHeight;
-  const scale=Math.min(devicePixelRatio,1.5);
-  canvas.width=w*scale;canvas.height=h*scale;
-  const g=canvas.getContext('2d');
-  g.scale(scale,scale);
-  const narrow=w<700, x=w*(narrow?.51:.73),y=h*(narrow?.66:.52),d=Math.min(w,h)*.32;
-  const palette=['#b9a3ff','#73c9eb','#ffb382','#66e1bf'];
-  const tint=part===9?palette[Math.min(2,Math.floor(dial.value*3))]:palette[part%4];
-  const fog=g.createRadialGradient(x,y,0,x,y,d*1.8);
-  fog.addColorStop(0,tint+'49');fog.addColorStop(1,'#080b19');
-  g.fillStyle=fog;g.fillRect(0,0,w,h);
-  let seed=115+part;
-  const rng=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
-  for(let i=0;i<510;i++){
-    const r=Math.sqrt(rng()), angle=rng()*6.283+yaw;
-    let dx=Math.cos(angle)*r,dy=Math.sin(angle)*r;
-    if(part===1){dx=dx*.31+(i<460?-.56:.56);dy*=.41;}
-    if(part===2){dy*=.035;}
-    if(part===12){dx=dx*.16+(i%3-1)*.5;}
-    if(part===13)dy=Math.sin(dx*6+i%3)*.23+dy*.21;
-    if(part>=17&&part<=21)dy*=part>=19?.25:.6;
-    if(part===4&&i>510*(.15+dial.value*.85))break;
-    const spread=[15,16,17,18].includes(part)?1.1-dial.value*.57:.75+dial.value*.27;
-    g.fillStyle=(i%3?tint:'#fff4e6')+(i%4?'69':'be');
-    g.beginPath();g.arc(x+dx*d*spread,y+(dy+pitch*.1)*d*spread,.5+rng()*1.8,0,Math.PI*2);g.fill();
-  }
-  if(part===2||[7,8,14,17,18,19,20,21,22,23].includes(part)){
-    const cx=part===2?x+d*(2*dial.value-1):x;
-    if(part!==21||dial.value>.27){
-      const glow=g.createRadialGradient(cx,y,0,cx,y,15+dial.value*30);
-      glow.addColorStop(0,'#fff6dc');glow.addColorStop(1,tint+'00');
-      g.fillStyle=glow;g.fillRect(cx-50,y-50,100,100);
-    }
-  }
-}
-
 let art;
 function draw(now) {
   raf=requestAnimationFrame(draw);
-  if(document.hidden||!visible||(!redraw&&(!visual||dial.still))||now-last<31)return;
+  if(document.hidden||!visible||(!redraw&&dial.still)||now-last<39)return;
+  if(!dial.still)animationTime+=Math.min(.06,(now-last)/1000);
   last=now;redraw=false;
-  if(quest){
-    syncModel();
-    if(!visual){drawDiagram(canvas,chapter,quest.scenes[part],state,()=>{redraw=true;});return;}
-  }else if(!visual){diagram();return;}
+  if(!visual){
+    drawCinema(canvas,questId,part,dial.value,animationTime,yaw,pitch);
+    return;
+  }
+  if(quest)syncModel();
   const w=viewport.clientWidth,h=viewport.clientHeight;
   if(!w||!h)return;
   const view=art.cameraPreset(quest?questId:'nebula',quest?quest.scenes[part]:1,state,w<700);
@@ -134,25 +100,30 @@ function draw(now) {
   if(part===12)view.eye.z-=dial.value*2;
   if(part===1||part===3)view.eye.z-=dial.value*1.5;
   if(w<700)view.target.y=1.45;
-  try { visual.frame(dial.still?0:now/1000,view,dial.still?1:.22,w,h); }
+  try { visual.frame(animationTime,view,dial.still?1:.22,w,h); }
   catch { fallback(); }
 }
 function fallback() {
   if(visual){visual.renderer.domElement.remove();visual.dispose();visual=null;}
   canvas.hidden=false;
-  $('status').textContent='Interactive diagram · illustrative';
+  $('status').textContent='Illustrative animation';
+  $('render').textContent='3D view';
   redraw=true;
 }
 async function start3d() {
+  const generation=++modeGeneration;
+  $('render').textContent='Loading 3D…';
   let context;
   try {
     context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
-    if(!context){fallback();return;}
+    if(!context){fallback();$('status').textContent='Illustrative animation · 3D unavailable';return;}
     art=await import('./cosmic-art.js?v=9');
+    if(generation!==modeGeneration){context.getExtension('WEBGL_lose_context')?.loseContext();return;}
     visual=art.createRenderer(viewport,true,context,()=>{redraw=true;});
     visual.renderer.domElement.addEventListener('webglcontextlost',fallback,{once:true});
     visualKey='';syncModel();
-    $('status').textContent='Illustrative 3D model';
+    $('status').textContent='Illustrative 3D overview';
+    $('render').textContent='Story animation';
     canvas.hidden=true;redraw=true;
   } catch { context?.getExtension('WEBGL_lose_context')?.loseContext();fallback(); }
 }
@@ -197,4 +168,30 @@ if(quest)document.querySelector('.nova-flight details a').href=chapter.source;
 if(quest)document.querySelector('.nova-flight details a').textContent='Chapter science reference';
 go(0);setStill(dial.still);
 raf=requestAnimationFrame(draw);
-requestAnimationFrame(()=>setTimeout(start3d,0));
+$('render').onclick=()=>{
+  if(visual||$('render').textContent==='Loading 3D…'){modeGeneration++;fallback();}
+  else start3d();
+};
+$('status').textContent='Illustrative animation';
+const films={
+  nebula:[['nebula','Nebula evolution']],
+  stars:[['sun-like-star','Evolution of a Sun-like star'],['massive-star','Evolution of a massive star']],
+  planets:[['planet-formation','From nebula to solar system'],['worlds-from-dust','Worlds from dust']],
+}[questId]||[];
+$('films').hidden=!films.length;
+for(const [file,name] of films){
+  const button=document.createElement('button');
+  button.type='button';button.textContent='Play '+name;
+  button.onclick=()=>{
+    $('film-list').querySelector('video')?.remove();
+    const video=document.createElement('video');
+    video.controls=true;video.playsInline=true;
+    video.poster='textures/cosmic/'+file+'-poster.webp';
+    video.src='textures/cosmic/'+file+'.mp4';
+    video.setAttribute('aria-label',name);
+    $('film-list').append(video);
+    video.play().catch(()=>{});
+  };
+  $('film-list').append(button);
+}
+$('films').addEventListener('toggle',()=>{if(!$('films').open)$('film-list').querySelector('video')?.pause();});
