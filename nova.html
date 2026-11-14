@@ -3,40 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0a1021">
-<title>Nova’s Nebula Quest · ASTRA NEXUS</title>
+<meta name="theme-color" content="#0c0d2a">
+<title>Nova’s Quests · ASTRA NEXUS</title>
 <link rel="stylesheet" href="css/cosmic.css?v=10">
-<link rel="stylesheet" href="css/cosmic-journey.css?v=12">
 <link rel="stylesheet" href="css/navigation.css?v=2">
+<link rel="stylesheet" href="css/nova.css?v=1">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 </head>
 <body class="nova">
 <header class="cx-header">
-  <a class="cx-brand" href="cosmic.html?v=15#chapters">← Cosmic Explorer</a>
+  <a class="cx-brand" href="cosmic.html?v=16#chapters">← Cosmic Explorer</a>
   <a class="cx-back cx-exit" href="./#dash">Exit to Mission Control</a>
 </header>
-<nav id="nova-series" class="cx-chapters" aria-label="Nova quests"></nav>
-<main class="nova-main">
-  <section class="nova-stage" aria-label="Nebula visualization">
-    <div id="nova-viewport"></div>
-    <canvas id="nova-diagram" aria-hidden="true"></canvas>
-    <div class="nova-caption"><p class="cx-eyebrow" id="nova-act"></p><h1 id="nova-title">Nova’s Nebula Quest</h1><p id="nova-story"></p></div>
-    <div class="nova-mode"><button id="nova-render" type="button">3D view</button><button id="nova-still" aria-pressed="false">Still mode</button><p id="nova-status">Illustrative model</p></div>
-  </section>
-  <section class="nova-flight" aria-label="Nova flight controls">
-    <div><p id="nova-visual"></p><a id="nova-credit" class="cx-back" hidden></a><p id="nova-move"></p></div>
-    <label><span id="nova-dial-name">Drift</span> <output id="nova-dial-value" for="nova-dial">0%</output><input id="nova-dial" type="range" min="0" max="100" value="0"></label>
-    <p id="nova-stars" role="status"></p>
-    <div class="nova-actions">
-      <button id="nova-prev" aria-label="Previous story part">←</button>
-      <label for="nova-part" class="nova-part">Story part <select id="nova-part"></select></label>
-      <button id="nova-next" aria-label="Next story part">→</button>
-      <a href="cosmic.html?v=15#stars" id="nova-star-life">Continue to Star Life →</a>
+<nav id="nova-series" class="nv-quests" aria-label="Nova quests"></nav>
+<main class="nv-main">
+  <section class="nv-stage" aria-label="Story scene">
+    <div class="nv-caption">
+      <p class="nv-eyebrow" id="nova-act"></p>
+      <h1 id="nova-title">Nova’s Quest</h1>
+      <p id="nova-story"></p>
     </div>
-    <details><summary>Science notes &amp; sources</summary><p>Nova is fictional. Models simplify size, time, density and color. The dials change the illustration.</p><p><a href="https://spaceplace.nasa.gov/nebula/en/">NASA nebula guide</a> · <a href="https://science.nasa.gov/asset/webb/webb-telescope-reveals-the-protostar-l1527-irs/">Webb’s view of a protostar</a> · <a href="cosmic.html?v=15#nebula">Original nebula scenes and film</a></p></details>
-    <details id="nova-films" hidden><summary>Watch the chapter films</summary><div id="nova-film-list"></div></details>
+    <div class="nv-view" id="nova-view">
+      <div id="nova-viewport"></div>
+      <canvas id="nova-diagram" hidden aria-hidden="true"></canvas>
+      <canvas id="nova-hud" aria-hidden="true"></canvas>
+      <div id="nova-labels" aria-hidden="true"></div>
+      <div class="nv-score" aria-live="polite">
+        <div class="nv-starset" id="nova-starset"><i>★</i><i>★</i><i>★</i></div>
+        <span class="nv-rank" id="nova-rank">Rookie</span>
+      </div>
+      <p class="nv-hint" id="nova-hint">Drag to look around</p>
+      <div class="nv-mode">
+        <button id="nova-still" type="button" aria-pressed="false">Pause motion</button>
+        <button id="nova-render" type="button">Simple view</button>
+        <span id="nova-status"></span>
+      </div>
+    </div>
+    <div class="nv-dial">
+      <div class="nv-dial-head"><label for="nova-dial" id="nova-dial-name">Drift</label><output id="nova-dial-value" for="nova-dial">0%</output></div>
+      <input id="nova-dial" type="range" min="0" max="100" value="0">
+      <p id="nova-move"></p>
+    </div>
+  </section>
+  <div class="nv-track" id="nova-track" aria-label="Story parts"></div>
+  <section class="nv-deck" aria-label="Quest controls">
+    <div class="nv-nav">
+      <button id="nova-prev" class="nv-btn" type="button" aria-label="Previous story part">← Back</button>
+      <label for="nova-part" class="nv-part">Part <select id="nova-part"></select></label>
+      <button id="nova-next" class="nv-btn nv-go" type="button" aria-label="Next story part">Next part →</button>
+    </div>
+    <div class="nv-cards">
+      <article class="nv-card"><h2>On screen</h2><p id="nova-visual"></p></article>
+      <article class="nv-card"><h2>Your stars</h2><p id="nova-stars" role="status"></p></article>
+    </div>
+    <a href="cosmic.html?v=16#chapters" id="nova-star-life" class="nv-btn nv-go nv-continue" hidden>Continue →</a>
+    <details class="nv-card"><summary>Science notes &amp; sources</summary><p>Nova is fictional. Scenes simplify size, time, density and color so they are easy to see. The dials change the illustration.</p><p><a id="nova-source" href="https://science.nasa.gov/universe/">NASA science reference</a> · <a href="sources.html">All sources</a></p></details>
+    <details id="nova-films" class="nv-card" hidden><summary>Watch the chapter films</summary><div id="nova-film-list"></div></details>
   </section>
 </main>
-<script type="module" src="js/nova.js?v=15"></script>
+<script type="module" src="js/nova.js?v=16"></script>
 </body>
 </html>

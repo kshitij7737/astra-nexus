@@ -1,213 +1,223 @@
-import { acts, parts as nebulaParts } from './nova-data.js';
-import { chapters, initialSettings } from './cosmic-data.js?v=4';
+import { acts as nebulaActs, parts as nebulaParts } from './nova-data.js';
+import { chapters } from './cosmic-data.js?v=4';
 import { drawCinema } from './nova-cinema.js?v=15';
-import { series, questLink } from './nova-series.js?v=15';
+import { series, questLink } from './nova-series.js?v=16';
 
-const requested=new URLSearchParams(location.search).get('quest');
-const questIndex=Math.max(0,series.findIndex(([id])=>id===requested));
-const [questId]=series[questIndex];
-const quest=questIndex? (await import('./nova-'+questId+'.js')).default : null;
-const parts=quest?.parts||nebulaParts;
-const title=quest?.title||'Nova’s Nebula Quest';
-document.title=title+' · ASTRA NEXUS';
+const requested = new URLSearchParams(location.search).get('quest');
+const questIndex = Math.max(0, series.findIndex(([id]) => id === requested));
+const [questId] = series[questIndex];
+const quest = questIndex ? (await import('./nova-' + questId + '.js')).default : null;
+const parts = quest?.parts || nebulaParts;
+const title = quest?.title || 'Nova’s Nebula Quest';
+document.title = title + ' · ASTRA NEXUS';
 
-const $=id=>document.getElementById('nova-'+id);
-const canvas=$('diagram'), viewport=$('viewport');
-const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-const dial={value:0,still:reduced.matches};
-const key=quest?'nexus-nova-'+questId:'nexus-nova';
-const thresholds=[25,55,85];
-const ranks=['Rookie','Scout','Pilot','Captain','Star master'];
-const colors=['#c5aaff','#84dfef','#ffad9f','#f6d797','#91e1be'];
-const labels=['Drift','Zoom','Light speed','Atoms','Dust','Backlight','Infrared','Starlight','Zap','Filter','Warmth','Tune in','Fly in','Stretch','Blast','Gravity','Chill','Gravity','Spin','Spin','Power','Infrared','Glow','Recycle'];
-let progress={};
-try { progress=JSON.parse(localStorage.getItem(key))||{}; } catch {}
-let part=0, visual, visible=true, redraw=true, raf=0, last=0, yaw=0, pitch=0, pointer=null;
-const chapter=quest?chapters.find(c=>c.id===questId):{id:'nova',bg:'#262950'};
-let state={novaDial:dial};
-let visualKey='', animationTime=0, modeGeneration=0;
-function syncModel(){
-  if(!quest){visual?.setChapter(chapter,part,state);return;}
-  const n=dial.value, label=parts[part][4], scene=quest.scenes[part];
-  state={...initialSettings,still:dial.still,scale:true,observer:scene>=2,alignment:Math.round((1-n)*90),
-    branch:n>.5?'massive':'sun',cutaway:label==='Cutaway'&&n>.15,forces:label==='Gravity',
-    thermal:scene===1,collision:n<.34?'stick':n<.67?'bounce':'fragment',system:n>.5?'rocky':'mixed',
-    mass:n>.5?'supermassive':'stellar',jets:label==='Power'&&n>.15,binary:part===19&&questId==='black-holes',
-    trace:scene===4,paths:true,angle:label==='Tilt'&&n>.5?'edge':'oblique',magnify:label==='Zoom'&&n>.5};
-  if(questId==='lensing')state.alignment=Math.round(state.alignment/4)*4;
-  const key=JSON.stringify([scene,state]);
-  if(visual&&key!==visualKey){visual.setChapter(chapter,scene,state);visualKey=key;}
-}
-for(const [id,name] of series){
-  const a=document.createElement('a');a.href=questLink(id);a.textContent=name;
-  if(id===questId)a.setAttribute('aria-current','page');
+const ACTS = {
+  nebula: nebulaActs.map(([s, n]) => [s, n]),
+  stars: [[0, 'A star switches on'], [5, 'Not all stars are equal'], [10, 'A sun-like star grows old'], [15, 'A massive star’s finale'], [20, 'Stardust']],
+  planets: [[0, 'A disk around a young star'], [5, 'Dust becomes pebbles'], [10, 'Building worlds'], [15, 'Giants and gaps'], [20, 'Many possible systems']],
+  'black-holes': [[0, 'Finding the invisible'], [5, 'How black holes form'], [10, 'Edges and shadows'], [15, 'Bright matter outside'], [20, 'Seeing the shadow']],
+  lensing: [[0, 'Gravity bends light'], [5, 'Shapes of lensing'], [10, 'Natural telescopes'], [15, 'Weighing the invisible'], [19, 'Your turn to lens']],
+  universe: [[0, 'Close to home'], [5, 'Our neighbors'], [10, 'Our galaxy and beyond'], [15, 'Galaxies everywhere'], [20, 'The edge of what we can see']],
+};
+const QUEST_COLOR = { nebula: '#a070ff', stars: '#ffd45a', planets: '#ff5fae', 'black-holes': '#52e4ff', lensing: '#6dff9e', universe: '#ff9a5a' };
+const ACT_COLORS = ['#ff5fae', '#52e4ff', '#a070ff', '#ffd45a', '#6dff9e'];
+const NEBULA_DIALS = ['Drift', 'Zoom', 'Light speed', 'Atoms', 'Dust', 'Backlight', 'Infrared', 'Starlight', 'Zap', 'Filter', 'Warmth', 'Tune in', 'Fly in', 'Stretch', 'Blast', 'Gravity', 'Chill', 'Gravity', 'Spin', 'Spin', 'Power', 'Infrared', 'Glow', 'Recycle'];
+const acts = ACTS[questId];
+const color = QUEST_COLOR[questId];
+document.body.style.setProperty('--c', color);
+
+const $ = id => document.getElementById('nova-' + id);
+const view = $('view'), viewport = $('viewport'), diagram = $('diagram'), hudCanvas = $('hud'), labelsEl = $('labels');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const key = quest ? 'nexus-nova-' + questId : 'nexus-nova';
+const thresholds = [25, 55, 85];
+const ranks = ['Rookie', 'Scout', 'Pilot', 'Captain', 'Star master'];
+let progress = {};
+try { progress = JSON.parse(localStorage.getItem(key)) || {}; } catch {}
+let part = 0, engine = null, shots = null, still = reduced.matches, visible = true, raf = 0, last = 0, dirty = true;
+let dialValue = 0, time2d = 0, yaw = 0, pitch = 0, pointer = null, dragged = 0;
+
+// Quest tabs
+series.forEach(([id, name], i) => {
+  const a = document.createElement('a'); a.href = questLink(id); a.style.setProperty('--c', QUEST_COLOR[id]);
+  a.innerHTML = '<b>' + (i + 1) + '</b>'; a.append(name);
+  if (id === questId) a.setAttribute('aria-current', 'page');
   $('series').append(a);
-}
-const nextQuest=series[questIndex+1];
-$('star-life').href=nextQuest?questLink(nextQuest[0]):'cosmic.html?v=11#chapters';
-$('star-life').textContent=nextQuest?'Continue to '+nextQuest[1]+' →':'Return to Cosmic Explorer →';
+});
+const nextQuest = series[questIndex + 1];
+$('star-life').href = nextQuest ? questLink(nextQuest[0]) : 'cosmic.html?v=11#chapters';
+$('star-life').textContent = nextQuest ? 'Continue to ' + nextQuest[1] + ' →' : 'Back to Cosmic Explorer →';
+const chapter = chapters.find(c => c.id === questId);
+if (chapter?.source) $('source').href = chapter.source;
 
+// Part track grouped by act
+const dots = [];
+acts.forEach(([start, name], ai) => {
+  const end = acts[ai + 1]?.[0] ?? parts.length;
+  const g = document.createElement('div'); g.className = 'nv-act'; g.style.setProperty('--ac', ACT_COLORS[ai]);
+  const s = document.createElement('span'); s.textContent = 'Act ' + (ai + 1); g.append(s);
+  for (let i = start; i < end; i++) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'nv-dot'; b.title = (i + 1) + ' · ' + parts[i][0];
+    b.setAttribute('aria-label', 'Part ' + (i + 1) + ': ' + parts[i][0]); b.onclick = () => go(i); g.append(b); dots[i] = b;
+  }
+  $('track').append(g);
+});
+parts.forEach(([t], i) => $('part').add(new Option((i + 1) + ' · ' + t, i)));
 
-function refreshStars() {
-  const stars=parts.reduce((total,_,i)=>total+(progress[i]||0),0);
-  const rank=ranks[Math.min(4,Math.floor(stars/(parts.length*3/4)))];
-  $('stars').textContent=(progress[part]||0)+' of 3 stars in this part · '+stars+' / '+parts.length*3+' total · '+rank;
+function actOf(i) { return acts.findLastIndex(([s]) => s <= i); }
+function refreshStars(popIndex) {
+  const total = parts.reduce((s, _, i) => s + (progress[i] || 0), 0);
+  const rank = ranks[Math.min(4, Math.floor(total / (parts.length * 3 / 4)))];
+  const here = progress[part] || 0;
+  [...$('starset').children].forEach((el, i) => { el.classList.toggle('on', i < here); if (i === popIndex) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } });
+  $('rank').textContent = rank;
+  $('stars').textContent = here + ' of 3 stars in this part · ' + total + ' of ' + parts.length * 3 + ' in the quest · Rank: ' + rank + '. Slide the dial all the way to catch every star.';
+  dots.forEach((d, i) => { d.dataset.s = progress[i] || 0; });
 }
-function save() {
-  try { localStorage.setItem(key,JSON.stringify(progress)); } catch {}
+function save() { try { localStorage.setItem(key, JSON.stringify(progress)); } catch {} }
+
+function setDial(v) {
+  dialValue = v / 100;
+  $('dial').value = v; $('dial').style.setProperty('--fill', v + '%');
+  $('dial-value').textContent = !quest && part === 9 ? ['Hydrogen', 'Oxygen', 'Sulfur'][Math.min(2, Math.floor(v / 34))] : Math.round(v) + '%';
+  if (engine) engine.dial = dialValue;
+  const earned = thresholds.filter(n => v >= n).length;
+  if (earned > (progress[part] || 0)) { const prev = progress[part] || 0; progress[part] = earned; save(); refreshStars(earned - 1); if (prev === 0 && earned) {} }
+  dirty = true;
 }
+
+function crossfade() {
+  if (!engine || still) return;
+  try { engine.frame(0, true); } catch { return; }
+  const snap = engine.snapshot(); if (!snap) return;
+  snap.className = 'nv-ghost'; view.insertBefore(snap, hudCanvas);
+  snap.animate([{ opacity: 1, filter: 'blur(0)' }, { opacity: 0, filter: 'blur(6px)' }], { duration: 900, easing: 'cubic-bezier(.3,.6,.3,1)' }).onfinish = () => snap.remove();
+}
+
 function go(index) {
-  part=Math.max(0,Math.min(parts.length-1,index));
-  const [heading,story,graphic,action,label]=parts[part];
-  const act=acts.findLastIndex(([start])=>start<=part);
-  document.body.style.setProperty('--accent',quest?chapter.accent:colors[act]);
-  $('act').textContent=title+' · '+(quest?'':acts[act][1]+' · ')+(part+1)+' / '+parts.length;
-  $('title').textContent=heading;
-  $('story').textContent=story;
-  $('visual').textContent=graphic;
-  const credit=$('credit');
-  const nebula=questId==='nebula'&&[0,7,8,10,12,22].includes(part);
-  const planets=questId==='universe'&&part===3||questId==='planets'&&part===20;
-  credit.hidden=!nebula&&!planets;
-  credit.href=nebula?'https://science.nasa.gov/asset/webb/cosmic-cliffs-in-the-carina-nebula-nircam-image/':'sources.html';
-  credit.textContent=nebula?'Backdrop: NASA, ESA, CSA, STScI · color adapted':'Planet texture credits · sizes and distances illustrative';
-  $('move').textContent=quest?(label==='View'?'Drag the scene or use the View dial.':action):action;
-  $('dial-name').textContent=label||labels[part];
-  dialReadout(0);
-  $('dial').value=0;
-  $('part').value=part;
-  $('prev').disabled=part===0;
-  $('next').disabled=part===parts.length-1;
-  $('star-life').hidden=part!==parts.length-1;
-  dial.value=0; yaw=pitch=0; animationTime=0;
-  if(!dial.still&&canvas.animate)canvas.animate([{opacity:.32},{opacity:1}],{duration:340,easing:'ease-out'});
-  visualKey='';syncModel();
+  index = Math.max(0, Math.min(parts.length - 1, index));
+  const [heading, story, graphic, action, label] = parts[index];
+  const changed = index !== part || !engine?.shown;
+  if (changed) crossfade();
+  part = index;
+  const ai = actOf(part);
+  $('act').textContent = 'Chapter ' + (questIndex + 1) + ' · Act ' + (ai + 1) + ' · Part ' + (part + 1) + ' of ' + parts.length;
+  $('title').textContent = heading; $('story').textContent = story;
+  const cap = document.querySelector('.nv-caption'); cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
+  $('visual').textContent = graphic;
+  $('move').textContent = action;
+  $('dial-name').textContent = label || NEBULA_DIALS[part] || 'Dial';
+  $('part').value = part;
+  $('prev').disabled = part === 0;
+  $('next').disabled = part === parts.length - 1;
+  $('star-life').hidden = part !== parts.length - 1;
+  dots.forEach((d, i) => d.toggleAttribute('aria-current', i === part)); dots[part]?.setAttribute('aria-current', 'step');
+  yaw = pitch = 0; time2d = 0;
+  if (engine && shots) {
+    try { engine.resetView(); engine.show(shots[part]); engine.shown = true; engine.dial = 0; }
+    catch (e) { console.error(e); fallback('Simple view'); }
+  }
+  setDial(0);
   refreshStars();
-  redraw=true;
+  try { history.replaceState(null, '', '#part-' + (part + 1)); } catch {}
+  dirty = true;
 }
 
-let art;
-function draw(now) {
-  raf=requestAnimationFrame(draw);
-  if(document.hidden||!visible||(!redraw&&dial.still)||now-last<39)return;
-  if(!dial.still)animationTime+=Math.min(.06,(now-last)/1000);
-  last=now;redraw=false;
-  if(!visual){
-    drawCinema(canvas,questId,part,dial.value,animationTime,yaw,pitch,()=>{redraw=true;});
+function frame(now) {
+  raf = requestAnimationFrame(frame);
+  const dt = Math.min(.05, (now - (last || now)) / 1000); const ms = now - last; last = now;
+  if (document.hidden || !visible) return;
+  if (still && !dirty) return;
+  dirty = false;
+  if (engine) {
+    try { engine.frame(still ? 0 : dt, still); if (!still) engine.perf(ms); }
+    catch (e) { console.error(e); fallback('Simple view'); }
     return;
   }
-  if(quest)syncModel();
-  const w=viewport.clientWidth,h=viewport.clientHeight;
-  if(!w||!h)return;
-  const view=art.cameraPreset(quest?questId:'nebula',quest?quest.scenes[part]:1,state,w<700);
-  if(quest)view.eye.multiplyScalar(1-dial.value*.26);
-  view.eye.x+=Math.sin(yaw)*3;
-  view.eye.y+=pitch;
-  if(part===12)view.eye.z-=dial.value*2;
-  if(part===1||part===3)view.eye.z-=dial.value*1.5;
-  if(w<700)view.target.y=1.45;
-  try { visual.frame(animationTime,view,dial.still?1:.22,w,h); }
-  catch { fallback(); }
-}
-function fallback() {
-  if(visual){visual.renderer.domElement.remove();visual.dispose();visual=null;}
-  canvas.hidden=false;
-  $('status').textContent='Illustrative animation';
-  $('render').textContent='3D view';
-  redraw=true;
-}
-async function start3d() {
-  const generation=++modeGeneration;
-  $('render').textContent='Loading 3D…';
-  let context;
-  try {
-    context=document.createElement('canvas').getContext('webgl2',{powerPreference:'low-power'});
-    if(!context){fallback();$('status').textContent='Illustrative animation · 3D unavailable';return;}
-    art=await import('./cosmic-art.js?v=9');
-    if(generation!==modeGeneration){context.getExtension('WEBGL_lose_context')?.loseContext();return;}
-    visual=art.createRenderer(viewport,true,context,()=>{redraw=true;});
-    visual.renderer.domElement.addEventListener('webglcontextlost',fallback,{once:true});
-    visualKey='';syncModel();
-    $('status').textContent='Illustrative 3D overview';
-    $('render').textContent='Story animation';
-    canvas.hidden=true;redraw=true;
-  } catch { context?.getExtension('WEBGL_lose_context')?.loseContext();fallback(); }
+  if (!still) time2d += dt;
+  drawCinema(diagram, questId, part, dialValue, time2d, yaw, pitch, () => { dirty = true; });
+  if (!still) dirty = true;
 }
 
-parts.forEach(([title],i)=>$('part').add(new Option((i+1)+' · '+title,i)));
-$('part').onchange=e=>go(+e.target.value);
-$('prev').onclick=()=>go(part-1);
-$('next').onclick=()=>go(part+1);
-function dialReadout(value){
-  const label=parts[part][4];
-  let readout=value+'%';
-  if(!quest&&part===9)readout=['Hydrogen','Oxygen','Sulfur'][Math.min(2,Math.floor(value/34))];
-  if(questId==='black-holes'&&label==='Mass'&&[11,20].includes(part)){
-    const mass=Math.round(3+value*.37);
-    readout=mass+' solar masses · ~'+Math.round(mass*2.95)+' km horizon radius';
-  }
-  $('dial-value').textContent=readout;
+function fallback(reason) {
+  if (engine) { try { engine.dispose(); } catch {} engine = null; }
+  hudCanvas.getContext('2d').clearRect(0, 0, hudCanvas.width, hudCanvas.height); labelsEl.textContent = '';
+  diagram.hidden = false;
+  $('status').textContent = reason || '';
+  $('render').textContent = '3D view';
+  dirty = true;
 }
-$('dial').oninput=e=>{
-  const value=+e.target.value;
-  dial.value=value/100;
-  dialReadout(value);
-  const earned=thresholds.filter(n=>value>=n).length;
-  if(earned>(progress[part]||0)){progress[part]=earned;save();refreshStars();}
-  redraw=true;
-};
-function setStill(value){dial.still=value;$('still').setAttribute('aria-pressed',String(value));redraw=true;}
-$('still').onclick=()=>setStill(!dial.still);
-reduced.addEventListener('change',e=>setStill(e.matches));
-viewport.onpointerdown=e=>{pointer=[e.clientX,e.clientY];viewport.setPointerCapture(e.pointerId);};
-viewport.onpointermove=e=>{
-  if(!pointer)return;
-  if(questId==='lensing'&&[0,4,19].includes(part)){
-    const input=$('dial');
-    input.value=Math.max(0,Math.min(100,+input.value+(e.clientY-pointer[1])*.65));
-    input.oninput({target:input});
-  }
-  yaw+=(e.clientX-pointer[0])*.009;
-  pitch=Math.max(-2,Math.min(2,pitch+(e.clientY-pointer[1])*.012));
-  pointer=[e.clientX,e.clientY];redraw=true;
-};
-viewport.onpointerup=viewport.onpointercancel=()=>{pointer=null;};
-document.addEventListener('keydown',e=>{
-  if(e.target.closest('input,select,button,a,summary'))return;
-  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();go(part+(e.key==='ArrowRight'?1:-1));}
+async function start3d() {
+  $('render').textContent = 'Loading…';
+  try {
+    const test = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+    if (!test) throw new Error('no webgl');
+    const [{ createNova }, mod] = await Promise.all([import('./nova-gl.js'), import(['nebula', 'stars', 'planets'].includes(questId) ? './nova-shots-a.js' : './nova-shots-b.js')]);
+    shots = mod.default[questId];
+    engine = createNova(viewport, labelsEl, hudCanvas);
+    engine.renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); fallback('Simple view · 3D paused by the browser'); }, { once: true });
+    diagram.hidden = true;
+    $('status').textContent = '';
+    $('render').textContent = 'Simple view';
+    engine.show(shots[part]); engine.shown = true; engine.dial = dialValue;
+    dirty = true;
+  } catch (e) { console.warn(e); fallback('Simple view · 3D is not available on this device'); }
+}
+
+$('part').onchange = e => go(+e.target.value);
+$('prev').onclick = () => go(part - 1);
+$('next').onclick = () => go(part + 1);
+$('dial').oninput = e => setDial(+e.target.value);
+function setStill(v) { still = v; $('still').setAttribute('aria-pressed', String(v)); $('still').textContent = v ? 'Play motion' : 'Pause motion'; dirty = true; }
+$('still').onclick = () => setStill(!still);
+reduced.addEventListener('change', e => setStill(e.matches));
+$('render').onclick = () => { if (engine) fallback('Simple view'); else start3d(); };
+
+viewport.addEventListener('pointerdown', e => { pointer = [e.clientX, e.clientY]; dragged = 0; viewport.setPointerCapture(e.pointerId); });
+viewport.addEventListener('pointermove', e => {
+  if (!pointer) return;
+  const dx = e.clientX - pointer[0], dy = e.clientY - pointer[1]; pointer = [e.clientX, e.clientY]; dragged += Math.abs(dx) + Math.abs(dy);
+  if (engine) engine.drag(dx, dy); else { yaw += dx * .009; pitch = Math.max(-2, Math.min(2, pitch + dy * .012)); }
+  if (dragged > 30) $('hint').classList.add('gone');
+  dirty = true;
 });
-new ResizeObserver(()=>{redraw=true;}).observe(viewport);
-new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;redraw=true;}).observe(viewport);
-addEventListener('pagehide',()=>cancelAnimationFrame(raf));
-addEventListener('pageshow',e=>{if(e.persisted)raf=requestAnimationFrame(draw);});
-if(quest)document.querySelector('.nova-flight details a').href=chapter.source;
-if(quest)document.querySelector('.nova-flight details a').textContent='Chapter science reference';
-go(0);setStill(dial.still);
-raf=requestAnimationFrame(draw);
-$('render').onclick=()=>{
-  if(visual||$('render').textContent==='Loading 3D…'){modeGeneration++;fallback();}
-  else start3d();
-};
-$('status').textContent='Illustrative animation';
-const films={
-  nebula:[['nebula','Nebula evolution']],
-  stars:[['sun-like-star','Evolution of a Sun-like star'],['massive-star','Evolution of a massive star']],
-  planets:[['planet-formation','From nebula to solar system'],['worlds-from-dust','Worlds from dust']],
-}[questId]||[];
-$('films').hidden=!films.length;
-for(const [file,name] of films){
-  const button=document.createElement('button');
-  button.type='button';button.textContent='Play '+name;
-  button.onclick=()=>{
+viewport.addEventListener('pointerup', () => { pointer = null; });
+viewport.addEventListener('pointercancel', () => { pointer = null; });
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea')) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); go(part + (e.key === 'ArrowRight' ? 1 : -1)); }
+});
+new ResizeObserver(() => { engine?.resize(); dirty = true; }).observe(view);
+new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; dirty = true; }).observe(view);
+addEventListener('pagehide', () => cancelAnimationFrame(raf));
+addEventListener('pageshow', e => { if (e.persisted) { last = 0; raf = requestAnimationFrame(frame); } });
+
+const start = Math.max(0, Math.min(parts.length - 1, (parseInt((location.hash.match(/part-(\d+)/) || [])[1], 10) || 1) - 1));
+setStill(still);
+go(start);
+raf = requestAnimationFrame(frame);
+start3d();
+setTimeout(() => $('hint').classList.add('gone'), 9000);
+
+const films = {
+  nebula: [['nebula', 'Nebula evolution']],
+  stars: [['sun-like-star', 'Evolution of a Sun-like star'], ['massive-star', 'Evolution of a massive star']],
+  planets: [['planet-formation', 'From nebula to solar system'], ['worlds-from-dust', 'Worlds from dust']],
+}[questId] || [];
+$('films').hidden = !films.length;
+for (const [file, name] of films) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.textContent = '▶ ' + name;
+  button.onclick = () => {
     $('film-list').querySelector('video')?.remove();
-    const video=document.createElement('video');
-    video.controls=true;video.playsInline=true;
-    video.poster='textures/cosmic/'+file+'-poster.webp';
-    video.src='textures/cosmic/'+file+'.mp4';
-    video.setAttribute('aria-label',name);
+    const video = document.createElement('video');
+    video.controls = true; video.playsInline = true;
+    video.poster = 'textures/cosmic/' + file + '-poster.webp';
+    video.src = 'textures/cosmic/' + file + '.mp4';
+    video.setAttribute('aria-label', name);
     $('film-list').append(video);
-    video.play().catch(()=>{});
+    video.play().catch(() => {});
   };
   $('film-list').append(button);
 }
-$('films').addEventListener('toggle',()=>{if(!$('films').open)$('film-list').querySelector('video')?.pause();});
+$('films').addEventListener('toggle', () => { if (!$('films').open) $('film-list').querySelector('video')?.pause(); });

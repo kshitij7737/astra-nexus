@@ -35,6 +35,8 @@ Live: https://kshitij7737.github.io/astra-nexus/
 - Accents: ASTRA ion blue #4aa8ff, LUNARIS silver-cyan #9fe0ea, HALO violet #a78bfa, JEZERO ECHO Mars red #d0674c with pale blue #a9d4ff.
 - Music: js/music.js, generated with Web Audio. Moods: calm, launch, ops, tense.
 
+- nova.html (Nova's Quests, six chapters, 142 story parts from the six quest storytelling documents): js/nova.js runs the page; js/nova-gl.js is the WebGL engine (particle clouds, disks, galaxies, cosmic web, glowing stars with diffraction spikes, planets, gravity-well grids, black holes with lensed halo, wedge cutaways, labels and a 2D overlay for charts); js/nova-shots-a.js (Nebula, Star Life, Planet Formation) and js/nova-shots-b.js (Black Holes, Lensing, Universe Tour) hold one scene function per part, driven by that part's dial. Story text lives in js/nova-data.js and js/nova-<quest>.js. Look follows the documents: deep indigo sky, pink/cyan/purple/yellow/green, chunky rounded buttons and cards (css/nova.css). Stars are earned at 25/55/85 percent of the dial and saved in localStorage. js/nova-cinema.js is the 2D fallback when WebGL is missing.
+
 ## Performance and polish
 - textures/sm holds half-size maps. js/scene.js picks them on phones, low-memory devices and data-saver mode.
 - A thin bar at the top of the page shows imagery loading (css/nexus.css).
