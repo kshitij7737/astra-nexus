@@ -307,3 +307,9 @@ body.lx-pick { cursor: pointer; }
 @media (max-width: 1240px) { .lx-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .lx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lx-card--cosmic { grid-column: 1 / -1; } }
 @media (max-width: 480px) { .lx-cards { grid-template-columns: 1fr; } }
+
+/* keep the hero buttons clear of the mission cards on shorter laptop screens */
+.lx-hero { row-gap: clamp(28px, 4.5vh, 52px); }
+.lx-hero__copy { align-self: end; }
+@media (min-height: 860px) { .lx-hero__copy { align-self: center; } }
+@media (max-width: 720px) { .lx-hero { padding-bottom: 76px; } }
