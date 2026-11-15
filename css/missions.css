@@ -280,3 +280,6 @@
 .astra-mm .mm-jz__detail h4 { margin: 0 0 6px; font-size: 17px; } .astra-mm .mm-jz__detail p { margin: 0 0 8px; color: #d8d4cc; font-size: 14.5px; }
 @media (max-width: 860px) { .astra-mm .mm-jz__grid { grid-template-columns: 1fr; } .astra-mm .mm-gstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .astra-mm .mm-jz__hs .ring { animation: none; } }
+
+/* phones: keep the hero footnote clear of the fixed status pill */
+@media (max-width: 760px) { .astra-mm .mm-hero.mm-ch { min-height: 0; } .astra-mm .mm-hero .mm-hero__copy { margin-bottom: 30vh; } .astra-mm .mm-hero__anchor { top: 36vh; } }
