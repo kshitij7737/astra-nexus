@@ -148,12 +148,12 @@ export const GAME = {
     ],
     challenges: [
       { orbit: 3, q: 'Why can ice survive in permanently shadowed craters?', a: ['They never see sunlight, so they stay extremely cold', 'Lunar gravity is strongest there', 'The exosphere is thicker at the poles'], correct: 0, src: 'lroInst',
-        why: 'No direct sunlight means cold traps. Diviner has measured about 35 K in some.' },
+        why: 'No direct sunlight means cold traps. Diviner has measured as low as about 25 K in some.' },
       { orbit: 11, q: 'Your radar sees a bright echo. Can you announce "ice found here"?', a: ['No. A claim about one crater needs direct measurement', 'Yes, radar echoes always mean ice'], correct: 0, src: 'lroInst',
         why: 'Rough rock can also echo brightly. Claims need more than one line of evidence.' },
     ],
     discoveries: [
-      { id: 'l1', title: 'About 35 kelvin', text: 'Diviner has measured temperatures down to about 35 K inside shadowed craters.', src: 'lroSys', unlock: 'temp' },
+      { id: 'l1', title: 'About 25 kelvin', text: 'Diviner has measured temperatures down to about 25 K inside shadowed craters, in the depth of lunar winter.', src: 'lroTemp', unlock: 'temp' },
       { id: 'l2', title: 'The longest watch', text: 'LRO launched in June 2009 and is the longest-lived lunar orbiter.', src: 'lro', unlock: 'terrain' },
       { id: 'l3', title: 'Hunting hydrogen', text: 'LEND counts neutrons to map hydrogen, a possible sign of ice.', src: 'lroInst', unlock: 'ice' },
     ],

@@ -75,7 +75,7 @@ const audio = {
 // ---------- story (mission control voice: VEGA)
 const STORY = {
   astra: 'Flight, this is VEGA. On 13 April 2029, a 340 metre asteroid called Apophis will pass inside the ring of our geosynchronous satellites. NASA\'s OSIRIS-APEX arrives just after the pass. We are asking a bolder question: what if we were already there? Build a probe, get there first, and map Apophis before and after Earth pulls on it.',
-  lunaris: 'Flight, VEGA. At the Moon\'s south pole there are craters the Sun never reaches. LRO has measured ground there at about 35 kelvin. If ice hides anywhere on the Moon, it is in places like Shackleton. Image the crater, map how cold it is and look for signs of ice. Then get it all home, eclipse after eclipse.',
+  lunaris: 'Flight, VEGA. At the Moon\'s south pole there are craters the Sun never reaches. LRO has measured ground there as cold as about 25 kelvin. If ice hides anywhere on the Moon, it is in places like Shackleton. Image the crater, map how cold it is and look for signs of ice. Then get it all home, eclipse after eclipse.',
   earth: 'Flight, VEGA. Most of the weather we live with happens in the lowest 6 to 20 kilometres of air. HALO will watch that thin layer from 705 km up, the height NASA\'s Aura has flown since 2004. Track dust and haze, measure ozone over Antarctica and profile the air. Then get it to the ground station before the next pass.',
   mars: 'Flight, VEGA. Long ago a river poured into Jezero crater and left a delta behind. Perseverance landed there in 2021. JEZERO ECHO will read that ancient lake from orbit: map it, zoom into the delta and find minerals that form in water. Mars is far from the Sun, so your arrays make less than half the power they would at Earth. Plan for it.',
 };

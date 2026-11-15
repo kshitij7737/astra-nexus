@@ -469,7 +469,7 @@
       detail: 'A 340 metre asteroid will pass about 32,000 km from Earth on 13 April 2029, close enough to see without a telescope. OSIRIS-APEX arrives just after the pass.',
       ref: 'Science reference: NASA OSIRIS-APEX at asteroid 99942 Apophis. Spacecraft shown is an illustrative, OSIRIS-APEX-inspired model.' },
     lunaris: { code: 'SELECTED · MISSION 02', metric: 'LUNAR POLAR ORBITER', title: 'LUNARIS · Reading the coldest craters', view: 'lunaris',
-      detail: 'Mapping the Moon from orbit, modelled on NASA’s LRO, in orbit since 2009. The darkest craters reach about 35 K. Water ice has been searched for but not confirmed.',
+      detail: 'Mapping the Moon from orbit, modelled on NASA’s LRO, in orbit since 2009. The darkest craters reach about 25 K in winter. Water ice has been searched for but not confirmed.',
       ref: 'Science reference: NASA Lunar Reconnaissance Orbiter (LRO). Darkened south pole and orbiter are illustrative.' },
     halo: { code: 'SELECTED · MISSION 03', metric: '705 KM SUN-SYNCHRONOUS', title: 'HALO · Watching Earth’s atmosphere', view: 'earth',
       detail: 'Four layers of air, watched from 705 km up. Aerosols, gases and clouds as seen by NASA’s Terra, Aqua and Aura. MODIS sees the whole Earth every one to two days.',
@@ -543,7 +543,7 @@
   // Live numbers from the game's own model (js/sim.js + js/game-data.js)
   const INFO = {
     astra: ['asteroid', 'OSIRIS-APEX', 'How does a close Earth pass change an asteroid?', '340 m wide · passes ~32,000 km from Earth on 13 Apr 2029'],
-    lunaris: ['moon', 'LRO', 'Where could water ice survive on the Moon?', 'Polar craters near 35 K that sunlight never reaches'],
+    lunaris: ['moon', 'LRO', 'Where could water ice survive on the Moon?', 'Polar craters as cold as 25 K that sunlight never reaches'],
     earth: ['earth', 'Terra, Aqua and Aura', 'What do haze, ozone and clouds look like from orbit?', 'Aura flies a 705 km sun-synchronous orbit'],
     mars: ['mars', 'Mars Reconnaissance Orbiter', 'What traces remain of an ancient lake?', 'Jezero is a 45 km crater with a river delta'],
   };

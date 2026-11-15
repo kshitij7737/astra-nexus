@@ -29,7 +29,7 @@ const CH = {
   earth: { label: 'HALO · Earth observation', world: 'Earth', h: 'Read Earth’s atmosphere from orbit.', sub: 'Track dust, ozone, and water vapour across the atmosphere.',
     facts: [['705 km', 'Aura: orbit altitude', 'aura'], ['1 to 2 days', 'MODIS: whole-Earth coverage', 'modis'], ['13 × 24 km', 'OMI: ground pixel size', 'omiData']], note: 'Reference facts from three NASA instruments and missions. They are not specifications of the HALO concept craft.' },
   lunaris: { label: 'LUNARIS · Moon', world: 'Moon', h: 'Some polar craters never receive direct sunlight.', sub: 'Map their temperatures and search for signs of ice.',
-    facts: [['~35 K', 'Diviner: coldest crater readings', 'lroSys'], ['2009', 'LRO launched', 'lro'], ['7', 'LRO instruments', 'lroNtrs']], note: 'Reference facts from NASA’s Lunar Reconnaissance Orbiter, not LUNARIS specifications.' },
+    facts: [['~25 K', 'Diviner: coldest crater readings', 'lroTemp'], ['2009', 'LRO launched', 'lro'], ['7', 'LRO instruments', 'lroNtrs']], note: 'Reference facts from NASA’s Lunar Reconnaissance Orbiter, not LUNARIS specifications.' },
   mars: { label: 'JEZERO ECHO · Mars', world: 'Mars', h: 'Trace the ancient river delta at Jezero.', sub: 'Map the terrain and look for minerals formed in water.',
     facts: [['0.3 m', 'HiRISE: pixel scale, best case', 'mroHuman'], ['~6 m', 'CTX: pixel scale', 'ctxMsss'], ['6 Mb/s', 'MRO: peak downlink', 'mroHuman']], note: 'Reference facts from NASA’s Mars Reconnaissance Orbiter, not JEZERO ECHO specifications.' },
 };
