@@ -9,7 +9,7 @@ const [questId] = series[questIndex];
 const quest = questIndex ? (await import('./nova-' + questId + '.js')).default : null;
 const parts = quest?.parts || nebulaParts;
 const title = quest?.title || 'Nova’s Nebula Quest';
-document.title = title + ' · ASTRA NEXUS';
+document.title = title + ' · NEXUS//04';
 
 const ACTS = {
   nebula: nebulaActs.map(([s, n]) => [s, n]),

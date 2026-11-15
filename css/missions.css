@@ -27,7 +27,7 @@
 
 /* chrome */
 .mm-top { position: fixed; z-index: 5; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 24px; padding: 18px var(--pad);
-  background: linear-gradient(#050507ee, #05050700); }
+  background: linear-gradient(#050507f5 0%, #050507e8 62%, #05050700 100%); }
 .mm-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--accent); }
 .mm-brand span { display: grid; line-height: 1.1; color: var(--ink); }
 .mm-brand b { font-weight: 800; font-stretch: 125%; letter-spacing: .14em; font-size: 14px; }

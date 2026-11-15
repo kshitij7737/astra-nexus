@@ -1060,7 +1060,7 @@ $('explorer-photo').onclick=()=>{
   ctx.fillStyle='#f3f5ff';ctx.font='600 '+size+'px system-ui';
   ctx.fillText(chapter.beats[beat][0],size,photo.height-size*2.6,photo.width-size*2);
   ctx.font=Math.max(10,Math.round(size*.76))+'px system-ui';
-  ctx.fillText('ASTRA NEXUS · Illustrative model · Asset credits: sources.html',size,photo.height-size,photo.width-size*2);
+  ctx.fillText('NEXUS//04 · Illustrative model · Asset credits: sources.html',size,photo.height-size,photo.width-size*2);
   photo.toBlob(blob=>{
     if(!blob)return;
     const url=URL.createObjectURL(blob);
