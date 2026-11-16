@@ -46,4 +46,4 @@ Live: https://kshitij7737.github.io/astra-nexus/
 - LUNARIS budget is 1300 so that a fully GO build exists on every difficulty.
 
 ## Roles
-Sneha: ASTRA, landing and navigation. Karishma: LUNARIS, QA. Kshitij: HALO, worlds and spacecraft. Anttariksha: JEZERO ECHO, mission control and challenges.
+Sneha: ASTRA and Cosmic Explorer research, landing and navigation. Karishma: LUNARIS, QA. Kshitij: HALO, worlds and spacecraft. Anttariksha: JEZERO ECHO, mission control and challenges.

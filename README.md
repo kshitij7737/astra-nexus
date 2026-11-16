@@ -1,6 +1,6 @@
 # NEXUS//04
 
-A space mission design game and learning site built for the NASA Space Apps Challenge 2026 (challenge: Space Mission Design Game) by team NEXUS//04: Sneha, Karishma, Kshitij and Anttariksha.
+A space mission design game and learning site built for the NASA Space Apps Challenge 2026 (challenge: Space Mission Design Game) by team NEXUS//04: Sneha (ASTRA and Cosmic Explorer research), Karishma (LUNARIS research), Kshitij (HALO research and website development) and Anttariksha (JEZERO ECHO research).
 
 Live site: https://kshitij7737.github.io/astra-nexus/
 
